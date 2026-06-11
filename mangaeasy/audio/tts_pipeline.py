@@ -21,9 +21,13 @@ _INDEX_TTS_DIR = Path(
     or (_PROJECT_ROOT.parent / "index-tts")
 ).resolve()
 
-for _p in (_PROJECT_ROOT, _INDEX_TTS_DIR):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+# _INDEX_TTS_DIR at front: gives `indextts` package source priority.
+# _PROJECT_ROOT appended: mangaeasy imports resolve, but index-tts's own
+# numpy/torch are not shadowed by whichever Python version built the outer venv.
+if str(_INDEX_TTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_INDEX_TTS_DIR))
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(_PROJECT_ROOT))
 
 from mangaeasy.config import HF_CACHE_DIR
 from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, project_name
