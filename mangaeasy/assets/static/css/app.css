@@ -67,6 +67,7 @@ code { background: #2d2d30; padding: 1px 5px; border-radius: 3px; font-size: 11p
   background: #007acc; color: #fff; font-size: 12px; font-weight: 600;
   display: inline-flex; align-items: center; justify-content: center;
 }
+.wf-badge { margin-left: auto; font-weight: 400; }
 
 /* ── Folder rows (label + path + Browse/Open) ────────────────────────── */
 .folder-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; }

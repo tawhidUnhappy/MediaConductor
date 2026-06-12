@@ -13,7 +13,8 @@
   <nav id="tabs">
     <button class="tab active" data-tab="setup">1 · Setup</button>
     <button class="tab" data-tab="project">2 · Project</button>
-    <button class="tab" data-tab="run">3 · Create videos</button>
+    <button class="tab" data-tab="flow">3 · Make a video</button>
+    <button class="tab" data-tab="run">Batch videos</button>
     <button class="tab" data-tab="editors">Editors</button>
   </nav>
   <div id="job-indicator" class="idle">idle</div>
@@ -97,7 +98,83 @@
     </details>
   </section>
 
-  <!-- ── Create videos (run) ───────────────────────────────────────────── -->
+  <!-- ── Make a video (guided chapter workflow) ────────────────────────── -->
+  <section id="tab-flow" class="tab-page">
+    <p class="lead">One chapter, start to finish — work through the steps top to bottom.
+      The badge on each step shows how far along you are. Uses the manga name &amp;
+      chapter below; music and voice come from the <b>Project</b> tab.</p>
+
+    <div class="panel">
+      <h3><span class="step-no">1</span> Get the chapter <span id="wf-st-download" class="badge wf-badge"></span></h3>
+      <div class="form-grid">
+        <label>MangaDex URL / ID
+          <input id="wf-manga-id" class="text" spellcheck="false" placeholder="https://mangadex.org/title/…"></label>
+        <label>Manga name <input id="wf-name" class="text" spellcheck="false" placeholder="my_manga"></label>
+        <label>Chapter <input id="wf-chapter" type="number" min="0" class="text"></label>
+        <label>Language
+          <select id="wf-lang">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="es-la">Spanish (LATAM)</option>
+            <option value="pt-br">Portuguese (BR)</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+            <option value="ru">Russian</option>
+            <option value="id">Indonesian</option>
+            <option value="vi">Vietnamese</option>
+            <option value="th">Thai</option>
+            <option value="zh">Chinese</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <button id="wf-download" class="btn primary">⬇ Download from MangaDex</button>
+        <button class="btn" data-wf-open="download">Open download folder</button>
+      </div>
+      <p class="hint">Got the pages from another site or scraped them yourself? Just drop the
+        image files into the download folder — the next steps don't care where pages came from.</p>
+    </div>
+
+    <div class="panel">
+      <h3><span class="step-no">2</span> Crop into panels <span id="wf-st-panels" class="badge wf-badge"></span></h3>
+      <div class="row">
+        <button id="wf-cut" class="btn primary">✂ Cut pages (manga / manhua)</button>
+        <button id="wf-arrange" class="btn primary">⬇ Arrange strips (webtoon)</button>
+        <button class="btn" data-wf-open="panels">Open panels folder</button>
+      </div>
+      <p class="hint">Both open an editor in your browser and save the panels into the chapter's
+        panels folder. Already have panels? Drop them in the folder and move on.</p>
+    </div>
+
+    <div class="panel">
+      <h3><span class="step-no">3</span> Write the narration <span id="wf-st-narration" class="badge wf-badge"></span></h3>
+      <div class="row">
+        <button id="wf-narrate" class="btn primary">📝 Open narration editor</button>
+        <button class="btn" data-wf-open="chapter">Open chapter folder</button>
+      </div>
+      <p class="hint">Prefer to write it yourself (or with an AI)? Create
+        <code id="wf-narration-name">narration_01.json</code> in the chapter folder:
+        a JSON array of <code>{"image": "panel file", "narration": "text"}</code> entries.</p>
+    </div>
+
+    <div class="panel">
+      <h3><span class="step-no">4</span> Generate audio &amp; video <span id="wf-st-generate" class="badge wf-badge"></span></h3>
+      <div class="row">
+        <button id="wf-all" class="btn primary big">▶ Generate everything</button>
+        <button id="wf-audio" class="btn">🎙 Only audio</button>
+        <button id="wf-video" class="btn">🎬 Only video</button>
+        <button class="btn" data-wf-open="chapter">Open output folder</button>
+      </div>
+      <p class="hint">Audio clones your <b>voice reference</b> with IndexTTS, then the video is
+        rendered from panels + audio and your <b>background music</b> is mixed in. The finished
+        MP4 lands in the chapter folder. One job runs at a time — watch the log below.</p>
+    </div>
+  </section>
+
+  <!-- ── Batch videos (item pipeline) ──────────────────────────────────── -->
   <section id="tab-run" class="tab-page">
     <p class="lead">Turns every item folder inside your <b>manga folder</b> (a
       <code>panels/</code> folder + a <code>narration.json</code>) into a narrated video,

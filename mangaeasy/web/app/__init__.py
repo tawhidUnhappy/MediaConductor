@@ -11,7 +11,8 @@ The package is split by concern:
     api_setup.py    prerequisite checks + one-click AI tool installs
     api_project.py  project folder, config files, remembered UI state
     api_fs.py       folder & file pickers, open-in-file-manager
-    api_run.py      run pipeline / chapter commands, editors, status
+    api_run.py      run pipeline / chapter commands (single or chained), editors
+    api_workflow.py guided chapter workflow: settings + per-step progress
     server.py       startup: desktop window or browser
 
 All endpoints bind to 127.0.0.1 only.
@@ -37,12 +38,13 @@ def create_app() -> Flask:
     register_shutdown(flask_app)
     broadcaster.register_route(flask_app)
 
-    from mangaeasy.web.app import api_fs, api_project, api_run, api_setup
+    from mangaeasy.web.app import api_fs, api_project, api_run, api_setup, api_workflow
 
     flask_app.register_blueprint(api_setup.bp)
     flask_app.register_blueprint(api_project.bp)
     flask_app.register_blueprint(api_fs.bp)
     flask_app.register_blueprint(api_run.bp)
+    flask_app.register_blueprint(api_workflow.bp)
 
     @flask_app.route("/")
     def index():

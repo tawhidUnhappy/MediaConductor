@@ -59,7 +59,27 @@ folder when the current directory doesn't look like a project.
   the bundled example on first use). Saving creates the files if they don't
   exist.
 
-### 3 · Create videos
+### 3 · Make a video (guided workflow)
+
+One chapter from start to finish, top to bottom, with a progress badge on
+every step ("12 pages ✓", "no panels yet", …):
+
+1. **Get the chapter** — MangaDex URL/ID, manga name, chapter and language,
+   then **Download**. Scraped the pages from another site? Open the download
+   folder and drop the images in — later steps don't care where pages came
+   from.
+2. **Crop into panels** — one click opens the page cutter (manga/manhua) or
+   the strip arranger (webtoons) in your browser.
+3. **Write the narration** — opens the narration editor; or write
+   `narration_XX.json` yourself in the chapter folder
+   (`[{"image": …, "narration": …}, …]`).
+4. **Generate** — **Generate everything** chains
+   `index-tts → fade-audio → render-video → add-bgm` as one job (background
+   music is skipped automatically when none is set); *Only audio* / *Only
+   video* run the halves separately. The finished MP4 lands in the chapter
+   folder.
+
+### Batch videos
 
 Three numbered steps:
 

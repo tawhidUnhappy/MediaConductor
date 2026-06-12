@@ -4,6 +4,7 @@
 import { $, api, store } from "./core.js";
 import { loadDoctor } from "./setup.js";
 import { updateEditors } from "./editors.js";
+import { refreshWorkflow } from "./workflow.js";
 
 export async function pollStatus() {
   let st;
@@ -35,6 +36,9 @@ export async function pollStatus() {
 
   updateEditors(st.editors);
 
-  // refresh tool cards when an install just finished
-  if (wasRunning && !store.jobRunning) loadDoctor();
+  // refresh tool cards + workflow progress when a job just finished
+  if (wasRunning && !store.jobRunning) {
+    loadDoctor();
+    refreshWorkflow();
+  }
 }

@@ -16,6 +16,7 @@ import { initPicker } from "./picker.js";
 import { initUiState, loadUiState } from "./uistate.js";
 import { initSetup, loadDoctor } from "./setup.js";
 import { initProject, loadProject } from "./project.js";
+import { initWorkflow, refreshWorkflow } from "./workflow.js";
 import { initRun, updateStepUI } from "./run.js";
 import { renderEditors } from "./editors.js";
 import { pollStatus } from "./status.js";
@@ -38,10 +39,13 @@ function initTabs() {
   initUiState();
   initSetup();
   initProject();
+  initWorkflow();
   initRun();
   renderEditors();
 
-  await Promise.allSettled([loadDoctor(), loadProject(), loadUiState(), pollStatus()]);
+  await Promise.allSettled([
+    loadDoctor(), loadProject(), refreshWorkflow(), loadUiState(), pollStatus(),
+  ]);
   updateStepUI();
   setInterval(pollStatus, 2000);
 })();

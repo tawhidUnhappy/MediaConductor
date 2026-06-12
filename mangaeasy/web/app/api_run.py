@@ -41,6 +41,52 @@ def api_run():
     return jsonify({"started": command})
 
 
+@bp.route("/api/run-chain", methods=["POST"])
+def api_run_chain():
+    """Run several commands back to back as one job, stopping on first failure.
+
+    Body: {"steps": [{"command": ..., "args": [...]}, ...]}.
+    """
+    from mangaeasy.cli import COMMANDS
+
+    body = request.get_json(silent=True) or {}
+    steps: list[tuple[str, list[str]]] = []
+    for raw in body.get("steps") or []:
+        command = str(raw.get("command", ""))
+        if command not in COMMANDS:
+            return jsonify({"error": f"unknown command '{command}'"}), 400
+        steps.append((command, [str(a) for a in raw.get("args", [])]))
+    if not steps:
+        return jsonify({"error": "no steps given"}), 400
+
+    label = " → ".join(command for command, _ in steps)
+    with lock:
+        if jobs.job_running():
+            return jsonify({"error": "another job is already running"}), 409
+
+        job: dict = {"kind": "run", "name": label, "thread": None, "proc": None}
+
+        def work():
+            for command, args in steps:
+                proc = jobs.spawn_cli(command, args, state["project_root"])
+                job["proc"] = proc  # so /api/stop terminates the current step
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    log(line.rstrip("\n"))
+                code = proc.wait()
+                log(f"[{command}] finished with exit code {code}")
+                if code != 0:
+                    log(f"[workflow] stopped — '{command}' failed; later steps were skipped.")
+                    return
+            log("[workflow] all steps finished ✓")
+
+        thread = threading.Thread(target=work, daemon=True)
+        job["thread"] = thread
+        state["job"] = job
+        thread.start()
+    return jsonify({"started": label})
+
+
 @bp.route("/api/stop", methods=["POST"])
 def api_stop():
     job = state["job"]

@@ -143,7 +143,15 @@ def api_open_folder():
         return jsonify({"error": "no folder given"}), 400
     path = resolve_against_project(raw)
     if not path.is_dir():
-        return jsonify({"error": f"folder does not exist yet: {path}"}), 400
+        # The workflow tab's Open buttons create their target so the user can
+        # drop files into the right place before any command has run.
+        if body.get("create"):
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                return jsonify({"error": f"could not create folder: {exc}"}), 500
+        else:
+            return jsonify({"error": f"folder does not exist yet: {path}"}), 400
     path = path.resolve()
     try:
         if sys.platform == "win32":
