@@ -11,9 +11,9 @@
 <header id="topbar">
   <div class="brand">mangaEasy <span class="version">v{{ version }}</span></div>
   <nav id="tabs">
-    <button class="tab active" data-tab="setup">Setup</button>
-    <button class="tab" data-tab="project">Project</button>
-    <button class="tab" data-tab="run">Run</button>
+    <button class="tab active" data-tab="setup">1 · Setup</button>
+    <button class="tab" data-tab="project">2 · Project</button>
+    <button class="tab" data-tab="run">3 · Create videos</button>
     <button class="tab" data-tab="editors">Editors</button>
   </nav>
   <div id="job-indicator" class="idle">idle</div>
@@ -23,6 +23,9 @@
 
   <!-- ── Setup ─────────────────────────────────────────────────────────── -->
   <section id="tab-setup" class="tab-page active">
+    <p class="lead">First time here? Check that everything below is green, install the AI
+      tools you want, then move on to the <b>Project</b> tab.</p>
+
     <div class="row between">
       <h2>Environment</h2>
       <button id="doctor-refresh" class="btn">Refresh</button>
@@ -43,86 +46,135 @@
 
   <!-- ── Project ───────────────────────────────────────────────────────── -->
   <section id="tab-project" class="tab-page">
-    <h2>Project folder</h2>
-    <div class="row">
-      <input id="project-root" class="text grow" spellcheck="false">
-      <button id="project-set" class="btn primary">Set</button>
-    </div>
-    <p class="hint">All commands and editors run against this folder.</p>
+    <p class="lead">The <b>project folder</b> is your workspace — every command, editor and
+      output lives under it unless you choose other folders on the next tab.</p>
 
-    <h2>config.json <span class="hint">(per-manga settings)</span></h2>
+    <h2>Project folder</h2>
+    <div class="folder-row">
+      <input id="project-root" class="text grow mono" spellcheck="false">
+      <button class="btn" data-browse="project-root">Browse…</button>
+      <button class="btn" data-open="project-root" title="Show this folder in your file manager">Open</button>
+      <button id="project-set" class="btn primary">Use this folder</button>
+    </div>
+    <p class="hint">Pick any folder you like — everything you create (manga pages, audio, videos) is stored in it; the app itself stays installed globally.</p>
+
+    <h2>Manga settings <span class="hint">(config.json)</span></h2>
     <div class="form-grid">
-      <label>Manga URL / ID <input id="cfg-manga-id" class="text" spellcheck="false"></label>
-      <label>Name <input id="cfg-name" class="text" spellcheck="false"></label>
+      <label>Manga URL / ID
+        <input id="cfg-manga-id" class="text" spellcheck="false" placeholder="https://mangadex.org/title/…">
+      </label>
+      <label>Name <input id="cfg-name" class="text" spellcheck="false" placeholder="my_manga"></label>
       <label>Chapter <input id="cfg-chapter" type="number" min="0" class="text"></label>
     </div>
     <div class="row">
-      <button id="cfg-save" class="btn primary">Save config.json</button>
+      <button id="cfg-save" class="btn primary">Save settings</button>
       <span id="cfg-status" class="hint"></span>
     </div>
 
-    <h2>config.system.json <span class="hint">(machine / render settings)</span></h2>
-    <textarea id="syscfg" rows="16" spellcheck="false"></textarea>
-    <div class="row">
-      <button id="syscfg-save" class="btn primary">Save config.system.json</button>
-      <span id="syscfg-status" class="hint"></span>
-    </div>
+    <details class="advanced">
+      <summary>Advanced: machine &amp; render settings (config.system.json)</summary>
+      <p class="hint">Resolution, fps, encoder tuning, ports, watermark… You normally don't need to touch this.</p>
+      <textarea id="syscfg" rows="16" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="syscfg-save" class="btn primary">Save config.system.json</button>
+        <span id="syscfg-status" class="hint"></span>
+      </div>
+    </details>
   </section>
 
-  <!-- ── Run ───────────────────────────────────────────────────────────── -->
+  <!-- ── Create videos (run) ───────────────────────────────────────────── -->
   <section id="tab-run" class="tab-page">
-    <h2>General video pipeline</h2>
-    <div class="form-grid">
-      <label>Step
-        <select id="run-step">
-          <option value="video">Full pipeline (audio + render + join)</option>
-          <option value="video-check">Check inputs</option>
-          <option value="video-audio">Generate audio (Kokoro)</option>
-          <option value="video-audio-indextts">Generate audio (IndexTTS)</option>
-          <option value="video-render">Render item videos</option>
-          <option value="video-join">Join long video</option>
-          <option value="video-validate">Validate outputs</option>
-        </select>
-      </label>
-      <label>TTS engine (full pipeline)
-        <select id="run-tts">
-          <option value="auto">auto — IndexTTS if GPU, else Kokoro</option>
-          <option value="indextts">IndexTTS (voice cloning, GPU)</option>
-          <option value="kokoro">Kokoro (light, any machine)</option>
-        </select>
-      </label>
-      <label>Content folder <input id="run-content" class="text" value="content" spellcheck="false"></label>
-      <label>Project name <input id="run-name" class="text" placeholder="(defaults to folder name)" spellcheck="false"></label>
-      <label>Items <input id="run-items" class="text" placeholder="e.g. 01-12" spellcheck="false"></label>
-      <label>Encoder
-        <select id="run-encoder">
-          <option value="auto">auto (detect GPU)</option>
-          <option value="h264_nvenc">NVIDIA NVENC</option>
-          <option value="h264_amf">AMD AMF</option>
-          <option value="h264_qsv">Intel Quick Sync</option>
-          <option value="libx264">CPU (libx264)</option>
-        </select>
-      </label>
-      <label>TTS device
-        <select id="run-device">
-          <option value="auto">auto</option>
-          <option value="cuda">cuda</option>
-          <option value="cpu">cpu</option>
-        </select>
-      </label>
-    </div>
-    <div class="opts">
-      <label><input type="checkbox" id="run-long" checked> Build long video</label>
-      <label><input type="checkbox" id="run-ow-audio"> Overwrite audio</label>
-      <label><input type="checkbox" id="run-ow-video"> Overwrite video</label>
-    </div>
-    <div class="row">
-      <button id="run-start" class="btn primary">Run</button>
-      <button id="run-stop" class="btn danger" disabled>Stop</button>
-      <span id="run-status" class="hint"></span>
+    <p class="lead">Turns every item folder inside your <b>manga folder</b> (a
+      <code>panels/</code> folder + a <code>narration.json</code>) into a narrated video,
+      and can join them all into one long video.</p>
+
+    <div class="panel">
+      <h3><span class="step-no">1</span> Choose folders</h3>
+      <div class="folder-row">
+        <label class="folder-label" for="run-manga-dir">Manga folder</label>
+        <input id="run-manga-dir" class="text grow mono" value="content" spellcheck="false">
+        <button class="btn" data-browse="run-manga-dir">Browse…</button>
+        <button class="btn" data-open="run-manga-dir" title="Show this folder in your file manager">Open</button>
+      </div>
+      <p class="hint indent">Where your manga lives: one subfolder per item/chapter. Relative names (like <code>content</code>) are inside the project folder.</p>
+
+      <div class="folder-row">
+        <label class="folder-label" for="run-output-dir">Output folder</label>
+        <input id="run-output-dir" class="text grow mono" value="output" spellcheck="false">
+        <button class="btn" data-browse="run-output-dir">Browse…</button>
+        <button class="btn" data-open="run-output-dir" title="Show this folder in your file manager">Open</button>
+      </div>
+      <p class="hint indent">Finished videos are saved here.</p>
     </div>
 
-    <h2>Manga chapter commands</h2>
+    <div class="panel">
+      <h3><span class="step-no">2</span> What to do</h3>
+      <div class="form-grid">
+        <label>Step
+          <select id="run-step">
+            <option value="video">Everything — audio + videos + long video</option>
+            <option value="video-check">Check my files first (no changes)</option>
+            <option value="video-audio">Only generate audio (Kokoro)</option>
+            <option value="video-audio-indextts">Only generate audio (IndexTTS)</option>
+            <option value="video-render">Only render item videos</option>
+            <option value="video-join">Only join into one long video</option>
+            <option value="video-validate">Validate generated output</option>
+          </select>
+        </label>
+        <label>Voice engine
+          <select id="run-tts">
+            <option value="auto">Auto — best available (recommended)</option>
+            <option value="indextts">IndexTTS — best quality, needs NVIDIA GPU</option>
+            <option value="kokoro">Kokoro — light, works on any machine</option>
+          </select>
+        </label>
+      </div>
+      <div class="opts">
+        <label title="After rendering each item, also concatenate everything into a single long video">
+          <input type="checkbox" id="run-long" checked> Also build one long video</label>
+      </div>
+
+      <details class="advanced" id="run-advanced">
+        <summary>Advanced options</summary>
+        <div class="form-grid">
+          <label>Items <input id="run-items" class="text" placeholder="all — or e.g. 01-12" spellcheck="false"></label>
+          <label>Project name <input id="run-name" class="text" placeholder="(defaults to manga folder name)" spellcheck="false"></label>
+          <label>Video encoder
+            <select id="run-encoder">
+              <option value="auto">auto (detect GPU)</option>
+              <option value="h264_nvenc">NVIDIA NVENC</option>
+              <option value="h264_amf">AMD AMF</option>
+              <option value="h264_qsv">Intel Quick Sync</option>
+              <option value="libx264">CPU (libx264)</option>
+            </select>
+          </label>
+          <label>TTS device
+            <select id="run-device">
+              <option value="auto">auto</option>
+              <option value="cuda">cuda</option>
+              <option value="cpu">cpu</option>
+            </select>
+          </label>
+        </div>
+        <div class="opts">
+          <label><input type="checkbox" id="run-ow-audio"> Re-generate audio that already exists</label>
+          <label><input type="checkbox" id="run-ow-video"> Re-render videos that already exist</label>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h3><span class="step-no">3</span> Run</h3>
+      <div class="row">
+        <button id="run-start" class="btn primary big">▶ Start</button>
+        <button id="run-stop" class="btn danger" disabled>■ Stop</button>
+        <span id="run-status" class="hint"></span>
+      </div>
+      <p class="hint">Progress streams into the log console below. Only one job runs at a time.</p>
+    </div>
+
+    <h2>Manga chapter tools</h2>
+    <p class="hint">Classic per-chapter commands. They use the manga settings from the <b>Project</b> tab and work inside the project folder.</p>
     <div class="row">
       <select id="chap-cmd">
         <option value="download">download — fetch chapter from MangaDex</option>
@@ -138,13 +190,12 @@
       <input id="chap-args" class="text grow" placeholder="extra args (optional)" spellcheck="false">
       <button id="chap-run" class="btn">Run</button>
     </div>
-    <p class="hint">Chapter commands use config.json / config.system.json from the project folder.</p>
   </section>
 
   <!-- ── Editors ───────────────────────────────────────────────────────── -->
   <section id="tab-editors" class="tab-page">
-    <h2>Web editors</h2>
-    <p class="hint">Each editor opens automatically in your browser and works on the current project folder.</p>
+    <p class="lead">Visual editors for preparing panels and writing narration. Each one opens
+      in your browser and works on the current project folder.</p>
     <div id="editor-cards"></div>
   </section>
 
@@ -159,6 +210,26 @@
     <button id="console-toggle" class="btn small">Hide</button>
   </div>
   <div id="log-lines"></div>
+</div>
+
+<!-- ── Folder picker (fallback when no native dialog is available) ─────── -->
+<div id="folder-modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-title">Choose a folder</div>
+    <div class="row">
+      <button id="fm-up" class="btn small" title="Go to the parent folder">⬆ Up</button>
+      <input id="fm-path" class="text grow mono" spellcheck="false">
+      <button id="fm-go" class="btn small">Go</button>
+    </div>
+    <div id="fm-shortcuts" class="fm-shortcuts"></div>
+    <div id="fm-list" class="fm-list"></div>
+    <div class="row">
+      <span id="fm-error" class="hint fm-err"></span>
+      <span class="spacer"></span>
+      <button id="fm-cancel" class="btn">Cancel</button>
+      <button id="fm-select" class="btn primary">Use this folder</button>
+    </div>
+  </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>

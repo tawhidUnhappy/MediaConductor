@@ -18,9 +18,25 @@ mangaeasy app --port 5050   # use a different local port
 On Linux/macOS, pywebview may need a system GTK/Qt backend; if no GUI backend is
 available the app automatically falls back to the browser.
 
+## Choosing folders
+
+Every folder field (project folder, manga folder, output folder) has a
+**Browse…** button:
+
+- In the desktop window it opens the **native OS folder dialog**.
+- In browser mode it opens a small **in-app folder browser** (drives, home
+  shortcut, click-to-enter folders).
+
+Next to each field, **Open** shows the folder in your file manager — handy for
+finding the finished videos.
+
+Folder choices and run options are **remembered between launches** in
+`~/.mangaeasy/app_state.json`. On start the app also reuses your last project
+folder when the current directory doesn't look like a project.
+
 ## Tabs
 
-### Setup
+### 1 · Setup
 
 - Prerequisite checks: git, git-lfs, uv, uvx, FFmpeg, FFprobe, NVIDIA GPU.
 - One card per external AI tool (IndexTTS, MAGI v3, Kokoro) showing
@@ -29,22 +45,33 @@ available the app automatically falls back to the browser.
   full output streaming into the log console. Options: *CPU-only* and *Skip
   model download*.
 
-### Project
+### 2 · Project
 
-- Set the **project folder** every command and editor runs against.
-- Edit `config.json` (manga URL/ID, name, chapter) as a simple form.
-- Edit `config.system.json` as validated JSON (seeded from the bundled example
-  on first use). Saving creates the files if they don't exist.
+- Pick the **project folder** every command and editor runs against
+  (Browse… applies it immediately).
+- Edit the manga settings (`config.json`: manga URL/ID, name, chapter) as a
+  simple form.
+- `config.system.json` lives under **Advanced** as validated JSON (seeded from
+  the bundled example on first use). Saving creates the files if they don't
+  exist.
 
-### Run
+### 3 · Create videos
 
-- **General video pipeline**: pick the step (full pipeline or an individual
-  stage), content folder, item range, encoder, and TTS device; toggle
-  long-video build and overwrite flags; press **Run**. Logs stream live and
-  **Stop** terminates the run.
-- **Manga chapter commands**: run `download`, `render-video`, `add-bgm`,
-  `join-chapters`, `to-pdf`, etc. against the current project folder, with an
-  optional free-form extra-args field.
+Three numbered steps:
+
+1. **Choose folders** — the *manga folder* (one subfolder per item/chapter,
+   each with `panels/` + `narration.json`) and the *output folder* where
+   finished videos land. Relative names like `content` resolve inside the
+   project folder; Browse… picks any folder on the machine.
+2. **What to do** — pick the step (everything, or a single stage) and the
+   voice engine. Encoder, TTS device, item ranges and overwrite flags sit
+   under **Advanced options**.
+3. **Run** — Start / Stop with live logs. The status line tells you when the
+   job finishes.
+
+Below that, **Manga chapter tools** run the classic per-chapter commands
+(`download`, `render-video`, `add-bgm`, `join-chapters`, `to-pdf`, …) against
+the current project folder, with an optional free-form extra-args field.
 
 Only one job runs at a time; the indicator in the top bar shows what's active.
 

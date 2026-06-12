@@ -6,8 +6,13 @@ If pywebview or a GUI backend is unavailable, it falls back to the browser.
 The UI drives everything end-to-end without the terminal:
   Setup   — prerequisite checks + one-click install of external AI tools
   Project — pick the project folder, edit config.json / config.system.json
-  Run     — run the video pipeline or chapter commands with live logs
+  Create  — run the video pipeline or chapter commands with live logs
   Editors — launch the panel / narration web editors
+
+Folders (project, manga input, video output) are chosen with a real folder
+picker: the native OS dialog in the desktop window, or a small in-app browser
+when running in a plain web browser. Choices persist across launches in
+~/.mangaeasy/app_state.json.
 
 All endpoints bind to 127.0.0.1 only.
 """
@@ -52,12 +57,52 @@ register_shutdown(app)
 broadcaster = LogBroadcaster(buf_size=400)
 broadcaster.register_route(app)
 
+# ── Persisted app state (folders + UI choices survive restarts) ──────────────
+
+APP_STATE_FILE = Path.home() / ".mangaeasy" / "app_state.json"
+
+
+def _load_app_state() -> dict:
+    try:
+        data = json.loads(APP_STATE_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _initial_project_root(saved: dict) -> Path:
+    """Prefer the current directory when it looks like a project; otherwise
+    fall back to the project folder used last time the app ran."""
+    cwd = Path.cwd().resolve()
+    if (cwd / "config.json").exists() or (cwd / "content").is_dir():
+        return cwd
+    remembered = saved.get("project_root")
+    if remembered:
+        path = Path(remembered)
+        if path.is_dir():
+            return path.resolve()
+    return cwd
+
+
+_saved_state = _load_app_state()
+
 _lock = threading.Lock()
 _state: dict = {
-    "project_root": Path.cwd().resolve(),
+    "project_root": _initial_project_root(_saved_state),
+    "ui": dict(_saved_state.get("ui") or {}),  # free-form UI field values
+    "window": None,   # pywebview window when running as a desktop app
     "job": None,      # {"kind", "name", "thread", "proc"}
     "editors": {},    # command name -> subprocess.Popen
 }
+
+
+def _save_app_state() -> None:
+    try:
+        APP_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        data = {"project_root": str(_state["project_root"]), "ui": _state["ui"]}
+        APP_STATE_FILE.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    except Exception as exc:
+        _log(f"[app] could not save app state: {exc}")
 
 
 def _log(line: str) -> None:
@@ -179,7 +224,115 @@ def api_project():
             return jsonify({"error": f"not a folder: {raw}"}), 400
         _state["project_root"] = path.resolve()
         _log(f"[app] project folder set to {path.resolve()}")
+        _save_app_state()
     return jsonify({"root": str(_state["project_root"])})
+
+
+@app.route("/api/appstate", methods=["GET", "POST"])
+def api_appstate():
+    """Remember UI field values (folders, selected step, ...) across launches."""
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        _state["ui"].update(body)
+        _save_app_state()
+    return jsonify({"ui": _state["ui"]})
+
+
+# ── Folder picking API ────────────────────────────────────────────────────────
+
+
+def _resolve_against_project(raw: str) -> Path:
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = _state["project_root"] / path
+    return path
+
+
+@app.route("/api/pick-folder", methods=["POST"])
+def api_pick_folder():
+    """Open the native OS folder dialog (desktop window only).
+
+    Returns {"folder": path} on selection, {"folder": null} on cancel, and
+    {"unsupported": true} in browser mode — the UI then falls back to the
+    in-app folder browser built on /api/fs/list.
+    """
+    win = _state.get("window")
+    if win is None:
+        return jsonify({"unsupported": True})
+    try:
+        import webview
+
+        body = request.get_json(silent=True) or {}
+        start = _resolve_against_project(str(body.get("start") or ""))
+        directory = str(start) if start.is_dir() else str(Path.home())
+        result = win.create_file_dialog(webview.FOLDER_DIALOG, directory=directory)
+        if not result:
+            return jsonify({"folder": None})
+        folder = result[0] if isinstance(result, (list, tuple)) else result
+        return jsonify({"folder": str(folder)})
+    except Exception as exc:
+        _log(f"[app] native folder dialog failed: {exc}")
+        return jsonify({"unsupported": True})
+
+
+def _list_drives() -> list[str]:
+    if os.name != "nt":
+        return []
+    import string
+
+    return [f"{letter}:\\" for letter in string.ascii_uppercase
+            if Path(f"{letter}:\\").exists()]
+
+
+@app.route("/api/fs/list")
+def api_fs_list():
+    """List subfolders of a path — backs the in-app folder browser."""
+    raw = (request.args.get("path") or "").strip()
+    path = _resolve_against_project(raw) if raw else Path.home()
+    try:
+        path = path.resolve()
+        if not path.is_dir():
+            return jsonify({"error": f"not a folder: {raw}"}), 400
+        dirs = sorted(
+            (entry.name for entry in path.iterdir()
+             if entry.is_dir() and not entry.name.startswith(".")),
+            key=str.lower,
+        )
+    except PermissionError:
+        return jsonify({"error": f"no permission to read {path}"}), 403
+    except OSError as exc:
+        return jsonify({"error": str(exc)}), 400
+    parent = str(path.parent) if path.parent != path else None
+    return jsonify({
+        "path": str(path),
+        "parent": parent,
+        "dirs": dirs,
+        "drives": _list_drives(),
+        "home": str(Path.home()),
+    })
+
+
+@app.route("/api/open-folder", methods=["POST"])
+def api_open_folder():
+    """Open a folder in the system file manager (Explorer / Finder / ...)."""
+    body = request.get_json(silent=True) or {}
+    raw = str(body.get("path", "")).strip()
+    if not raw:
+        return jsonify({"error": "no folder given"}), 400
+    path = _resolve_against_project(raw)
+    if not path.is_dir():
+        return jsonify({"error": f"folder does not exist yet: {path}"}), 400
+    path = path.resolve()
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(path))  # noqa: S606 — local desktop convenience
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
+    except Exception as exc:
+        return jsonify({"error": f"could not open folder: {exc}"}), 500
+    return jsonify({"opened": str(path)})
 
 
 @app.route("/api/config", methods=["GET", "POST"])
@@ -346,8 +499,12 @@ def main() -> int:
         print("[app] server did not start in time.")
         return 1
 
-    window.create_window("mangaEasy", url, width=1240, height=820, min_size=(900, 600))
+    # Keep the window handle so /api/pick-folder can show the native dialog.
+    _state["window"] = window.create_window(
+        "mangaEasy", url, width=1240, height=820, min_size=(900, 600)
+    )
     window.start()
+    _state["window"] = None
     _cleanup()
     return 0
 

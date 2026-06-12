@@ -128,10 +128,11 @@ backend is available) with everything in one place:
 
 - **Setup** — checks git / uv / FFmpeg / GPU, shows which AI tools are installed,
   and installs them with one click while streaming the logs live.
-- **Project** — pick your project folder and edit `config.json` /
-  `config.system.json` with forms, no manual JSON wrangling.
-- **Run** — run the full video pipeline (or any single step) and chapter commands
-  with dropdowns and checkboxes; watch progress in the built-in log console.
+- **Project** — pick your project folder with a real folder dialog and edit
+  `config.json` / `config.system.json` with forms, no manual JSON wrangling.
+- **Create videos** — choose your manga folder and output folder with
+  Browse… buttons, pick what to run, press Start; watch progress in the
+  built-in log console. Your folder choices are remembered between launches.
 - **Editors** — launch the panel / narration web editors with one click.
 
 See [docs/app.md](docs/app.md) for details.

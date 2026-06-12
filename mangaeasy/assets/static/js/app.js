@@ -56,6 +56,145 @@ $("console-toggle").addEventListener("click", () => {
   $("console-toggle").textContent = c.classList.contains("collapsed") ? "Show" : "Hide";
 });
 
+/* ── Folder picking ────────────────────────────────────────────────────── */
+/* Browse… first asks the server for the native OS dialog (desktop window).
+   In browser mode it falls back to the in-app folder browser modal. */
+
+let fmOnSelect = null;
+let fmCurrent = "";
+
+async function fmLoad(path) {
+  let data;
+  try {
+    data = await api(`/api/fs/list?path=${encodeURIComponent(path || "")}`);
+  } catch (err) {
+    $("fm-error").textContent = err.message;
+    return;
+  }
+  $("fm-error").textContent = "";
+  fmCurrent = data.path;
+  $("fm-path").value = data.path;
+  $("fm-up").disabled = !data.parent;
+  $("fm-up").dataset.parent = data.parent || "";
+
+  const shortcuts = $("fm-shortcuts");
+  shortcuts.innerHTML = "";
+  const links = [["🏠 Home", data.home], ...data.drives.map((d) => [d, d])];
+  for (const [label, target] of links) {
+    const b = document.createElement("button");
+    b.className = "btn small";
+    b.textContent = label;
+    b.addEventListener("click", () => fmLoad(target));
+    shortcuts.appendChild(b);
+  }
+
+  const list = $("fm-list");
+  list.innerHTML = "";
+  if (!data.dirs.length) {
+    list.innerHTML = `<div class="fm-empty">No subfolders — click “Use this folder” to pick it.</div>`;
+  }
+  for (const name of data.dirs) {
+    const row = document.createElement("div");
+    row.className = "fm-dir";
+    row.textContent = `📁 ${name}`;
+    row.addEventListener("click", () =>
+      fmLoad(fmCurrent.endsWith("\\") || fmCurrent.endsWith("/")
+        ? fmCurrent + name : `${fmCurrent}/${name}`));
+    list.appendChild(row);
+  }
+}
+
+function openFolderModal(start, onSelect) {
+  fmOnSelect = onSelect;
+  $("folder-modal").classList.remove("hidden");
+  fmLoad(start || "");
+}
+
+function closeFolderModal() {
+  $("folder-modal").classList.add("hidden");
+  fmOnSelect = null;
+}
+
+$("fm-up").addEventListener("click", () => fmLoad($("fm-up").dataset.parent));
+$("fm-go").addEventListener("click", () => fmLoad($("fm-path").value.trim()));
+$("fm-path").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") fmLoad($("fm-path").value.trim());
+});
+$("fm-cancel").addEventListener("click", closeFolderModal);
+$("folder-modal").addEventListener("click", (e) => {
+  if (e.target === $("folder-modal")) closeFolderModal();
+});
+$("fm-select").addEventListener("click", () => {
+  if (fmOnSelect && fmCurrent) fmOnSelect(fmCurrent);
+  closeFolderModal();
+});
+
+async function pickFolder(input) {
+  const start = input.value.trim();
+  try {
+    const res = await api("/api/pick-folder", {
+      method: "POST",
+      body: JSON.stringify({ start }),
+    });
+    if (res.folder) {
+      input.value = res.folder;
+      input.dispatchEvent(new Event("change"));
+      return;
+    }
+    if (!res.unsupported) return; // native dialog shown, user cancelled
+  } catch { /* fall through to the in-app browser */ }
+  openFolderModal(start, (folder) => {
+    input.value = folder;
+    input.dispatchEvent(new Event("change"));
+  });
+}
+
+document.querySelectorAll("[data-browse]").forEach((btn) =>
+  btn.addEventListener("click", () => pickFolder($(btn.dataset.browse))));
+
+document.querySelectorAll("[data-open]").forEach((btn) =>
+  btn.addEventListener("click", async () => {
+    const path = $(btn.dataset.open).value.trim();
+    try {
+      await api("/api/open-folder", { method: "POST", body: JSON.stringify({ path }) });
+    } catch (err) {
+      appendLog("", `open folder: ${err.message}`);
+    }
+  }));
+
+/* ── Remembered UI state ───────────────────────────────────────────────── */
+const PERSIST_VALUES = [
+  "run-manga-dir", "run-output-dir", "run-step", "run-tts",
+  "run-encoder", "run-device", "run-items", "run-name",
+];
+const PERSIST_CHECKS = ["run-long", "run-ow-audio", "run-ow-video"];
+
+let saveTimer = null;
+function scheduleSaveState() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const ui = {};
+    for (const id of PERSIST_VALUES) ui[id] = $(id).value;
+    for (const id of PERSIST_CHECKS) ui[id] = $(id).checked;
+    try {
+      await api("/api/appstate", { method: "POST", body: JSON.stringify(ui) });
+    } catch { /* persistence is best-effort */ }
+  }, 400);
+}
+
+async function loadUiState() {
+  try {
+    const { ui } = await api("/api/appstate");
+    for (const id of PERSIST_VALUES) if (ui[id] != null) $(id).value = ui[id];
+    for (const id of PERSIST_CHECKS) if (ui[id] != null) $(id).checked = !!ui[id];
+  } catch { /* fresh defaults are fine */ }
+  updateStepUI();
+}
+
+for (const id of [...PERSIST_VALUES, ...PERSIST_CHECKS]) {
+  $(id).addEventListener("change", scheduleSaveState);
+}
+
 /* ── Setup tab ─────────────────────────────────────────────────────────── */
 const PREREQ_LABELS = {
   git: "Git", uv: "uv", uvx: "uvx",
@@ -151,7 +290,7 @@ async function loadProject() {
   $("syscfg-status").textContent = data.system ? "" : "config.system.json not found yet — Save creates it.";
 }
 
-$("project-set").addEventListener("click", async () => {
+async function setProjectRoot() {
   try {
     await api("/api/project", { method: "POST", body: JSON.stringify({ root: $("project-root").value }) });
     await loadProject();
@@ -159,7 +298,11 @@ $("project-set").addEventListener("click", async () => {
   } catch (err) {
     appendLog("", `project: ${err.message}`);
   }
-});
+}
+
+$("project-set").addEventListener("click", setProjectRoot);
+// Browsing to a folder is a clear intent — apply it without a second click.
+$("project-root").addEventListener("change", setProjectRoot);
 
 $("cfg-save").addEventListener("click", async () => {
   const data = await api("/api/config");
@@ -190,18 +333,30 @@ $("syscfg-save").addEventListener("click", async () => {
   setTimeout(() => ($("syscfg-status").textContent = ""), 2500);
 });
 
-/* ── Run tab ───────────────────────────────────────────────────────────── */
+/* ── Create videos (run) tab ───────────────────────────────────────────── */
+const STEPS_WITH_OUTPUT = new Set(["video", "video-render", "video-join", "video-validate"]);
+
+function updateStepUI() {
+  const step = $("run-step").value;
+  $("run-tts").disabled = step !== "video";
+  $("run-long").disabled = step !== "video";
+  $("run-output-dir").disabled = !STEPS_WITH_OUTPUT.has(step);
+}
+$("run-step").addEventListener("change", updateStepUI);
+
 function buildRunArgs() {
   const step = $("run-step").value;
-  const content = $("run-content").value.trim() || "content";
+  const mangaDir = $("run-manga-dir").value.trim() || "content";
+  const outputDir = $("run-output-dir").value.trim() || "output";
   const name = $("run-name").value.trim();
   const items = $("run-items").value.trim();
-  const args = ["--project-root", content];
+  const args = ["--project-root", mangaDir];
 
+  if (STEPS_WITH_OUTPUT.has(step)) args.push("--output-root", outputDir);
   if (items) args.push("--item-range", items);
+  if (name) args.push("--project-name", name);
 
   if (step === "video") {
-    if (name) args.push("--project-name", name);
     args.push("--tts", $("run-tts").value);
     args.push("--encoder", $("run-encoder").value, "--device", $("run-device").value);
     if ($("run-long").checked) args.push("--build-long-video");
@@ -213,13 +368,10 @@ function buildRunArgs() {
     args.push("--device", $("run-device").value);
     if ($("run-ow-audio").checked) args.push("--overwrite");
   } else if (step === "video-audio-indextts") {
-    if (name) args.push("--project-name", name);
     if ($("run-ow-audio").checked) args.push("--overwrite");
   } else if (step === "video-render") {
     args.push("--encoder", $("run-encoder").value);
     if ($("run-ow-video").checked) args.push("--overwrite");
-  } else if (step === "video-join" || step === "video-validate") {
-    if (name) args.push("--project-name", name);
   }
   return { command: step, args };
 }
@@ -312,7 +464,14 @@ async function pollStatus() {
   $("run-start").disabled = jobRunning;
   $("chap-run").disabled = jobRunning;
   $("run-stop").disabled = !(jobRunning && st.job.kind === "run");
-  $("run-status").textContent = jobRunning && st.job.kind === "run" ? `running: ${st.job.name}…` : "";
+  if (jobRunning && st.job.kind === "run") {
+    $("run-status").textContent = `running: ${st.job.name}…`;
+  } else if (wasRunning && !jobRunning) {
+    $("run-status").textContent = "finished — see the log below ✓";
+    setTimeout(() => {
+      if (!jobRunning) $("run-status").textContent = "";
+    }, 8000);
+  }
 
   const edChanged = JSON.stringify(st.editors) !== JSON.stringify(editorState);
   editorState = st.editors || {};
@@ -325,6 +484,6 @@ async function pollStatus() {
 /* ── Init ──────────────────────────────────────────────────────────────── */
 (async function init() {
   renderEditors();
-  await Promise.allSettled([loadDoctor(), loadProject(), pollStatus()]);
+  await Promise.allSettled([loadDoctor(), loadProject(), loadUiState(), pollStatus()]);
   setInterval(pollStatus, 2000);
 })();
