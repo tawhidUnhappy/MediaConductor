@@ -52,6 +52,7 @@ class ToolSpec:
     model_subdir: str | None = None
     adapter: str | None = None          # asset filename to copy into the tool dir
     env_deps: list[str] = field(default_factory=list)  # for managed_env
+    exclude_extras: list[str] = field(default_factory=list)  # extras uv sync must skip
     verify_import: str | None = None    # module to import-check inside the env
     needs_gpu: bool = False
     notes: str = ""
@@ -65,6 +66,10 @@ TOOLS: dict[str, ToolSpec] = {
         git_url="https://github.com/index-tts/index-tts",
         model_repo="IndexTeam/IndexTTS-2",
         model_subdir="checkpoints",
+        # DeepSpeed is a training accelerator, unused for inference, and its
+        # native build fails on most machines (needs the system CUDA toolkit
+        # to exactly match torch's, plus aio/cufile libs Windows lacks).
+        exclude_extras=["deepspeed"],
         needs_gpu=True,
         notes="High-quality voice-cloning TTS; the default engine for `mangaeasy video` on NVIDIA GPU machines. Needs git-lfs and a large model download.",
     ),
@@ -238,7 +243,11 @@ def _install_uv_project(
     else:
         log("[warn] git-lfs not found; skipping lfs pull. Install git-lfs if model files are missing.")
 
-    _run(["uv", "sync", "--all-extras"], log, cwd=dest)
+    sync_cmd = ["uv", "sync", "--all-extras"]
+    for extra in spec.exclude_extras:
+        log(f"[info] skipping optional extra '{extra}' (not needed for inference)")
+        sync_cmd += ["--no-extra", extra]
+    _run(sync_cmd, log, cwd=dest)
 
     if spec.needs_gpu and not _has_gpu():
         log("[warn] no NVIDIA GPU detected; this tool will run on CPU, which is much slower.")
