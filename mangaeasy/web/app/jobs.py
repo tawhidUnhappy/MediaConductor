@@ -6,7 +6,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from mangaeasy.runtime import cli_command
+from mangaeasy.runtime import cli_command, popen_kwargs
 from mangaeasy.web.app.state import log, state
 
 
@@ -34,11 +34,10 @@ def spawn_cli(command: str, args: list[str], cwd: Path) -> subprocess.Popen:
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        # No terminal behind GUI runs — a child that reads stdin must fail
-        # fast (EOF) instead of hanging forever on a prompt nobody can see.
         stdin=subprocess.DEVNULL,
         text=True,
         bufsize=1,
+        **popen_kwargs(),
     )
 
 

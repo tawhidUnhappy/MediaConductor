@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from mangaeasy.runtime import popen_kwargs
 from mangaeasy.tools.external import (
     python_command,
     resolve_tool_dir,
@@ -126,6 +127,7 @@ def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None =
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
+            **popen_kwargs(),
         )
     except FileNotFoundError as exc:
         raise InstallError(f"command not found: {cmd[0]} ({exc})") from exc
@@ -157,7 +159,7 @@ def _git_lfs_ok() -> bool:
     if not _which("git"):
         return False
     try:
-        return subprocess.run(["git", "lfs", "version"], capture_output=True).returncode == 0
+        return subprocess.run(["git", "lfs", "version"], capture_output=True, **popen_kwargs()).returncode == 0
     except Exception:
         return False
 

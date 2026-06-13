@@ -27,7 +27,8 @@ a = Analysis(
     pathex=[str(ROOT)],
     datas=[
         (str(PKG), "mangaeasy"),
-        (str(ROOT / "packaging" / "icon.png"), "."),  # available at runtime for any UI that needs it
+        (str(ROOT / "packaging" / "icon.png"), "."),
+        (str(ROOT / "packaging" / "icon.ico"), "."),  # loaded at runtime to set the Win32 window icon
     ],
     hiddenimports=hiddenimports,
     excludes=["torch", "torchvision", "transformers", "faster_whisper"],
@@ -67,7 +68,7 @@ if _sys.platform == "darwin":
         info_plist={
             "CFBundleName": "mangaEasy",
             "CFBundleDisplayName": "mangaEasy",
-            "CFBundleShortVersionString": "0.6.2",
+            "CFBundleShortVersionString": "0.6.3",
             "NSHighResolutionCapable": True,
             "NSRequiresAquaSystemAppearance": False,  # supports dark mode
         },

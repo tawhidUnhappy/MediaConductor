@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import socket
+import sys
 import threading
 import time
+from pathlib import Path
 
 from flask import Flask
 
@@ -13,6 +15,59 @@ from mangaeasy.web.app.jobs import cleanup
 from mangaeasy.web.app.state import state
 
 DEFAULT_PORT = 5010
+
+
+# ── Windows taskbar / window-icon helpers ─────────────────────────────────────
+
+def _win_setup() -> None:
+    """Set AppUserModelID so Windows groups our windows under mangaEasy, not Python."""
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("com.mangaeasy.app")
+    except Exception:
+        pass
+
+
+def _win_apply_icon() -> None:
+    """Load the bundled icon.ico and push it onto the pywebview window via Win32."""
+    try:
+        import ctypes
+        # Give pywebview a moment to finish creating the Win32 window.
+        for _ in range(20):
+            win = state.get("window")
+            hwnd = getattr(win, "native_handle", None)
+            if hwnd:
+                break
+            time.sleep(0.1)
+        else:
+            return
+
+        user32 = ctypes.windll.user32
+        WM_SETICON, ICON_SMALL, ICON_BIG = 0x0080, 0, 1
+        LR_LOADFROMFILE, IMAGE_ICON = 0x10, 1
+
+        # Prefer the bundled icon.ico (has all sizes incl. 256×256 for HiDPI).
+        if getattr(sys, "frozen", False):
+            ico = Path(sys.executable).parent / "icon.ico"
+        else:
+            ico = Path(__file__).parent.parent.parent.parent / "packaging" / "icon.ico"
+
+        if ico.exists():
+            hBig = user32.LoadImageW(None, str(ico), IMAGE_ICON, 256, 256, LR_LOADFROMFILE)
+            hSmall = user32.LoadImageW(None, str(ico), IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+        else:
+            # Fall back to extracting from the EXE itself.
+            shell32 = ctypes.windll.shell32
+            HICONp = ctypes.c_void_p
+            hBig, hSmall = HICONp(0), HICONp(0)
+            shell32.ExtractIconExW(sys.executable, 0, ctypes.byref(hBig), ctypes.byref(hSmall), 1)
+
+        if hBig:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hBig)
+        if hSmall:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hSmall)
+    except Exception:
+        pass
 
 
 def _wait_for_port(port: int, timeout: float = 10.0) -> bool:
@@ -36,6 +91,9 @@ def run(app: Flask) -> int:
     args = parser.parse_args()
 
     url = f"http://127.0.0.1:{args.port}"
+
+    if sys.platform == "win32":
+        _win_setup()
 
     window = None
     if not args.browser:
@@ -69,7 +127,10 @@ def run(app: Flask) -> int:
     state["window"] = window.create_window(
         "mangaEasy", url, width=1240, height=820, min_size=(900, 600)
     )
-    window.start()
+    if sys.platform == "win32":
+        window.start(func=_win_apply_icon)
+    else:
+        window.start()
     state["window"] = None
     cleanup()
     return 0

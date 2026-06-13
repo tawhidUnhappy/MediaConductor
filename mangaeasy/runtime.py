@@ -9,6 +9,7 @@ Every place that spawns another mangaeasy command must build its argv via
 
 from __future__ import annotations
 
+import subprocess
 import sys
 
 
@@ -21,3 +22,15 @@ def cli_command(command: str, *args: str) -> list[str]:
     if is_frozen():
         return [sys.executable, command, *args]
     return [sys.executable, "-m", "mangaeasy.cli", command, *args]
+
+
+def popen_kwargs() -> dict:
+    """Extra kwargs for subprocess.Popen/run that suppress console windows on Windows.
+
+    A GUI-subsystem exe causes Windows to allocate a new console window for
+    every child console process it spawns (ffmpeg, git, uv …). Adding
+    CREATE_NO_WINDOW prevents that window from ever appearing.
+    """
+    if sys.platform == "win32":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}

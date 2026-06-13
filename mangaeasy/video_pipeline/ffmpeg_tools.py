@@ -5,6 +5,8 @@ import shlex
 import subprocess
 from pathlib import Path
 
+from mangaeasy.runtime import popen_kwargs
+
 
 def run(
     command: list[str],
@@ -25,6 +27,7 @@ def run(
         text=True,
         encoding="utf-8",
         errors="replace",
+        **popen_kwargs(),
     )
 
 
@@ -95,6 +98,7 @@ def available_encoders() -> set[str]:
             text=True,
             encoding="utf-8",
             errors="replace",
+            **popen_kwargs(),
         )
     except Exception:
         return set()

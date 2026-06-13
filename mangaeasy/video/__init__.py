@@ -3,6 +3,8 @@
 import shutil
 import subprocess
 
+from mangaeasy.runtime import popen_kwargs
+
 
 def get_ffmpeg() -> tuple:
     """Return (ffmpeg_path, ffprobe_path). Raises RuntimeError if either is not on PATH."""
@@ -20,6 +22,7 @@ def nvenc_available(ffmpeg_path: str | None = None) -> bool:
         out = subprocess.check_output(
             [ffmpeg, "-hide_banner", "-encoders"],
             text=True, stderr=subprocess.STDOUT,
+            **popen_kwargs(),
         )
         return "h264_nvenc" in out
     except Exception:
