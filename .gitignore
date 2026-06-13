@@ -8,6 +8,7 @@ __pycache__/
 .venv/
 dist/
 build/
+build-tmp/
 *.egg-info/
 
 # Local config (publish the *.example.json files instead)
@@ -54,3 +55,5 @@ config.system.json
 .claude/
 .idea/
 .vscode/
+/dist/
+/build/

@@ -3,9 +3,9 @@ from __future__ import annotations
 import argparse
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
+from mangaeasy.runtime import cli_command
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
     DEFAULT_KOKORO_ROOT,
@@ -104,16 +104,16 @@ def main() -> int:
 
     engine = resolve_tts_engine(args.tts, args.speaker_wav)
     if engine == "indextts":
-        audio_cmd = [
-            sys.executable, "-m", "mangaeasy.video_pipeline.generate_audio_indextts",
+        audio_cmd = cli_command(
+            "video-audio-indextts",
             "--project-root", str(args.project_root),
             "--audio-root", str(args.audio_root),
-        ]
+        )
         if args.speaker_wav is not None:
             audio_cmd += ["--speaker-wav", str(args.speaker_wav)]
     else:
-        audio_cmd = [
-            sys.executable, "-m", "mangaeasy.video_pipeline.generate_audio",
+        audio_cmd = cli_command(
+            "video-audio",
             "--project-root", str(args.project_root),
             "--audio-root", str(args.audio_root),
             "--work-dir", str(args.work_dir),
@@ -122,7 +122,7 @@ def main() -> int:
             "--lang", args.lang,
             "--speed", str(args.speed),
             "--device", args.device,
-        ]
+        )
     if args.project_name:
         audio_cmd += ["--project-name", args.project_name]
     if args.overwrite_audio:
@@ -130,8 +130,8 @@ def main() -> int:
     if selected_items:
         audio_cmd += ["--items", *selected_items]
 
-    video_cmd = [
-        sys.executable, "-m", "mangaeasy.video_pipeline.make_videos",
+    video_cmd = cli_command(
+        "video-render",
         "--project-root", str(args.project_root),
         "--audio-root", str(args.audio_root),
         "--output-root", str(args.output_root),
@@ -144,7 +144,7 @@ def main() -> int:
         "--cq", str(args.cq),
         "--fps", str(args.fps),
         "--workers", str(args.video_workers),
-    ]
+    )
     if args.project_name:
         video_cmd += ["--project-name", args.project_name]
     if args.background_image is not None:
@@ -158,15 +158,15 @@ def main() -> int:
     run(video_cmd, cwd)
     if args.build_long_video:
         name = project_name(args.project_root, args.project_name)
-        long_cmd = [
-            sys.executable, "-m", "mangaeasy.video_pipeline.make_long_video",
+        long_cmd = cli_command(
+            "video-join",
             "--project-root", str(args.project_root),
             "--output-root", str(args.output_root),
             "--work-dir", str(args.work_dir),
             "--narration-dir", str(args.audio_root.resolve() / name / "_items"),
             "--audio-bitrate", args.audio_bitrate,
             "--overwrite",
-        ]
+        )
         if args.project_name:
             long_cmd += ["--project-name", args.project_name]
         if args.background_music is not None:
@@ -180,12 +180,12 @@ def main() -> int:
         run(long_cmd, cwd)
 
         if args.normalize_audio:
-            norm_cmd = [
-                sys.executable, "-m", "mangaeasy.video_pipeline.normalize_long_audio",
+            norm_cmd = cli_command(
+                "video-normalize-audio",
                 "--project-root", str(args.project_root),
                 "--output-root", str(args.output_root),
                 "--replace",
-            ]
+            )
             if args.project_name:
                 norm_cmd += ["--project-name", args.project_name]
             run(norm_cmd, cwd)

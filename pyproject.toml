@@ -92,6 +92,11 @@ include = [
     "/docs",
 ]
 
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.20.0",
+]
+
 [project.scripts]
 # A single entry point. Run `mangaeasy --help` to see every subcommand.
 mangaeasy = "mangaeasy.cli:main"

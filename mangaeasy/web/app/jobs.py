@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from pathlib import Path
 
+from mangaeasy.runtime import cli_command
 from mangaeasy.web.app.state import log, state
 
 
@@ -26,7 +26,7 @@ def spawn_cli(command: str, args: list[str], cwd: Path) -> subprocess.Popen:
     env = dict(os.environ)
     env["MANGAEASY_PROJECT_ROOT"] = str(cwd)
     env.setdefault("PYTHONUNBUFFERED", "1")
-    full = [sys.executable, "-m", "mangaeasy.cli", command, *args]
+    full = cli_command(command, *args)
     log(f"$ mangaeasy {command} {' '.join(args)}")
     return subprocess.Popen(
         full,

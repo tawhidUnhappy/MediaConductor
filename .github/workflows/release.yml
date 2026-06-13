@@ -1,0 +1,111 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to create a GitHub Release and upload assets
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: mangaEasy-windows.zip
+            archive_cmd: zip
+          - os: ubuntu-latest
+            artifact_name: mangaEasy-linux.tar.gz
+            archive_cmd: tar
+          - os: macos-latest
+            artifact_name: mangaEasy-macos.tar.gz
+            archive_cmd: tar
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Install Python via uv
+        run: uv python install
+
+      - name: Install project dependencies (including dev for PyInstaller)
+        run: uv sync --frozen --dev --no-extra deepspeed
+
+      - name: Build standalone bundle
+        run: uv run pyinstaller packaging/mangaeasy.spec --distpath dist --workpath build-tmp --noconfirm
+
+      # ── Windows: zip dist/mangaEasy ────────────────────────────────────────
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\mangaEasy -DestinationPath ${{ matrix.artifact_name }} -Force
+
+      # ── Linux / macOS: tar.gz dist/mangaEasy ──────────────────────────────
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          tar -czf ${{ matrix.artifact_name }} -C dist mangaEasy
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Create release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "mangaEasy ${{ github.ref_name }}"
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            ## mangaEasy ${{ github.ref_name }}
+
+            ### Download
+
+            | Platform | File | Notes |
+            |---|---|---|
+            | Windows 11 / 10 | `mangaEasy-windows.zip` | Extract, double-click `mangaEasy.exe` |
+            | Linux (x64) | `mangaEasy-linux.tar.gz` | Extract, run `./mangaEasy/mangaeasy` |
+            | macOS (x64 / Apple Silicon) | `mangaEasy-macos.tar.gz` | Extract, run `./mangaEasy/mangaeasy` |
+
+            ### First run
+
+            1. Double-click `mangaeasy.exe` (Windows) or run `./mangaEasy/mangaeasy` (Linux/macOS).
+            2. The control centre opens in your browser at `http://127.0.0.1:5000`.
+            3. Use **Setup** to download ffmpeg and the AI tools (IndexTTS / Kokoro) on first launch.
+
+            > Python and uv are **not** required — everything is bundled.
+
+            ### Requirements
+            - ffmpeg: downloaded automatically on first launch.
+            - For AI voice (IndexTTS): NVIDIA GPU recommended.
+            - For background-music video: no GPU required (Kokoro TTS runs on CPU).
+          files: |
+            artifacts/mangaEasy-windows.zip
+            artifacts/mangaEasy-linux.tar.gz
+            artifacts/mangaEasy-macos.tar.gz
