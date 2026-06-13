@@ -261,26 +261,6 @@ def _verify_tool_python(dest: Path, import_check: str, log: LogFn) -> None:
         log(f"[warn] verify import '{import_check}' failed: {exc}")
 
 
-_CUDA_TORCH_PKGS = ("torch", "torchvision", "torchaudio")
-
-
-def _write_cuda_uv_toml(dest: Path) -> None:
-    """Write a uv.toml in *dest* that steers torch packages to CUDA wheels.
-
-    uv.toml is separate from the repo's pyproject.toml, so it survives
-    `git pull` and can be safely created or removed by mangaEasy.
-    """
-    index_url = _torch_index_url("cuda")
-    if index_url is None:
-        return
-    sources = "\n".join(f'{p} = [{{ index = "pytorch" }}]' for p in _CUDA_TORCH_PKGS)
-    (dest / "uv.toml").write_text(
-        f'[[index]]\nname = "pytorch"\nurl = "{index_url}"\nexplicit = true\n\n'
-        f'[sources]\n{sources}\n',
-        encoding="utf-8",
-    )
-
-
 def _install_uv_project(
     spec: ToolSpec, dest: Path, ref: str | None, skip_model: bool, log: LogFn,
     gpu_mode: str = "cpu",
@@ -299,22 +279,27 @@ def _install_uv_project(
     else:
         log("[warn] git-lfs not found; skipping lfs pull. Install git-lfs if model files are missing.")
 
-    # Steer torch to CUDA wheels for uv-project tools (the repo's own pyproject.toml
-    # usually targets the default PyPI index which ships CPU-only torch on Windows).
-    if gpu_mode == "cuda":
-        log("Writing uv.toml: torch → CUDA wheels (cu128)…")
-        _write_cuda_uv_toml(dest)
-    else:
-        uv_toml = dest / "uv.toml"
-        if uv_toml.exists():
-            uv_toml.unlink()
-            log("Removed CUDA uv.toml override (CPU build).")
-
     sync_cmd = ["uv", "sync", "--all-extras"]
     for extra in spec.exclude_extras:
         log(f"[info] skipping optional extra '{extra}' (not needed for inference)")
         sync_cmd += ["--no-extra", extra]
     _run(sync_cmd, log, cwd=dest)
+
+    # uv.toml doesn't allow [sources], so we can't steer torch to a different
+    # index via that file. Instead, after uv has created the venv we use pip
+    # to force-reinstall torch with the CUDA wheel — this replaces the CPU
+    # build that uv pulled from PyPI.
+    if gpu_mode == "cuda" and spec.needs_gpu:
+        index_url = _torch_index_url("cuda")
+        assert index_url is not None
+        log(f"Reinstalling torch with CUDA wheels ({index_url})…")
+        _run(
+            [*python_command(dest), "-m", "pip", "install",
+             "torch", "torchvision",
+             "--index-url", index_url,
+             "--force-reinstall", "--quiet"],
+            log, cwd=dest, env=tool_env(),
+        )
 
     if spec.needs_gpu and not _has_gpu():
         log("[warn] no NVIDIA GPU detected; this tool will run on CPU, which is much slower.")

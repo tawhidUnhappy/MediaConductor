@@ -50,6 +50,22 @@ export function initLogConsole() {
 
   $("log-clear").addEventListener("click", () => (logLines.innerHTML = ""));
 
+  $("log-copy").addEventListener("click", () => {
+    const text = [...logLines.querySelectorAll(".log-line")]
+      .map(el => {
+        const ts  = el.querySelector(".ts")?.textContent  || "";
+        const msg = el.querySelector(".msg")?.textContent || "";
+        return ts ? `${ts}  ${msg}` : msg;
+      })
+      .join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = $("log-copy");
+      const prev = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = prev; }, 1500);
+    }).catch(() => {});
+  });
+
   const events = new EventSource("/log_stream");
   events.onopen = () => { if (statusEl) statusEl.textContent = "connected"; };
   events.onerror = () => { if (statusEl) statusEl.textContent = "reconnecting…"; };
