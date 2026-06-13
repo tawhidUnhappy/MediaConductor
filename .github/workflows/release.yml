@@ -30,7 +30,7 @@ jobs:
         uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: "3.12"
-          uv-version: "0.11.16"
+          version: "0.11.16"
 
       # pywebview needs GTK/webkit headers on Linux so PyInstaller can import it during analysis
       - name: Install system deps (Linux only)
