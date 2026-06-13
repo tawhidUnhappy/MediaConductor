@@ -13,6 +13,12 @@
   let hoverPanelIndexGlobal = -1;
   let hoverYGlobal          = null;
 
+  // Module-level drag state — shared across ALL page closures so a drag
+  // that starts on page N continues correctly when the mouse crosses into
+  // page N+1's canvas or escapes all canvases entirely.
+  let dragging  = null;   // { panelIndex, edge, startY, startTop, startBottom }
+  let dragMoved = false;
+
   const reader        = document.getElementById('reader');
   const pagesContainer = document.getElementById('pages');
   const statusSpan    = document.getElementById('status');
@@ -319,11 +325,54 @@
     }
   }
 
+  // ── Global drag fallback ────────────────────────────────────────────────
+  // Continues the drag when the mouse escapes every page canvas (e.g.
+  // dragged to the toolbar or below the last page). Defers to the per-page
+  // mousemove when the event target IS a hitLayer canvas.
+  window.addEventListener('mousemove', (evt) => {
+    if (!dragging) return;
+    if (pages.some(ps => ps.hitLayer === evt.target)) return; // page handler takes it
+
+    // Find the closest page vertically to borrow its coordinate system.
+    let bestPs = null, bestDist = Infinity;
+    for (const ps of pages) {
+      if (ps.origHeight == null) continue;
+      const rect = ps.hitLayer.getBoundingClientRect();
+      const dist = Math.max(0, rect.top - evt.clientY, evt.clientY - rect.bottom);
+      if (dist < bestDist) { bestDist = dist; bestPs = ps; }
+    }
+    if (!bestPs) return;
+
+    const globalY = getGlobalYFromEvent(bestPs, evt);
+    if (globalY == null) return;
+    dragMoved = true;
+
+    const dy = globalY - dragging.startY;
+    let newTop = dragging.startTop, newBottom = dragging.startBottom;
+    if (dragging.edge === "top")    newTop    = dragging.startTop    + dy;
+    if (dragging.edge === "bottom") newBottom = dragging.startBottom + dy;
+
+    if (newBottom - newTop >= MIN_PANEL_PX &&
+        !wouldOverlapAny(newTop, newBottom, dragging.panelIndex)) {
+      panels[dragging.panelIndex].top    = newTop;
+      panels[dragging.panelIndex].bottom = newBottom;
+      scheduleRedrawAll();
+    }
+  });
+
+  // Single mouseup listener — normalize and save once when drag ends.
+  window.addEventListener('mouseup', () => {
+    if (dragging) {
+      suppressClickOnce();
+      normalizePanels();
+      scheduleRedrawAll();
+    }
+    dragging = null; dragMoved = false;
+  });
+
   // ── Per-page events ────────────────────────────────────────────────────
   function attachPageEvents(ps) {
     const hit = ps.hitLayer;
-    let dragging  = null;
-    let dragMoved = false;
 
     hit.addEventListener('mousemove', (evt) => {
       if (ps.origHeight == null || ps.offsetTop == null) return;
@@ -402,23 +451,13 @@
       }
     });
 
-    window.addEventListener('mouseup', () => {
-      if (dragging) {
-        suppressClickOnce();
-        // Normalize and save exactly once when the drag finishes.
-        normalizePanels();
-        scheduleRedrawAll();
-      }
-      dragging = null; dragMoved = false;
-    });
-
     hit.addEventListener('mouseleave', () => {
       const oldHoverIdx     = hoverPanelIndexGlobal;
       ps.hoverPanelIndex    = -1;
       hoverPanelIndexGlobal = -1;
       hoverYGlobal          = null;
-      if (dragging) suppressClickOnce();
-      dragging = null; dragMoved = false;
+      // Do NOT clear dragging here — the drag continues on the next canvas
+      // or via the window-level mousemove fallback.
       scheduleRedrawPartial(new Set(pagesForPanel(oldHoverIdx)));
     });
 
