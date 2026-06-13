@@ -26,7 +26,7 @@ jobs:
 
       # setup-uv installs uv AND the pinned Python in one step
       - name: Set up uv + Python 3.12
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: "3.12"
 
@@ -229,7 +229,7 @@ jobs:
         run: ls -lh artifacts/
 
       - name: Create release and upload assets
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
