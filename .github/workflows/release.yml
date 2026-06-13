@@ -6,7 +6,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write   # needed to create a GitHub Release and upload assets
+  contents: write
 
 jobs:
   build:
@@ -17,11 +17,8 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact_name: mangaEasy-windows.zip
           - os: ubuntu-latest
-            artifact_name: mangaEasy-linux.tar.gz
           - os: macos-latest
-            artifact_name: mangaEasy-macos.tar.gz
 
     steps:
       - name: Checkout
@@ -42,14 +39,16 @@ jobs:
       - name: Build standalone bundle
         run: uv run pyinstaller packaging/mangaeasy.spec --distpath dist --workpath build-tmp --noconfirm
 
-      # ── Windows: portable zip ──────────────────────────────────────────────
-      - name: Package portable zip (Windows)
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # WINDOWS
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      - name: "[Win] Portable zip"
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path dist\mangaEasy -DestinationPath ${{ matrix.artifact_name }} -Force
+        run: Compress-Archive -Path dist\mangaEasy -DestinationPath mangaEasy-windows.zip -Force
 
-      # ── Windows: Inno Setup installer → mangaEasy-Setup-vX.Y.Z.exe ────────
-      - name: Build Windows installer (Inno Setup)
+      - name: "[Win] Installer via Inno Setup"
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -58,23 +57,157 @@ jobs:
             "/DMyAppVersion=$version" `
             "packaging\mangaeasy.iss"
 
-      - name: Upload installer artifact (Windows)
+      - name: "[Win] Upload portable"
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: mangaEasy-Setup
-          path: dist/mangaEasy-Setup-*.exe
+          name: mangaEasy-windows.zip
+          path: mangaEasy-windows.zip
 
-      # ── Linux / macOS: tar.gz ──────────────────────────────────────────────
-      - name: Package (Unix)
-        if: runner.os != 'Windows'
-        run: tar -czf ${{ matrix.artifact_name }} -C dist mangaEasy
-
-      - name: Upload artifact
+      - name: "[Win] Upload installer"
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}
+          name: mangaEasy-windows-installer
+          path: dist/mangaEasy-Setup-*.exe
+
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # LINUX
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      - name: "[Linux] Portable tar.gz"
+        if: runner.os == 'Linux'
+        run: tar -czf mangaEasy-linux.tar.gz -C dist mangaEasy
+
+      - name: "[Linux] Build .deb installer"
+        if: runner.os == 'Linux'
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          # ── package directory layout ──────────────────────
+          mkdir -p deb/opt/mangaEasy
+          mkdir -p deb/usr/share/applications
+          mkdir -p deb/DEBIAN
+
+          cp -r dist/mangaEasy/. deb/opt/mangaEasy/
+          chmod +x deb/opt/mangaEasy/mangaeasy
+
+          # ── postinst: create /usr/local/bin symlink ───────
+          cat > deb/DEBIAN/postinst << 'SCRIPT'
+          #!/bin/bash
+          set -e
+          mkdir -p /usr/local/bin
+          ln -sf /opt/mangaEasy/mangaeasy /usr/local/bin/mangaeasy
+          chmod +x /opt/mangaEasy/mangaeasy
+          SCRIPT
+          chmod 0755 deb/DEBIAN/postinst
+
+          # ── postrm: remove symlink on uninstall ───────────
+          cat > deb/DEBIAN/postrm << 'SCRIPT'
+          #!/bin/bash
+          set -e
+          rm -f /usr/local/bin/mangaeasy
+          SCRIPT
+          chmod 0755 deb/DEBIAN/postrm
+
+          # ── .desktop entry ────────────────────────────────
+          cat > deb/usr/share/applications/mangaeasy.desktop << EOF
+          [Desktop Entry]
+          Name=mangaEasy
+          Comment=Manga to video automation
+          Exec=/opt/mangaEasy/mangaeasy app
+          Terminal=true
+          Type=Application
+          Categories=Multimedia;Video;
+          EOF
+
+          # ── control file ──────────────────────────────────
+          INSTALLED_SIZE=$(du -sk deb/opt | cut -f1)
+          cat > deb/DEBIAN/control << EOF
+          Package: mangaeasy
+          Version: ${VERSION}
+          Architecture: amd64
+          Maintainer: mangaEasy contributors <https://github.com/tawhidUnhappy/mangaEasy>
+          Installed-Size: ${INSTALLED_SIZE}
+          Description: Manga to video automation tool
+           Turn manga panels or any folder of images into narrated videos.
+           Bundles all dependencies — no Python or uv required.
+          Homepage: https://github.com/tawhidUnhappy/mangaEasy
+          EOF
+
+          dpkg-deb --build deb mangaEasy-linux.deb
+
+      - name: "[Linux] Upload portable"
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangaEasy-linux.tar.gz
+          path: mangaEasy-linux.tar.gz
+
+      - name: "[Linux] Upload .deb"
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangaEasy-linux.deb
+          path: mangaEasy-linux.deb
+
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # MACOS
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      - name: "[macOS] Portable tar.gz"
+        if: runner.os == 'macOS'
+        run: tar -czf mangaEasy-macos.tar.gz -C dist mangaEasy
+
+      - name: "[macOS] Build .pkg installer"
+        if: runner.os == 'macOS'
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          # ── payload: goes to /opt/mangaEasy ───────────────
+          mkdir -p pkg-payload/opt/mangaEasy
+          cp -r dist/mangaEasy/. pkg-payload/opt/mangaEasy/
+          chmod +x pkg-payload/opt/mangaEasy/mangaeasy
+
+          # ── scripts: postinstall creates /usr/local/bin symlink ──
+          mkdir -p pkg-scripts
+          cat > pkg-scripts/postinstall << 'SCRIPT'
+          #!/bin/bash
+          set -e
+          mkdir -p /usr/local/bin
+          ln -sf /opt/mangaEasy/mangaeasy /usr/local/bin/mangaeasy
+          chmod +x /opt/mangaEasy/mangaeasy
+          SCRIPT
+          chmod +x pkg-scripts/postinstall
+
+          # ── build component package ───────────────────────
+          pkgbuild \
+            --root pkg-payload \
+            --scripts pkg-scripts \
+            --identifier com.mangaeasy.app \
+            --version "$VERSION" \
+            --install-location / \
+            mangaEasy-macos.pkg
+
+      - name: "[macOS] Upload portable"
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangaEasy-macos.tar.gz
+          path: mangaEasy-macos.tar.gz
+
+      - name: "[macOS] Upload .pkg"
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangaEasy-macos.pkg
+          path: mangaEasy-macos.pkg
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # RELEASE
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   release:
     name: Create GitHub Release
@@ -102,28 +235,49 @@ jobs:
 
             ### Download
 
-            | Platform | File | Notes |
+            #### Windows
+            | File | Type | Notes |
             |---|---|---|
-            | **Windows — Installer** | `mangaEasy-Setup-${{ github.ref_name }}.exe` | Run the installer — installs to Program Files, adds Start Menu shortcut |
-            | **Windows — Portable** | `mangaEasy-windows.zip` | Extract anywhere, double-click `mangaeasy.exe` — no install needed |
-            | **Linux (x64)** | `mangaEasy-linux.tar.gz` | `tar -xzf …`, then `./mangaEasy/mangaeasy` |
-            | **macOS** | `mangaEasy-macos.tar.gz` | `tar -xzf …`, then `./mangaEasy/mangaeasy` |
+            | `mangaEasy-Setup-${{ github.ref_name }}.exe` | **Installer** | Wizard — installs to Program Files, Start Menu shortcut, optional PATH |
+            | `mangaEasy-windows.zip` | Portable | Extract anywhere, double-click `mangaeasy.exe` — no install needed |
+
+            #### Linux (x64)
+            | File | Type | Notes |
+            |---|---|---|
+            | `mangaEasy-linux.deb` | **Installer** | `sudo dpkg -i mangaEasy-linux.deb` — installs to `/opt/mangaEasy/`, adds `mangaeasy` to PATH |
+            | `mangaEasy-linux.tar.gz` | Portable | Extract and run `./mangaEasy/mangaeasy` — no install needed |
+
+            #### macOS
+            | File | Type | Notes |
+            |---|---|---|
+            | `mangaEasy-macos.pkg` | **Installer** | Double-click — installs to `/opt/mangaEasy/`, adds `mangaeasy` to PATH |
+            | `mangaEasy-macos.tar.gz` | Portable | Extract and run `./mangaEasy/mangaeasy` — no install needed |
+
+            ---
 
             ### First run
 
-            1. **Windows**: run the installer **or** extract the portable zip and double-click `mangaeasy.exe`.
-            2. **Linux/macOS**: `chmod +x mangaEasy/mangaeasy && ./mangaEasy/mangaeasy`
-            3. The control centre opens in your browser at `http://127.0.0.1:5000`.
-            4. Use the **Setup** tab to download ffmpeg and the AI voice tools on first launch.
+            1. Launch mangaEasy (double-click exe / `mangaeasy app` in terminal).
+            2. The control centre opens in your browser at `http://127.0.0.1:5000`.
+            3. Go to the **Setup** tab to download ffmpeg and AI tools on first launch.
 
-            > **Python and uv are not required** — everything is bundled inside the download.
+            > **Python and uv are not required** — everything is bundled.
 
             ### System requirements
             - Windows 10/11, Ubuntu 20.04+, or macOS 12+
             - ffmpeg — downloaded automatically on first launch
             - NVIDIA GPU — optional; needed only for IndexTTS voice cloning (Kokoro TTS runs on CPU)
+
+            ### macOS note
+            macOS may block the app on first launch. Right-click → Open to allow it, or run once in Terminal:
+            ```bash
+            sudo xattr -cr /opt/mangaEasy   # for .pkg install
+            xattr -cr mangaEasy             # for portable tar.gz
+            ```
           files: |
             artifacts/mangaEasy-Setup-*.exe
             artifacts/mangaEasy-windows.zip
+            artifacts/mangaEasy-linux.deb
             artifacts/mangaEasy-linux.tar.gz
+            artifacts/mangaEasy-macos.pkg
             artifacts/mangaEasy-macos.tar.gz

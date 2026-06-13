@@ -13,36 +13,71 @@ No Python, no uv, no dependencies. Just download, extract, and run.
 Go to the [**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest)
 and download the file for your platform:
 
-| Platform | File | Notes |
+#### Windows
+| File | Type | Notes |
 |---|---|---|
-| **Windows — Installer** | `mangaEasy-Setup-vX.Y.Z.exe` | Recommended — installs to Program Files, adds Start Menu shortcut |
-| **Windows — Portable** | `mangaEasy-windows.zip` | No install needed — extract and run from anywhere |
-| Linux (x64) | `mangaEasy-linux.tar.gz` | |
-| macOS (Intel or Apple Silicon) | `mangaEasy-macos.tar.gz` | |
+| `mangaEasy-Setup-vX.Y.Z.exe` | **Installer** | Installs to Program Files, adds Start Menu shortcut |
+| `mangaEasy-windows.zip` | Portable | Extract anywhere, run without installing |
+
+#### Linux (x64)
+| File | Type | Notes |
+|---|---|---|
+| `mangaEasy-linux.deb` | **Installer** | For Ubuntu / Debian and derivatives |
+| `mangaEasy-linux.tar.gz` | Portable | Works on any Linux distro |
+
+#### macOS
+| File | Type | Notes |
+|---|---|---|
+| `mangaEasy-macos.pkg` | **Installer** | Standard macOS installer wizard |
+| `mangaEasy-macos.tar.gz` | Portable | Extract and run without installing |
 
 ### Step 2: Install or extract
 
-**Windows — Installer (recommended)**
+**Windows — Installer**
 - Double-click `mangaEasy-Setup-vX.Y.Z.exe` and follow the wizard.
 - Installs to `C:\Program Files\mangaEasy\`, adds a Start Menu shortcut,
   and optionally adds `mangaeasy` to your system PATH.
 
 **Windows — Portable zip**
-- Right-click the zip → *Extract All* → choose any permanent folder.
+- Right-click → *Extract All* → choose any permanent folder.
 - You get a `mangaEasy\` folder. Move it wherever you like.
 
-**Linux / macOS**
-- `tar -xzf mangaEasy-*.tar.gz`
-- You get a `mangaEasy/` folder.
+**Linux — .deb installer (Ubuntu / Debian)**
+```bash
+sudo dpkg -i mangaEasy-linux.deb
+# mangaeasy is now on your PATH
+mangaeasy app
+```
+
+**Linux — Portable tar.gz (any distro)**
+```bash
+tar -xzf mangaEasy-linux.tar.gz
+chmod +x mangaEasy/mangaeasy
+./mangaEasy/mangaeasy
+```
+
+**macOS — .pkg installer**
+- Double-click `mangaEasy-macos.pkg` and follow the installer.
+- Installs to `/opt/mangaEasy/` and adds `mangaeasy` to `/usr/local/bin/`.
+- If Gatekeeper blocks it: System Settings → Privacy & Security → Allow.
+
+**macOS — Portable tar.gz**
+```bash
+tar -xzf mangaEasy-macos.tar.gz
+xattr -cr mangaEasy          # clear Gatekeeper quarantine
+./mangaEasy/mangaeasy
+```
 
 ### Step 3: Run
 
 | Platform | How to start |
 |---|---|
 | Windows (installer) | Start Menu → **mangaEasy**, or `mangaeasy app` in any terminal |
-| Windows (portable) | Double-click **`mangaeasy.exe`** inside the extracted `mangaEasy\` folder |
-| Linux | `./mangaEasy/mangaeasy` |
-| macOS | `./mangaEasy/mangaeasy` |
+| Windows (portable) | Double-click **`mangaeasy.exe`** inside the `mangaEasy\` folder |
+| Linux (installed) | `mangaeasy app` in any terminal |
+| Linux (portable) | `./mangaEasy/mangaeasy` |
+| macOS (installed) | `mangaeasy app` in any terminal |
+| macOS (portable) | `./mangaEasy/mangaeasy` |
 
 The control centre opens automatically in your browser at `http://127.0.0.1:5000`.
 
