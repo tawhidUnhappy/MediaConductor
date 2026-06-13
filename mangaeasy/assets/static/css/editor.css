@@ -72,6 +72,25 @@ button:disabled { opacity: 0.35; cursor: default; box-shadow: none; transform: n
   border-radius: 999px;
 }
 
+.device-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+.device-badge.gpu {
+  background: rgba(20, 70, 40, 0.7);
+  border: 1px solid #2a7a4888;
+  color: #4dffaa;
+}
+.device-badge.cpu {
+  background: rgba(40, 40, 55, 0.7);
+  border: 1px solid #4a4a6088;
+  color: #8888aa;
+}
+
 #reader {
   flex: 1;
   overflow-y: auto;
