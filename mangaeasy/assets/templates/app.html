@@ -179,6 +179,32 @@
       <code>panels/</code> folder + a <code>narration.json</code>) into a narrated video,
       and can join them all into one long video.</p>
 
+    <!-- ── Chapter progress overview ───────────────────────────────────── -->
+    <div class="panel">
+      <div class="row between" style="margin-bottom:6px">
+        <h3 style="margin:0">Chapter progress</h3>
+        <button id="chapters-refresh" class="btn small">↻ Refresh</button>
+      </div>
+      <p id="chapters-summary" class="hint" style="margin:0 0 6px"></p>
+      <div id="chapters-grid"></div>
+    </div>
+
+    <!-- ── Batch download ───────────────────────────────────────────────── -->
+    <div class="panel">
+      <h3>Batch download from MangaDex</h3>
+      <div class="row">
+        <label class="bdl-range-label">Chapters
+          <input id="bdl-start" type="number" min="1" class="text bdl-num" value="1">
+          to
+          <input id="bdl-end" type="number" min="1" class="text bdl-num" value="8">
+        </label>
+        <button id="bdl-run" class="btn primary">⬇ Download</button>
+        <button id="bdl-stop" class="btn danger" disabled>■ Stop</button>
+        <span id="bdl-status" class="hint"></span>
+      </div>
+      <p class="hint">Downloads each chapter in sequence using the manga URL from your Project settings. Watch progress in the Terminal tab.</p>
+    </div>
+
     <div class="panel">
       <h3><span class="step-no">1</span> Choose folders</h3>
       <div class="folder-row">

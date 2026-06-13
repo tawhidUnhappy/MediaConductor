@@ -9,12 +9,14 @@ along the current chapter is.
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
+from mangaeasy.web.app import jobs
 from mangaeasy.web.app.api_project import _read_json
-from mangaeasy.web.app.state import log, state
+from mangaeasy.web.app.state import lock, log, state
 
 bp = Blueprint("workflow", __name__)
 
@@ -129,3 +131,102 @@ def api_workflow():
         "video": video_bgm.exists() or video.exists(),
     }
     return jsonify(info)
+
+
+@bp.route("/api/workflow/chapters", methods=["GET"])
+def api_workflow_chapters():
+    """Scan the manga library folder and return per-chapter progress counts."""
+    root: Path = state["project_root"]
+    cfg = _read_json(root / "config.json") or {}
+    sys_cfg = _read_json(root / "config.system.json") or {}
+    dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+
+    name = str(dl.get("name") or "")
+    if not name:
+        return jsonify({"chapters": [], "name": ""})
+
+    lib_dir = _library_dir(root, sys_cfg)
+    manga_dir = lib_dir / name
+    if not manga_dir.is_dir():
+        return jsonify({"chapters": [], "name": name})
+
+    paths_cfg = sys_cfg.get("paths") or {}
+    panels_sub = paths_cfg.get("panels_subdir", "panels")
+    audio_sub  = paths_cfg.get("audio_subdir",  "audio")
+
+    chapters = []
+    for ch_dir in sorted(manga_dir.iterdir()):
+        if not ch_dir.is_dir():
+            continue
+        try:
+            ch_num = int(ch_dir.name)
+        except ValueError:
+            continue
+        chapters.append({
+            "chapter":    ch_num,
+            "downloaded": _count_files(ch_dir / "download", IMAGE_EXTS),
+            "panels":     _count_files(ch_dir / panels_sub,  IMAGE_EXTS),
+            "audio":      _count_files(ch_dir / audio_sub,   {".wav"}),
+            "video":      bool(list(ch_dir.glob("*.mp4"))),
+        })
+
+    return jsonify({"chapters": chapters, "name": name})
+
+
+@bp.route("/api/workflow/batch-download", methods=["POST"])
+def api_batch_download():
+    """Download a range of chapters from MangaDex one by one as a single job."""
+    body = request.get_json(silent=True) or {}
+    try:
+        start = int(body.get("start", 1))
+        end   = int(body.get("end",   1))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid chapter range"}), 400
+
+    if start < 1 or end < start or end > 999:
+        return jsonify({"error": "range must be 1–999 and start ≤ end"}), 400
+
+    root: Path = state["project_root"]
+    cfg_path = root / "config.json"
+    total = end - start + 1
+
+    job: dict = {
+        "kind":   "batch-download",
+        "name":   f"ch {start:02d}–{end:02d}",
+        "thread": None,
+        "proc":   None,
+    }
+
+    def work() -> None:
+        for i, ch in enumerate(range(start, end + 1), 1):
+            log(f"[batch-download] chapter {ch:02d} ({i}/{total})…")
+            # Update config.json so the download command picks up the right chapter.
+            cfg = _read_json(cfg_path) or {}
+            dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+            dl["chapter"] = ch
+            cfg["download"] = dl
+            cfg.pop("_comment", None)
+            cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+
+            proc = jobs.spawn_cli("download", [], root)
+            job["proc"] = proc
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                log(line.rstrip("\n"))
+            code = proc.wait()
+            log(f"[download] chapter {ch:02d} exit {code}")
+            if code != 0:
+                log(f"[batch-download] stopped — chapter {ch:02d} failed")
+                return
+
+        log(f"[batch-download] chapters {start:02d}–{end:02d} done ✓")
+
+    thread = threading.Thread(target=work, daemon=True)
+    job["thread"] = thread
+    with lock:
+        if jobs.job_running():
+            return jsonify({"error": "another job is already running"}), 409
+        state["job"] = job
+        thread.start()
+
+    return jsonify({"started": True})

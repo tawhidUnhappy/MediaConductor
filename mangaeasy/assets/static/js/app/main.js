@@ -18,6 +18,7 @@ import { initSetup, loadDoctor } from "./setup.js";
 import { initProject, loadProject } from "./project.js";
 import { initWorkflow, refreshWorkflow } from "./workflow.js";
 import { initRun, updateStepUI } from "./run.js";
+import { initChapters, loadChapters } from "./chapters.js";
 import { renderEditors } from "./editors.js";
 import { pollStatus } from "./status.js";
 
@@ -33,6 +34,8 @@ function initTabs() {
       document.querySelectorAll(".tab-page").forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
       $(`tab-${btn.dataset.tab}`).classList.add("active");
+      // Refresh chapter table whenever the Batch tab is opened.
+      if (btn.dataset.tab === "run") loadChapters();
     });
   });
   // Delegated handler for .tab-link buttons rendered by JS (e.g. workflow summary).
@@ -51,10 +54,11 @@ function initTabs() {
   initProject();
   initWorkflow();
   initRun();
+  initChapters();
   renderEditors();
 
   await Promise.allSettled([
-    loadDoctor(), loadProject(), refreshWorkflow(), loadUiState(), pollStatus(),
+    loadDoctor(), loadProject(), refreshWorkflow(), loadUiState(), pollStatus(), loadChapters(),
   ]);
   updateStepUI();
   setInterval(pollStatus, 2000);
