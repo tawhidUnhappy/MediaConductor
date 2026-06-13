@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # setup-uv installs uv AND the pinned Python in one step
       # uv-version must match the local version that generated uv.lock
@@ -65,14 +65,14 @@ jobs:
 
       - name: "[Win] Upload portable"
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mangaEasy-windows.zip
           path: mangaEasy-windows.zip
 
       - name: "[Win] Upload installer"
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mangaEasy-windows-installer
           path: dist/mangaEasy-Setup-*.exe
@@ -146,14 +146,14 @@ jobs:
 
       - name: "[Linux] Upload portable"
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mangaEasy-linux.tar.gz
           path: mangaEasy-linux.tar.gz
 
       - name: "[Linux] Upload .deb"
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mangaEasy-linux.deb
           path: mangaEasy-linux.deb
@@ -199,14 +199,14 @@ jobs:
 
       - name: "[macOS] Upload portable"
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mangaEasy-macos.tar.gz
           path: mangaEasy-macos.tar.gz
 
       - name: "[macOS] Upload .pkg"
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mangaEasy-macos.pkg
           path: mangaEasy-macos.pkg
@@ -222,7 +222,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
           merge-multiple: true
