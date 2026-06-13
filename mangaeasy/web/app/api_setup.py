@@ -51,6 +51,47 @@ def api_install_tool(name: str):
     return jsonify({"started": name})
 
 
+@bp.route("/api/setup-gpu", methods=["POST"])
+def api_setup_gpu():
+    """Force-reinstall torch + torchvision with CUDA wheels into mangaeasy's own venv."""
+    import sys
+    from mangaeasy.tools.install import _has_gpu, _torch_index_url
+
+    if not _has_gpu():
+        return jsonify({"error": "No NVIDIA GPU detected"}), 400
+
+    with lock:
+        if jobs.job_running():
+            return jsonify({"error": "another job is already running"}), 409
+
+        index_url = _torch_index_url("cuda")
+        python = sys.executable
+
+        def work():
+            from mangaeasy.tools.install import InstallError, _run
+            try:
+                log(f"[setup-gpu] Installing CUDA torch into mangaeasy env ({python})")
+                log(f"[setup-gpu] Index: {index_url}")
+                _run(
+                    ["uv", "pip", "install",
+                     "--python", python,
+                     "torch", "torchvision",
+                     "--index-url", index_url,
+                     "--force-reinstall", "--quiet"],
+                    log,
+                )
+                log("[setup-gpu] Done — restart mangaeasy to activate GPU acceleration.")
+            except InstallError as exc:
+                log(f"[setup-gpu] FAILED: {exc}")
+            except Exception as exc:
+                log(f"[setup-gpu] unexpected error: {exc}")
+
+        thread = threading.Thread(target=work, daemon=True)
+        state["job"] = {"kind": "setup-gpu", "name": "cuda-torch", "thread": thread, "proc": None}
+        thread.start()
+    return jsonify({"started": True})
+
+
 @bp.route("/api/install-tool/<name>", methods=["DELETE"])
 def api_delete_tool(name: str):
     import shutil

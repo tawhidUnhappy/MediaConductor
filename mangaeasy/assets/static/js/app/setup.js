@@ -36,10 +36,28 @@ export async function loadDoctor() {
     const cudaOk = report.cuda;
     const label = cudaOk
       ? `CUDA · ${report.cuda_device || "GPU"}`
-      : "CUDA (torch is CPU-only — reinstall tools with GPU unchecked)";
+      : "CUDA torch not installed (gutter detection runs on CPU)";
     grid.insertAdjacentHTML("beforeend",
-      `<div class="prereq" title="${cudaOk ? "torch.cuda.is_available() = True" : "torch.cuda.is_available() = False — reinstall tools"}">
-         <span class="dot ${cudaOk ? "ok" : "bad"}"></span>${label}</div>`);
+      `<div class="prereq" title="${cudaOk ? "torch.cuda.is_available() = True" : "torch.cuda.is_available() = False in mangaeasy env"}">
+         <span class="dot ${cudaOk ? "ok" : "bad"}"></span>${label}
+         ${cudaOk ? "" : `<button id="btn-install-cuda-torch" class="btn small" style="margin-left:8px" ${store.jobRunning ? "disabled" : ""}>Install CUDA torch</button>`}
+       </div>`);
+
+    if (!cudaOk) {
+      document.getElementById("btn-install-cuda-torch")?.addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = "Installing…";
+        try {
+          await api("/api/setup-gpu", { method: "POST" });
+          appendLog("", "Installing CUDA torch for mangaeasy built-in tools (watch logs). Restart app when done.");
+        } catch (err) {
+          appendLog("", `CUDA torch install failed: ${err.message}`);
+          btn.disabled = false;
+          btn.textContent = "Install CUDA torch";
+        }
+      });
+    }
   }
 
   const cards = $("tool-cards");
