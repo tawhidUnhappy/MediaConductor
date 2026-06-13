@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
@@ -198,11 +199,27 @@ def api_batch_download():
     }
 
     def work() -> None:
+        # Resolve manga dir once so we can skip already-downloaded chapters.
+        cfg0    = _read_json(cfg_path) or {}
+        sys_cfg = _read_json(root / "config.system.json") or {}
+        dl0     = cfg0.get("download") if isinstance(cfg0.get("download"), dict) else {}
+        name    = str(dl0.get("name") or "")
+        lib     = _library_dir(root, sys_cfg) if name else None
+
+        downloaded_count = 0
         for i, ch in enumerate(range(start, end + 1), 1):
+            # Skip chapters whose download folder is already populated.
+            if lib and name:
+                dl_dir = lib / name / f"{ch:02d}" / "download"
+                if _count_files(dl_dir, IMAGE_EXTS) > 0:
+                    log(f"[batch-download] chapter {ch:02d} already downloaded — skipping")
+                    continue
+
             log(f"[batch-download] chapter {ch:02d} ({i}/{total})…")
+
             # Update config.json so the download command picks up the right chapter.
             cfg = _read_json(cfg_path) or {}
-            dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+            dl  = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
             dl["chapter"] = ch
             cfg["download"] = dl
             cfg.pop("_comment", None)
@@ -219,7 +236,16 @@ def api_batch_download():
                 log(f"[batch-download] stopped — chapter {ch:02d} failed")
                 return
 
-        log(f"[batch-download] chapters {start:02d}–{end:02d} done ✓")
+            downloaded_count += 1
+
+            # Polite pause between chapters so we don't hammer MangaDex.
+            if ch < end:
+                pause = 10
+                log(f"[batch-download] pausing {pause}s before next chapter…")
+                time.sleep(pause)
+
+        log(f"[batch-download] chapters {start:02d}–{end:02d} done ✓"
+            f" ({downloaded_count} downloaded)")
 
     thread = threading.Thread(target=work, daemon=True)
     job["thread"] = thread
