@@ -24,16 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+      # setup-uv installs uv AND the pinned Python in one step
+      - name: Set up uv + Python 3.12
+        uses: astral-sh/setup-uv@v8
         with:
-          version: "latest"
-          enable-cache: true
+          python-version: "3.12"
 
-      - name: Install Python via uv
-        run: uv python install
-
-      # Install system libs so pywebview can be imported during PyInstaller analysis
+      # pywebview needs GTK/webkit headers on Linux so PyInstaller can import it during analysis
       - name: Install system deps (Linux only)
         if: runner.os == 'Linux'
         run: |
@@ -232,7 +229,7 @@ jobs:
         run: ls -lh artifacts/
 
       - name: Create release and upload assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
