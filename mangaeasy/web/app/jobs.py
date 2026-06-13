@@ -29,6 +29,10 @@ def spawn_cli(command: str, args: list[str], cwd: Path) -> subprocess.Popen:
     # Force UTF-8 I/O so subprocess print() calls with non-ASCII characters
     # (arrows, checkmarks, …) don't crash on Windows where the default is cp1252.
     env["PYTHONIOENCODING"] = "utf-8"
+    # Signal to child processes that they're running inside the desktop app so
+    # Flask-based editor tools emit MANGAEASY_OPEN_URL instead of calling
+    # webbrowser.open() (which would open the OS browser instead of the app).
+    env["MANGAEASY_APP_MODE"] = "1"
     full = cli_command(command, *args)
     log(f"$ mangaeasy {command} {' '.join(args)}")
     return subprocess.Popen(

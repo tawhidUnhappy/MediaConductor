@@ -29,15 +29,21 @@ function switchTab(name) {
 }
 
 function initTabs() {
-  document.querySelectorAll(".tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab-page").forEach((p) => p.classList.remove("active"));
-      btn.classList.add("active");
-      $(`tab-${btn.dataset.tab}`).classList.add("active");
-      // Refresh chapter table whenever the Batch tab is opened.
-      if (btn.dataset.tab === "run") loadChapters();
-    });
+  // Use event delegation on #tabs so dynamically added editor tabs (which
+  // manage themselves in editors.js) don't need extra wiring here.
+  const tabsNav = document.getElementById("tabs");
+  tabsNav.addEventListener("click", (e) => {
+    const btn = e.target.closest(".tab");
+    if (!btn || btn.classList.contains("editor-tab")) return; // editors.js owns these
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-page").forEach(p => p.classList.remove("active"));
+    // Return to main view when any non-editor tab is clicked
+    document.querySelector("main").style.display = "";
+    document.getElementById("editor-frames").classList.remove("active");
+    document.querySelectorAll(".editor-frame-wrap").forEach(f => f.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(`tab-${btn.dataset.tab}`)?.classList.add("active");
+    if (btn.dataset.tab === "run") loadChapters();
   });
   // Delegated handler for .tab-link buttons rendered by JS (e.g. workflow summary).
   document.addEventListener("click", (e) => {

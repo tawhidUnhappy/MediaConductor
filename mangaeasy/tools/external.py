@@ -40,18 +40,9 @@ def tools_home() -> Path:
 
 
 def candidate_roots() -> list[Path]:
-    cwd = Path.cwd().resolve()
-    root = package_root().resolve()
-    # Managed tools dir first (install-once-use-anywhere), then folders relative
-    # to where the user is working, then the package location.
-    candidates = [tools_home(), cwd, cwd.parent, root, root.parent]
-    seen: set[Path] = set()
-    result: list[Path] = []
-    for path in candidates:
-        if path not in seen:
-            seen.add(path)
-            result.append(path)
-    return result
+    # Only the managed install dir — tools must be provisioned with
+    # `mangaeasy install-tool` rather than relied on as sibling directories.
+    return [tools_home()]
 
 
 def env_vars_for(tool_name: str, env_var: str | None = None) -> tuple[str, ...]:
@@ -128,11 +119,9 @@ def main() -> int:
         status = str(path) if path else "not found"
         print(f"  {tool_name:10s} {status}  ({', '.join(env_vars)})")
     print()
-    print("Install tools as sibling uv projects when you need them, for example:")
-    print("  ./kokoro-82m")
-    print("  ./index-tts")
-    print("  ./magi-v3")
-    print("Each tool keeps its own .venv and Python.")
+    print(f"Tools are installed to: {tools_home()}")
+    print("Run `mangaeasy install-tool <name>` to provision a tool.")
+    print("Override with MANGAEASY_TOOLS_DIR or per-tool env vars above.")
     return 0
 
 

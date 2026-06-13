@@ -30,6 +30,18 @@ export async function loadDoctor() {
   grid.insertAdjacentHTML("beforeend",
     `<div class="prereq"><span class="dot ${report.git_lfs ? "ok" : "bad"}"></span>git-lfs</div>`);
 
+  // Show CUDA / torch status separately from nvidia-smi so the user can
+  // tell the difference between "no GPU" and "GPU present but CPU-only torch".
+  if (report.gpu) {
+    const cudaOk = report.cuda;
+    const label = cudaOk
+      ? `CUDA · ${report.cuda_device || "GPU"}`
+      : "CUDA (torch is CPU-only — reinstall tools with GPU unchecked)";
+    grid.insertAdjacentHTML("beforeend",
+      `<div class="prereq" title="${cudaOk ? "torch.cuda.is_available() = True" : "torch.cuda.is_available() = False — reinstall tools"}">
+         <span class="dot ${cudaOk ? "ok" : "bad"}"></span>${label}</div>`);
+  }
+
   const cards = $("tool-cards");
   cards.innerHTML = "";
   for (const [key, info] of Object.entries(report.tools)) {

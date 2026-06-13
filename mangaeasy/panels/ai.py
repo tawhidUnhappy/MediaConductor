@@ -135,12 +135,15 @@ def _run_magi_external(image_path: Path) -> Dict:
         out_path = Path(tmp.name)
 
     try:
+        # Pass the raw env var (not the resolved PANEL_DEVICE) so the external
+        # env can auto-detect its own CUDA even when the main env has CPU-only torch.
+        device_arg = os.environ.get("PANEL_DEVICE", "auto")
         cmd = [
             *python_command(MAGI_V3_DIR),
             str(script),
             str(image_path),
-            "--out",
-            str(out_path),
+            "--out", str(out_path),
+            "--device", device_arg,
         ]
         proc = subprocess.run(cmd, cwd=MAGI_V3_DIR, env=tool_env(), capture_output=True, text=True, check=False)
         if proc.returncode != 0:

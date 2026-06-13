@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 
 from flask import Blueprint, jsonify, request
@@ -116,15 +117,59 @@ def api_status():
     })
 
 
+def _open_editor_window(name: str, url: str) -> None:
+    """Open *url* in a native pywebview window, or the OS browser as fallback."""
+    window = state.get("window")
+    if window is None:
+        import webbrowser
+        webbrowser.open(url)
+        return
+    try:
+        # openEditorTab is exposed on window by editors.js; it adds a tab
+        # in the topbar and loads the editor in an iframe inside the app.
+        window.evaluate_js(
+            f"window.openEditorTab({json.dumps(name)}, {json.dumps(url)})"
+        )
+    except Exception as exc:
+        log(f"[app] editor tab: {exc}")
+        import webbrowser
+        webbrowser.open(url)
+
+
+def _pump_editor(proc, name: str) -> None:
+    """Like jobs.pump but intercepts MANGAEASY_OPEN_URL: lines."""
+    assert proc.stdout is not None
+    opened = False
+    for line in proc.stdout:
+        line = line.rstrip("\n")
+        if line.startswith("MANGAEASY_OPEN_URL:"):
+            url = line[len("MANGAEASY_OPEN_URL:"):]
+            state["editor_urls"][name] = url
+            log(f"[{name}] ready")
+            if not opened:
+                _open_editor_window(name, url)
+                opened = True
+        else:
+            log(line)
+    code = proc.wait()
+    log(f"[{name}] editor closed (exit {code})")
+    state["editors"].pop(name, None)
+    state["editor_urls"].pop(name, None)
+
+
 @bp.route("/api/editor/<name>/launch", methods=["POST"])
 def api_editor_launch(name: str):
     if name not in EDITOR_COMMANDS:
         return jsonify({"error": f"unknown editor '{name}'"}), 404
     existing = state["editors"].get(name)
     if existing and existing.poll() is None:
+        # Already running — re-open its window if we know the URL.
+        url = state["editor_urls"].get(name)
+        if url:
+            _open_editor_window(name, url)
         return jsonify({"running": True, "note": "already running"})
     proc = jobs.spawn_cli(name, [], state["project_root"])
-    threading.Thread(target=jobs.pump, args=(proc, name), daemon=True).start()
+    threading.Thread(target=_pump_editor, args=(proc, name), daemon=True).start()
     state["editors"][name] = proc
     return jsonify({"running": True})
 

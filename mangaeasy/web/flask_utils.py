@@ -60,9 +60,19 @@ def make_app(import_name: str = __name__, **kwargs) -> Flask:
 # ---------------------------------------------------------------------------
 
 def run_app(app: Flask, port: int, url_path: str = "/") -> None:
-    """Open the browser and start the Flask dev server (blocking)."""
+    """Start the Flask dev server and open the UI.
+
+    When launched from the desktop app (MANGAEASY_APP_MODE=1) the parent
+    process reads the stdout signal and opens the URL in a native webview
+    window.  Otherwise the system browser is used.
+    """
     url = f"http://127.0.0.1:{port}{url_path}"
-    threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    if os.environ.get("MANGAEASY_APP_MODE"):
+        # Signal to the parent desktop process — it will open the URL in a
+        # new pywebview window instead of the OS browser.
+        threading.Timer(1.0, lambda: print(f"MANGAEASY_OPEN_URL:{url}", flush=True)).start()
+    else:
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False, threaded=True)
 
 

@@ -15,6 +15,7 @@ log callback.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -164,8 +165,40 @@ def _git_lfs_ok() -> bool:
         return False
 
 
+def _find_nvidia_smi() -> str | None:
+    """Return the path to nvidia-smi, checking PATH and standard Windows install locations."""
+    where = _which("nvidia-smi")
+    if where:
+        return where
+    if sys.platform == "win32":
+        # NVIDIA drivers install nvidia-smi to System32 or the NVSMI folder, but
+        # neither location is always on PATH.
+        prog = os.environ.get("ProgramW6432") or os.environ.get("ProgramFiles", r"C:\Program Files")
+        for candidate in (
+            Path(r"C:\Windows\System32\nvidia-smi.exe"),
+            Path(prog) / "NVIDIA Corporation" / "NVSMI" / "nvidia-smi.exe",
+        ):
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
 def _has_gpu() -> bool:
-    return _which("nvidia-smi") is not None
+    if _find_nvidia_smi() is not None:
+        return True
+    if sys.platform == "win32":
+        # Last resort: WMI query for NVIDIA-branded video controllers. Catches
+        # setups where nvidia-smi is present but not readable by _find_nvidia_smi.
+        try:
+            out = subprocess.run(
+                ["wmic", "path", "Win32_VideoController", "get", "AdapterCompatibility"],
+                capture_output=True, text=True, timeout=8,
+            ).stdout
+            if "NVIDIA" in out:
+                return True
+        except Exception:
+            pass
+    return False
 
 
 def default_gpu_mode() -> str:
@@ -228,8 +261,29 @@ def _verify_tool_python(dest: Path, import_check: str, log: LogFn) -> None:
         log(f"[warn] verify import '{import_check}' failed: {exc}")
 
 
+_CUDA_TORCH_PKGS = ("torch", "torchvision", "torchaudio")
+
+
+def _write_cuda_uv_toml(dest: Path) -> None:
+    """Write a uv.toml in *dest* that steers torch packages to CUDA wheels.
+
+    uv.toml is separate from the repo's pyproject.toml, so it survives
+    `git pull` and can be safely created or removed by mangaEasy.
+    """
+    index_url = _torch_index_url("cuda")
+    if index_url is None:
+        return
+    sources = "\n".join(f'{p} = [{{ index = "pytorch" }}]' for p in _CUDA_TORCH_PKGS)
+    (dest / "uv.toml").write_text(
+        f'[[index]]\nname = "pytorch"\nurl = "{index_url}"\nexplicit = true\n\n'
+        f'[sources]\n{sources}\n',
+        encoding="utf-8",
+    )
+
+
 def _install_uv_project(
-    spec: ToolSpec, dest: Path, ref: str | None, skip_model: bool, log: LogFn
+    spec: ToolSpec, dest: Path, ref: str | None, skip_model: bool, log: LogFn,
+    gpu_mode: str = "cpu",
 ) -> None:
     if not spec.git_url:
         raise InstallError(
@@ -244,6 +298,17 @@ def _install_uv_project(
         _run(["git", "-C", str(dest), "lfs", "pull"], log)
     else:
         log("[warn] git-lfs not found; skipping lfs pull. Install git-lfs if model files are missing.")
+
+    # Steer torch to CUDA wheels for uv-project tools (the repo's own pyproject.toml
+    # usually targets the default PyPI index which ships CPU-only torch on Windows).
+    if gpu_mode == "cuda":
+        log("Writing uv.toml: torch → CUDA wheels (cu128)…")
+        _write_cuda_uv_toml(dest)
+    else:
+        uv_toml = dest / "uv.toml"
+        if uv_toml.exists():
+            uv_toml.unlink()
+            log("Removed CUDA uv.toml override (CPU build).")
 
     sync_cmd = ["uv", "sync", "--all-extras"]
     for extra in spec.exclude_extras:
@@ -352,7 +417,7 @@ def install_tool(
         log(f"Torch build: CPU ({detail}) — works on any machine.")
 
     if spec.kind == "uv_project":
-        _install_uv_project(spec, target, ref or spec.ref, skip_model, log)
+        _install_uv_project(spec, target, ref or spec.ref, skip_model, log, gpu_mode)
     else:
         _install_managed_env(spec, target, gpu_mode, clone, ref or spec.ref, log)
 
@@ -367,7 +432,20 @@ def doctor() -> dict:
     """Structured environment report (also consumed by the app)."""
     executables = {}
     for exe in ("git", "uv", "uvx", "ffmpeg", "ffprobe", "nvidia-smi"):
-        executables[exe] = _which(exe)
+        # Use extended finder for nvidia-smi so Windows users without nvidia-smi
+        # on PATH still see the real path instead of a false "missing".
+        executables[exe] = _find_nvidia_smi() if exe == "nvidia-smi" else _which(exe)
+
+    # Check if torch CUDA is actually usable in this Python environment.
+    cuda_available = False
+    cuda_device: str | None = None
+    try:
+        import torch  # type: ignore[import-untyped]
+        cuda_available = bool(torch.cuda.is_available())
+        if cuda_available:
+            cuda_device = torch.cuda.get_device_name(0)
+    except Exception:
+        pass
 
     tools = {}
     for key, spec in TOOLS.items():
@@ -386,6 +464,8 @@ def doctor() -> dict:
         "tools_home": str(tools_home()),
         "git_lfs": _git_lfs_ok(),
         "gpu": _has_gpu(),
+        "cuda": cuda_available,
+        "cuda_device": cuda_device,
         "executables": executables,
         "tools": tools,
     }

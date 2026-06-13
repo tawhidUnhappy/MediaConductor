@@ -52,9 +52,10 @@ lock = threading.Lock()
 state: dict = {
     "project_root": _initial_project_root(_saved_state),
     "ui": dict(_saved_state.get("ui") or {}),  # free-form UI field values
-    "window": None,   # pywebview window when running as a desktop app
-    "job": None,      # {"kind", "name", "thread", "proc"}
-    "editors": {},    # command name -> subprocess.Popen
+    "window": None,        # pywebview window when running as a desktop app
+    "job": None,           # {"kind", "name", "thread", "proc"}
+    "editors": {},         # command name -> subprocess.Popen
+    "editor_urls": {},     # command name -> URL once the editor is ready
 }
 
 
