@@ -74,9 +74,10 @@ Python and uv are **not required** — everything is bundled.
 
 | Platform | File | How to run |
 |---|---|---|
-| **Windows 11 / 10** | `mangaEasy-windows.zip` | Extract the zip → double-click **`mangaeasy.exe`** |
-| **Linux (x64)** | `mangaEasy-linux.tar.gz` | Extract → run **`./mangaEasy/mangaeasy`** |
-| **macOS** | `mangaEasy-macos.tar.gz` | Extract → run **`./mangaEasy/mangaeasy`** |
+| **Windows — Installer** | `mangaEasy-Setup-vX.Y.Z.exe` | Run the installer — adds Start Menu shortcut |
+| **Windows — Portable** | `mangaEasy-windows.zip` | Extract anywhere, double-click **`mangaeasy.exe`** |
+| **Linux (x64)** | `mangaEasy-linux.tar.gz` | Extract → `./mangaEasy/mangaeasy` |
+| **macOS** | `mangaEasy-macos.tar.gz` | Extract → `./mangaEasy/mangaeasy` |
 
 Double-clicking the exe (or running it with no arguments) opens the control
 centre in your browser at `http://127.0.0.1:5000`. From there, use **Setup**

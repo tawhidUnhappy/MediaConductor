@@ -13,25 +13,34 @@ No Python, no uv, no dependencies. Just download, extract, and run.
 Go to the [**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest)
 and download the file for your platform:
 
-| Platform | File |
-|---|---|
-| Windows 11 / 10 | `mangaEasy-windows.zip` |
-| Linux (x64) | `mangaEasy-linux.tar.gz` |
-| macOS (Intel or Apple Silicon) | `mangaEasy-macos.tar.gz` |
+| Platform | File | Notes |
+|---|---|---|
+| **Windows — Installer** | `mangaEasy-Setup-vX.Y.Z.exe` | Recommended — installs to Program Files, adds Start Menu shortcut |
+| **Windows — Portable** | `mangaEasy-windows.zip` | No install needed — extract and run from anywhere |
+| Linux (x64) | `mangaEasy-linux.tar.gz` | |
+| macOS (Intel or Apple Silicon) | `mangaEasy-macos.tar.gz` | |
 
-### Step 2: Extract
+### Step 2: Install or extract
 
-- **Windows**: right-click the zip → *Extract All* → choose a permanent folder
-  (e.g. `C:\Program Files\mangaEasy` or your Desktop)
-- **Linux / macOS**: `tar -xzf mangaEasy-*.tar.gz`
+**Windows — Installer (recommended)**
+- Double-click `mangaEasy-Setup-vX.Y.Z.exe` and follow the wizard.
+- Installs to `C:\Program Files\mangaEasy\`, adds a Start Menu shortcut,
+  and optionally adds `mangaeasy` to your system PATH.
 
-You'll get a `mangaEasy/` folder. Keep it wherever you like — it's self-contained.
+**Windows — Portable zip**
+- Right-click the zip → *Extract All* → choose any permanent folder.
+- You get a `mangaEasy\` folder. Move it wherever you like.
+
+**Linux / macOS**
+- `tar -xzf mangaEasy-*.tar.gz`
+- You get a `mangaEasy/` folder.
 
 ### Step 3: Run
 
 | Platform | How to start |
 |---|---|
-| Windows | Double-click **`mangaeasy.exe`** inside the `mangaEasy\` folder |
+| Windows (installer) | Start Menu → **mangaEasy**, or `mangaeasy app` in any terminal |
+| Windows (portable) | Double-click **`mangaeasy.exe`** inside the extracted `mangaEasy\` folder |
 | Linux | `./mangaEasy/mangaeasy` |
 | macOS | `./mangaEasy/mangaeasy` |
 

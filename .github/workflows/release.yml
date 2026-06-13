@@ -18,13 +18,10 @@ jobs:
         include:
           - os: windows-latest
             artifact_name: mangaEasy-windows.zip
-            archive_cmd: zip
           - os: ubuntu-latest
             artifact_name: mangaEasy-linux.tar.gz
-            archive_cmd: tar
           - os: macos-latest
             artifact_name: mangaEasy-macos.tar.gz
-            archive_cmd: tar
 
     steps:
       - name: Checkout
@@ -45,18 +42,33 @@ jobs:
       - name: Build standalone bundle
         run: uv run pyinstaller packaging/mangaeasy.spec --distpath dist --workpath build-tmp --noconfirm
 
-      # ── Windows: zip dist/mangaEasy ────────────────────────────────────────
-      - name: Package (Windows)
+      # ── Windows: portable zip ──────────────────────────────────────────────
+      - name: Package portable zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist\mangaEasy -DestinationPath ${{ matrix.artifact_name }} -Force
+
+      # ── Windows: Inno Setup installer → mangaEasy-Setup-vX.Y.Z.exe ────────
+      - name: Build Windows installer (Inno Setup)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Compress-Archive -Path dist\mangaEasy -DestinationPath ${{ matrix.artifact_name }} -Force
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=$version" `
+            "packaging\mangaeasy.iss"
 
-      # ── Linux / macOS: tar.gz dist/mangaEasy ──────────────────────────────
+      - name: Upload installer artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mangaEasy-Setup
+          path: dist/mangaEasy-Setup-*.exe
+
+      # ── Linux / macOS: tar.gz ──────────────────────────────────────────────
       - name: Package (Unix)
         if: runner.os != 'Windows'
-        run: |
-          tar -czf ${{ matrix.artifact_name }} -C dist mangaEasy
+        run: tar -czf ${{ matrix.artifact_name }} -C dist mangaEasy
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -76,6 +88,9 @@ jobs:
           path: artifacts/
           merge-multiple: true
 
+      - name: List artifacts
+        run: ls -lh artifacts/
+
       - name: Create release and upload assets
         uses: softprops/action-gh-release@v2
         with:
@@ -89,23 +104,26 @@ jobs:
 
             | Platform | File | Notes |
             |---|---|---|
-            | Windows 11 / 10 | `mangaEasy-windows.zip` | Extract, double-click `mangaEasy.exe` |
-            | Linux (x64) | `mangaEasy-linux.tar.gz` | Extract, run `./mangaEasy/mangaeasy` |
-            | macOS (x64 / Apple Silicon) | `mangaEasy-macos.tar.gz` | Extract, run `./mangaEasy/mangaeasy` |
+            | **Windows — Installer** | `mangaEasy-Setup-${{ github.ref_name }}.exe` | Run the installer — installs to Program Files, adds Start Menu shortcut |
+            | **Windows — Portable** | `mangaEasy-windows.zip` | Extract anywhere, double-click `mangaeasy.exe` — no install needed |
+            | **Linux (x64)** | `mangaEasy-linux.tar.gz` | `tar -xzf …`, then `./mangaEasy/mangaeasy` |
+            | **macOS** | `mangaEasy-macos.tar.gz` | `tar -xzf …`, then `./mangaEasy/mangaeasy` |
 
             ### First run
 
-            1. Double-click `mangaeasy.exe` (Windows) or run `./mangaEasy/mangaeasy` (Linux/macOS).
-            2. The control centre opens in your browser at `http://127.0.0.1:5000`.
-            3. Use **Setup** to download ffmpeg and the AI tools (IndexTTS / Kokoro) on first launch.
+            1. **Windows**: run the installer **or** extract the portable zip and double-click `mangaeasy.exe`.
+            2. **Linux/macOS**: `chmod +x mangaEasy/mangaeasy && ./mangaEasy/mangaeasy`
+            3. The control centre opens in your browser at `http://127.0.0.1:5000`.
+            4. Use the **Setup** tab to download ffmpeg and the AI voice tools on first launch.
 
-            > Python and uv are **not** required — everything is bundled.
+            > **Python and uv are not required** — everything is bundled inside the download.
 
-            ### Requirements
-            - ffmpeg: downloaded automatically on first launch.
-            - For AI voice (IndexTTS): NVIDIA GPU recommended.
-            - For background-music video: no GPU required (Kokoro TTS runs on CPU).
+            ### System requirements
+            - Windows 10/11, Ubuntu 20.04+, or macOS 12+
+            - ffmpeg — downloaded automatically on first launch
+            - NVIDIA GPU — optional; needed only for IndexTTS voice cloning (Kokoro TTS runs on CPU)
           files: |
+            artifacts/mangaEasy-Setup-*.exe
             artifacts/mangaEasy-windows.zip
             artifacts/mangaEasy-linux.tar.gz
             artifacts/mangaEasy-macos.tar.gz
