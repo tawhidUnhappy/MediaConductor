@@ -48,3 +48,32 @@ def api_install_tool(name: str):
         state["job"] = {"kind": "install", "name": name, "thread": thread, "proc": None}
         thread.start()
     return jsonify({"started": name})
+
+
+@bp.route("/api/install-tool/<name>", methods=["DELETE"])
+def api_delete_tool(name: str):
+    import shutil
+    from mangaeasy.tools.install import TOOLS
+    from mangaeasy.tools.external import resolve_tool_dir, tools_home
+
+    if name not in TOOLS:
+        return jsonify({"error": f"unknown tool '{name}'"}), 404
+    if jobs.job_running():
+        return jsonify({"error": "cannot delete while a job is running"}), 409
+
+    path = resolve_tool_dir(name, required=False)
+    if path is None:
+        return jsonify({"deleted": False, "reason": "not installed"})
+
+    # Safety: refuse to delete anything outside the managed tools directory
+    try:
+        path.relative_to(tools_home())
+    except ValueError:
+        return jsonify({"error": "path is outside the managed tools directory"}), 400
+
+    try:
+        shutil.rmtree(path)
+        log(f"[setup] deleted tool '{name}' ({path})")
+        return jsonify({"deleted": True})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500

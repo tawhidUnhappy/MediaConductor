@@ -48,7 +48,9 @@ export async function loadDoctor() {
     let badge, action = "";
     if (info.installed) {
       badge = `<span class="badge installed">installed</span>`;
-      action = `<button class="btn small" data-install="${key}" ${store.jobRunning ? "disabled" : ""}>Reinstall</button>`;
+      const dis = store.jobRunning ? "disabled" : "";
+      action = `<button class="btn small" data-install="${key}" ${dis}>Reinstall</button>
+                <button class="btn small danger" data-tool-del="${key}" ${dis}>Delete</button>`;
     } else if (!info.configured) {
       badge = `<span class="badge unconfigured">repo URL not set</span>`;
     } else {
@@ -82,6 +84,35 @@ export async function loadDoctor() {
       } catch (err) {
         appendLog("", `install failed to start: ${err.message}`);
         btn.disabled = false;
+      }
+    });
+  });
+
+  cards.querySelectorAll("[data-tool-del]").forEach((btn) => {
+    let timer = null;
+    btn.addEventListener("click", async () => {
+      if (!btn._confirming) {
+        // First click — ask for confirmation
+        btn._confirming = true;
+        btn.textContent = "Sure?";
+        timer = setTimeout(() => {
+          btn._confirming = false;
+          btn.textContent = "Delete";
+        }, 3000);
+      } else {
+        // Second click within 3 s — go ahead
+        clearTimeout(timer);
+        btn._confirming = false;
+        btn.disabled = true;
+        btn.textContent = "Deleting…";
+        const name = btn.dataset.toolDel;
+        try {
+          await api(`/api/install-tool/${name}`, { method: "DELETE" });
+          appendLog("", `deleted: ${name}`);
+        } catch (err) {
+          appendLog("", `delete failed: ${err.message}`);
+        }
+        loadDoctor();
       }
     });
   });
