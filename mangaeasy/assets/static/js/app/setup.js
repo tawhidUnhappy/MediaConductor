@@ -66,7 +66,7 @@ export async function loadDoctor() {
     ? "Whisper (narration transcription) · installed"
     : "Whisper not installed — narration transcription disabled";
   grid.insertAdjacentHTML("beforeend",
-    `<div class="prereq" title="${whisperOk ? "faster-whisper is importable" : "faster-whisper package not found in mangaeasy env"}">
+    `<div class="prereq" title="${whisperOk ? "faster-whisper installed in isolated managed env (~/.mangaeasy/tools/faster-whisper)" : "faster-whisper not yet installed — gets its own isolated env, never conflicts with main deps"}">
        <span class="dot ${whisperOk ? "ok" : "bad"}"></span>${whisperLabel}
        ${whisperOk ? "" : `<button id="btn-install-whisper" class="btn small" style="margin-left:8px" ${store.jobRunning ? "disabled" : ""}>Install Whisper</button>`}
      </div>`);
@@ -78,7 +78,7 @@ export async function loadDoctor() {
       btn.textContent = "Installing…";
       try {
         await api("/api/install-whisper", { method: "POST" });
-        appendLog("", "Installing faster-whisper (watch logs below). Restart app when done.");
+        appendLog("", "Installing faster-whisper in isolated env — watch logs below.");
       } catch (err) {
         appendLog("", `Whisper install failed: ${err.message}`);
         btn.disabled = false;

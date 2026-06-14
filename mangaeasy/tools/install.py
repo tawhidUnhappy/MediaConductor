@@ -75,6 +75,19 @@ TOOLS: dict[str, ToolSpec] = {
         needs_gpu=True,
         notes="High-quality voice-cloning TTS; the default engine for `mangaeasy video` on NVIDIA GPU machines. ~5.9 GB model download from Hugging Face (config, gpt.pth, s2mel.pth, bpe.model).",
     ),
+    "faster-whisper": ToolSpec(
+        key="faster-whisper",
+        title="Faster Whisper (transcription)",
+        kind="managed_env",
+        git_url=None,
+        env_deps=[
+            "faster-whisper>=1.2.1",
+            "huggingface-hub>=0.21",
+        ],
+        verify_import="faster_whisper",
+        needs_gpu=False,
+        notes="Optional: fast Whisper audio transcription. Runs on CPU; ctranslate2 auto-uses CUDA if available. Whisper models download from Hugging Face on first use.",
+    ),
     "magi-v3": ToolSpec(
         key="magi-v3",
         title="MAGI v3 (panel detection)",
@@ -117,8 +130,9 @@ TOOLS: dict[str, ToolSpec] = {
 # ── Shell helpers ─────────────────────────────────────────────────────────────
 
 
-# Strips ANSI colour/cursor codes and bare \r (progress-bar overwrites).
-_ANSI_RE = re.compile(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])|\r')
+# Strips ANSI colour/cursor codes. \r is kept and handled separately in
+# _run_pty_win32 to collapse progress-bar frames into a single final line.
+_ANSI_RE = re.compile(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 
 def _strip_ansi(text: str) -> str:
@@ -126,11 +140,44 @@ def _strip_ansi(text: str) -> str:
 
 
 def _run_pty_win32(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
-    """Run *cmd* inside a Windows ConPTY so the child flushes every line."""
+    """Run *cmd* inside a Windows ConPTY so the child flushes every line.
+
+    \r (bare carriage return) means "overwrite the current line" — the same
+    semantics a real terminal uses for tqdm/progress bars.  We track
+    *current_line* and reset it on \r, so only the final state of each
+    progress bar (the 100 % line that ends with \n) is ever logged.
+    """
     from winpty import PtyProcess  # type: ignore[import-untyped]  # pywinpty
 
     proc = PtyProcess.spawn(cmd, cwd=str(cwd) if cwd else None, env=env, dimensions=(50, 300))
-    pending = ""
+    current_line = ""
+
+    def _process_text(text: str) -> None:
+        nonlocal current_line
+        i = 0
+        while i < len(text):
+            c = text[i]
+            if c == "\r":
+                if i + 1 < len(text) and text[i + 1] == "\n":
+                    # CRLF — treat as a completed line then advance past \n
+                    stripped = current_line.rstrip()
+                    if stripped:
+                        log(stripped)
+                    current_line = ""
+                    i += 2
+                    continue
+                else:
+                    # Bare \r — overwrite: discard current line content
+                    current_line = ""
+            elif c == "\n":
+                stripped = current_line.rstrip()
+                if stripped:
+                    log(stripped)
+                current_line = ""
+            else:
+                current_line += c
+            i += 1
+
     while proc.isalive():
         try:
             chunk = proc.read(4096)
@@ -138,23 +185,18 @@ def _run_pty_win32(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dic
             break
         if not chunk:
             continue
-        pending += _strip_ansi(chunk)
-        while "\n" in pending:
-            line, pending = pending.split("\n", 1)
-            stripped = line.rstrip()
-            if stripped:
-                log(stripped)
+        _process_text(_strip_ansi(chunk))
     # drain any tail after process exits
     try:
         while True:
             chunk = proc.read(4096)
             if not chunk:
                 break
-            pending += _strip_ansi(chunk)
+            _process_text(_strip_ansi(chunk))
     except Exception:
         pass
-    if pending.strip():
-        log(pending.strip())
+    if current_line.strip():
+        log(current_line.strip())
     proc.wait()
     rc = proc.exitstatus or 0
     if rc != 0:
@@ -348,6 +390,10 @@ def _install_uv_project(
         sync_cmd += ["--no-extra", extra]
     _run(sync_cmd, log, cwd=dest)
 
+    venv_python = dest / ".venv" / (
+        "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
+    )
+
     # uv venvs do not include pip, so use `uv pip install` to force-reinstall
     # torch with the CUDA wheel when the project's own uv sync pulled a CPU build.
     if gpu_mode == "cuda" and spec.needs_gpu:
@@ -355,9 +401,6 @@ def _install_uv_project(
         assert index_url is not None
         log(f"Reinstalling torch/torchvision/torchaudio with CUDA wheels ({index_url})…")
         log("(this downloads ~3–5 GB; progress appears below)")
-        venv_python = dest / ".venv" / (
-            "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
-        )
         # --no-deps: only swap the three CUDA binary wheels; do NOT let uv
         # re-resolve and upgrade other deps (e.g. numpy). uv sync already
         # locked everything to the versions in the tool's uv.lock — upgrading
@@ -372,6 +415,21 @@ def _install_uv_project(
              "--no-deps"],
             log, cwd=dest, env=tool_env(),
         )
+
+    # torchaudio 2.8+ dropped its built-in audio backends and now requires
+    # torchcodec for torchaudio.save(). Install it into the index-tts venv
+    # regardless of CPU/CUDA mode; the binary wheel self-contains its deps.
+    if spec.key == "index-tts":
+        log("Installing torchcodec (required by torchaudio ≥2.8 for audio saving)…")
+        tc_cmd = [
+            "uv", "pip", "install",
+            "--python", str(venv_python),
+            "torchcodec",
+            "--no-deps",
+        ]
+        if gpu_mode == "cuda":
+            tc_cmd += ["--index-url", _torch_index_url("cuda")]
+        _run(tc_cmd, log, cwd=dest, env=tool_env())
 
     if spec.needs_gpu and not _has_gpu():
         log("[warn] no NVIDIA GPU detected; this tool will run on CPU, which is much slower.")
@@ -517,12 +575,9 @@ def doctor() -> dict:
             "notes": spec.notes,
         }
 
-    whisper_installed = False
-    try:
-        import importlib.util
-        whisper_installed = importlib.util.find_spec("faster_whisper") is not None
-    except Exception:
-        pass
+    # faster-whisper lives in its own managed isolated env (not the main venv)
+    # so it never conflicts with mangaeasy's deps or gets wiped by uv sync.
+    whisper_installed = resolve_tool_dir("faster-whisper", required=False) is not None
 
     return {
         "tools_home": str(tools_home()),

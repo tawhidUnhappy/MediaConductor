@@ -94,27 +94,15 @@ def api_setup_gpu():
 
 @bp.route("/api/install-whisper", methods=["POST"])
 def api_install_whisper():
-    """Install faster-whisper into mangaeasy's own venv."""
-    import sys
-
+    """Install faster-whisper into its own managed isolated env (not the main venv)."""
     with lock:
         if jobs.job_running():
             return jsonify({"error": "another job is already running"}), 409
 
-        python = sys.executable
-
         def work():
-            from mangaeasy.tools.install import InstallError, _run
+            from mangaeasy.tools.install import InstallError, install_tool
             try:
-                log(f"[install-whisper] Installing faster-whisper into mangaeasy env ({python})")
-                _run(
-                    ["uv", "pip", "install",
-                     "--python", python,
-                     "faster-whisper>=1.2.1",
-                     "--quiet"],
-                    log,
-                )
-                log("[install-whisper] Done — restart mangaeasy to enable narration transcription.")
+                install_tool("faster-whisper", log=log)
             except InstallError as exc:
                 log(f"[install-whisper] FAILED: {exc}")
             except Exception as exc:
