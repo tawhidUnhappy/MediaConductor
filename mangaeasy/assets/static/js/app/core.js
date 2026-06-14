@@ -48,10 +48,30 @@ export function clearProgress() {
 let logLines = null;
 let autoScroll = true;
 
+// Detect tqdm-style lines (non-TTY mode writes each frame with \n, not \r).
+// Also catches FFmpeg frame= progress output.
+function _isProgressLine(msg) {
+  return /\d+%\|/.test(msg) ||           // tqdm bar: "45%|████  |"
+         /^\s*frame=\s*\d+/.test(msg);   // ffmpeg:   "frame=  123 fps=..."
+}
+
 export function appendLog(ts, msg) {
   if (!logLines) return;
+
+  // If this and the previous line are both progress frames, overwrite in place
+  // instead of appending — mirrors \r terminal behaviour for non-TTY processes.
+  const isProgress = _isProgressLine(msg);
+  const last = logLines.lastElementChild;
+  if (isProgress && last && last.dataset.progress === "1") {
+    last.querySelector(".ts").textContent = ts;
+    last.querySelector(".msg").textContent = msg;
+    if (autoScroll) logLines.scrollTop = logLines.scrollHeight;
+    return;
+  }
+
   const div = document.createElement("div");
   div.className = "log-line";
+  if (isProgress) div.dataset.progress = "1";
   if (/\b(error|failed|fatal)\b/i.test(msg)) div.classList.add("err");
   else if (/\[warn\]|warning/i.test(msg)) div.classList.add("warn");
   const tsSpan = document.createElement("span");
