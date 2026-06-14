@@ -5,11 +5,17 @@
 # Produces dist/mangaEasy/ on Windows/Linux and dist/mangaEasy.app/ on macOS.
 
 import sys as _sys
+import os
+import tomllib
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path(SPECPATH).resolve().parent  # repo root (spec lives in packaging/)
 PKG  = ROOT / "mangaeasy"
+VERSION = os.environ.get("MANGAEASY_VERSION")
+if not VERSION:
+    with open(ROOT / "pyproject.toml", "rb") as _f:
+        VERSION = tomllib.load(_f)["project"]["version"]
 
 # Platform-appropriate icon file
 if _sys.platform == "darwin":
@@ -68,7 +74,7 @@ if _sys.platform == "darwin":
         info_plist={
             "CFBundleName": "mangaEasy",
             "CFBundleDisplayName": "mangaEasy",
-            "CFBundleShortVersionString": "0.6.3",
+            "CFBundleShortVersionString": VERSION,
             "NSHighResolutionCapable": True,
             "NSRequiresAquaSystemAppearance": False,  # supports dark mode
         },
