@@ -1,17 +1,27 @@
-/* terminal.js — single integrated xterm.js terminal.
-   Connects to /ws/terminal (git bash PTY + job output broadcast).
-   Exports write() so other modules can send text without a DOM dependency. */
+/* terminal.js — integrated xterm.js terminal.
 
-let term = null;
+   Architecture:
+     - WebSocket connects immediately at startup (before user opens the tab)
+       so no output is missed. The backend replays its 64 KB history buffer
+       on connect, so the user sees everything since the app launched.
+     - The xterm Terminal object is only created when the user first clicks the
+       Terminal tab, because xterm needs a visible, sized container to render.
+     - All text written via write() before xterm is ready is queued locally and
+       flushed into xterm when it opens. Combined with the backend replay, the
+       Terminal tab shows the full history the first time it is opened.
+*/
+
+let term  = null;
 let fitAddon = null;
-let ws = null;
-let _earlyBuf = [];   // buffer writes that arrive before term is ready
+let ws    = null;
+let _buf  = [];      // queued before xterm is open (strings or Uint8Arrays)
+let _ready = false;  // true once term.open() has been called
 
 export function write(text) {
-  if (term) {
+  if (_ready && term) {
     term.write(text);
   } else {
-    _earlyBuf.push(text);
+    _buf.push(text);
   }
 }
 
@@ -34,26 +44,24 @@ function _connect() {
   ws = new WebSocket(_wsUrl());
   ws.binaryType = "arraybuffer";
 
-  ws.onopen = () => {
-    _sendResize();
-  };
-
+  ws.onopen  = () => { _sendResize(); };
   ws.onmessage = (e) => {
-    if (!term) return;
-    term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data));
+    const data = typeof e.data === "string" ? e.data : new Uint8Array(e.data);
+    if (_ready && term) {
+      term.write(data);
+    } else {
+      _buf.push(data);   // buffer until xterm is opened by the tab click
+    }
   };
-
   ws.onclose = () => {
-    if (term) term.write("\r\n\x1b[2m[shell disconnected — reconnecting…]\x1b[0m\r\n");
+    if (_ready && term) term.write("\r\n\x1b[2m[terminal disconnected — reconnecting…]\x1b[0m\r\n");
     _reconnectTimer = setTimeout(_connect, 3000);
-  };
-
-  ws.onerror = () => {
-    // onclose fires after onerror — reconnect handled there
   };
 }
 
-export function initTerminal() {
+function _openXterm() {
+  if (_ready) return;
+
   const container = document.getElementById("xterm-container");
   if (!container || !window.Terminal) return;
 
@@ -66,58 +74,60 @@ export function initTerminal() {
       foreground:    "#d4d4d4",
       cursor:        "#ffffff",
       selectionBackground: "rgba(255,255,255,0.2)",
-      black:         "#000000",
-      red:           "#cc0000",
-      green:         "#4caf50",
-      yellow:        "#e6c000",
-      blue:          "#4d9de0",
-      magenta:       "#af87d7",
-      cyan:          "#00bcd4",
-      white:         "#d4d4d4",
-      brightBlack:   "#555555",
-      brightRed:     "#f87171",
-      brightGreen:   "#6fd388",
-      brightYellow:  "#fbbf24",
-      brightBlue:    "#6cc0ff",
-      brightMagenta: "#c084fc",
-      brightCyan:    "#67e8f9",
-      brightWhite:   "#ffffff",
+      black:         "#000000",   red:           "#cc0000",
+      green:         "#4caf50",   yellow:        "#e6c000",
+      blue:          "#4d9de0",   magenta:       "#af87d7",
+      cyan:          "#00bcd4",   white:         "#d4d4d4",
+      brightBlack:   "#555555",   brightRed:     "#f87171",
+      brightGreen:   "#6fd388",   brightYellow:  "#fbbf24",
+      brightBlue:    "#6cc0ff",   brightMagenta: "#c084fc",
+      brightCyan:    "#67e8f9",   brightWhite:   "#ffffff",
     },
-    scrollback: 10000,
+    scrollback: 20000,
     allowProposedApi: true,
   });
 
   fitAddon = new window.FitAddon.FitAddon();
   term.loadAddon(fitAddon);
   term.open(container);
+  _ready = true;
 
-  // Flush buffered early writes
-  _earlyBuf.forEach(t => term.write(t));
-  _earlyBuf = [];
+  // Size correctly now that the container is visible.
+  fitAddon.fit();
 
-  requestAnimationFrame(() => {
-    fitAddon.fit();
-    _connect();
-  });
+  // Flush everything that arrived before the tab was opened.
+  _buf.forEach(item => term.write(item));
+  _buf = [];
 
-  // User keystrokes → PTY stdin
+  // Send the current size to the PTY backend.
+  _sendResize();
+
+  // User keystrokes → PTY stdin.
   term.onData((data) => {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(data);
   });
 
-  // Resize → PTY winsize
+  // Refit when the container is resized (window resize, split panes, etc.).
   term.onResize(() => _sendResize());
-
-  // Re-fit when the terminal tab becomes visible
-  document.querySelector('.tab[data-tab="terminal"]')
-    ?.addEventListener("click", () => {
-      requestAnimationFrame(() => { if (fitAddon) fitAddon.fit(); });
-    });
-
-  // Keep sized to container
   if (window.ResizeObserver) {
     new ResizeObserver(() => {
       if (fitAddon) { fitAddon.fit(); _sendResize(); }
     }).observe(container);
+  }
+}
+
+export function initTerminal() {
+  // Connect to the WebSocket immediately — backend buffers output and replays
+  // it when we connect, so we get all history including app startup messages.
+  _connect();
+
+  // Open xterm (which needs a visible container) only on first tab click.
+  const tabBtn = document.querySelector('.tab[data-tab="terminal"]');
+  if (tabBtn) {
+    tabBtn.addEventListener("click", () => {
+      _openXterm();
+      // Re-fit a frame later to handle any layout settling.
+      requestAnimationFrame(() => { if (fitAddon) fitAddon.fit(); });
+    });
   }
 }

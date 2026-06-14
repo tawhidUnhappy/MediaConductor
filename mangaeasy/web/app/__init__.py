@@ -26,9 +26,15 @@ from flask_sock import Sock
 from mangaeasy import __version__
 from mangaeasy.web.flask_utils import register_shutdown
 from mangaeasy.web.app.state import ASSETS, broadcaster
+from mangaeasy.web.flask_utils import terminal_broadcaster
 
 
 def create_app() -> Flask:
+    # Tee all Python stdout/stderr into the in-app terminal from the very start
+    # so the user sees Flask startup messages, tracebacks, and everything else
+    # the moment they open the Terminal tab — no external shell needed.
+    terminal_broadcaster.install_tee()
+
     flask_app = Flask(
         __name__,
         # Always the packaged assets — the control center must not be shadowed

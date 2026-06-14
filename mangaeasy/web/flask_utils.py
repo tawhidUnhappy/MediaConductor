@@ -222,16 +222,48 @@ class LogBroadcaster:
 # Terminal broadcaster — writes raw text to connected xterm WebSocket clients
 # ---------------------------------------------------------------------------
 
-class TerminalBroadcaster:
-    """Broadcast raw text/bytes to every connected xterm WebSocket client."""
+_TERM_SKIP = re.compile(
+    r"^\s*$"
+    r"|GET /log_stream"
+    r"|GET /api/status"
+    r"|GET /image/"
+    r"|GET /static/"
+    r"|GET /vendor/"
+    r'|HTTP/1\.[01]" [23]\d\d -\s*$'
+)
 
-    def __init__(self) -> None:
+
+class TerminalBroadcaster:
+    """Broadcast raw text/bytes to every connected xterm WebSocket client.
+
+    Keeps a rolling history buffer so a new client (xterm WebSocket) receives
+    all output since startup the moment it connects — the user sees everything
+    even if they open the Terminal tab minutes after launch.
+    """
+
+    def __init__(self, buf_chars: int = 65536) -> None:
         self._sinks: list = []
         self._lock = threading.Lock()
+        self._buf_chars = buf_chars
+        self._buf: list[str] = []   # ordered chunks; total chars ≤ buf_chars
+        self._buf_size = 0
+
+    def _append_buf(self, text: str) -> None:
+        """Add text to the ring buffer, dropping the oldest chunk if needed."""
+        self._buf.append(text)
+        self._buf_size += len(text)
+        while self._buf and self._buf_size - len(self._buf[0]) >= self._buf_chars:
+            self._buf_size -= len(self._buf.pop(0))
 
     def add_client(self, send_fn) -> None:
         with self._lock:
             self._sinks.append(send_fn)
+            # Replay history so the client catches up immediately.
+            for chunk in self._buf:
+                try:
+                    send_fn(chunk)
+                except Exception:
+                    pass
 
     def remove_client(self, send_fn) -> None:
         with self._lock:
@@ -244,6 +276,7 @@ class TerminalBroadcaster:
         if not text:
             return
         with self._lock:
+            self._append_buf(text)
             dead = []
             for fn in list(self._sinks):
                 try:
@@ -258,6 +291,30 @@ class TerminalBroadcaster:
 
     def write_raw(self, data: bytes) -> None:
         self.write(data.decode("utf-8", errors="replace"))
+
+    def install_tee(self) -> None:
+        """Redirect sys.stdout and sys.stderr so all Python output also
+        appears in the in-app terminal (Werkzeug request-log spam filtered)."""
+        broadcaster = self
+
+        class _Tee:
+            def __init__(self, orig):
+                self._orig = orig
+
+            def write(self, text: str):
+                self._orig.write(text)
+                t = text.rstrip()
+                if t and not _TERM_SKIP.search(t):
+                    broadcaster.write(text)
+
+            def flush(self):
+                self._orig.flush()
+
+            def __getattr__(self, name):
+                return getattr(self._orig, name)
+
+        sys.stdout = _Tee(sys.stdout)
+        sys.stderr = _Tee(sys.stderr)
 
 
 terminal_broadcaster = TerminalBroadcaster()
