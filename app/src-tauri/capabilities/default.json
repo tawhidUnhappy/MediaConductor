@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "mangaEasy default capabilities",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:default",
+    "shell:allow-spawn",
+    "shell:allow-execute",
+    "shell:allow-kill",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:default",
+    "fs:allow-read-all",
+    "fs:allow-write-all",
+    "opener:default",
+    "opener:allow-open-url",
+    "opener:allow-reveal-item-in-file-manager"
+  ]
+}
