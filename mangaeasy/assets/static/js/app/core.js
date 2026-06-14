@@ -1,4 +1,4 @@
-/* core.js — shared helpers: DOM lookup, API fetch, log console, global flags. */
+/* core.js — shared helpers: DOM lookup, API fetch, log console, progress bar, global flags. */
 
 export const $ = (id) => document.getElementById(id);
 
@@ -13,6 +13,34 @@ export async function api(path, opts = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `${res.status} ${res.statusText}`);
   return data;
+}
+
+/* ── Progress bar ──────────────────────────────────────────────────────── */
+
+export function updateProgress(value, total, label) {
+  const wrap = $("job-progress-wrap");
+  const fill = $("job-progress-fill");
+  const ind  = $("job-indicator");
+  if (!wrap) return;
+  wrap.style.display = "";
+  if (total > 0) {
+    wrap.classList.remove("indeterminate");
+    const pct = Math.min(100, Math.round(value / total * 100));
+    fill.style.width = pct + "%";
+    if (ind && ind.classList.contains("busy") && label) {
+      ind.textContent = `${label}  ${value}/${total}`;
+    }
+  } else {
+    wrap.classList.add("indeterminate");
+    fill.style.width = "35%";
+  }
+}
+
+export function clearProgress() {
+  const wrap = $("job-progress-wrap");
+  const fill = $("job-progress-fill");
+  if (wrap) { wrap.style.display = "none"; wrap.classList.remove("indeterminate"); }
+  if (fill) fill.style.width = "0%";
 }
 
 /* ── Log console (SSE) ─────────────────────────────────────────────────── */
@@ -82,12 +110,15 @@ export function initLogConsole() {
       if (entry.action === "restart-app") {
         appendLog("", "[app] Restarting…");
         fetch("/api/restart", { method: "POST" }).catch(() => {});
-        // Wait for the new process to come up then reload the page
         setTimeout(() => location.reload(), 3000);
         return;
       }
       if (entry.action) {
         window.dispatchEvent(new CustomEvent("sse-action", { detail: entry.action }));
+        return;
+      }
+      if (entry.progress) {
+        updateProgress(entry.progress.value, entry.progress.total, entry.progress.label);
         return;
       }
       appendLog(entry.ts, entry.msg);

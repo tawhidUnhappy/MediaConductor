@@ -63,9 +63,12 @@ function render(data) {
   }
 
   // Show destructive buttons only when there is content to act on.
+  const hasDL     = (st.downloads || 0) > 0;
   const hasPanels = (st.panels || 0) > 0;
   const hasNarr   = !!st.narration && (st.narration_items || 0) > 0;
   const hasAv     = (st.audio || 0) > 0 || !!st.video;
+  const hasAny    = hasDL || hasPanels || hasAv;
+  const hasManga  = !!data.name;
   function _show(id, visible) {
     const el = document.getElementById(id);
     if (el) el.style.display = visible ? "" : "none";
@@ -75,6 +78,13 @@ function render(data) {
   _show("wf-narr-remove-empty", hasNarr);
   _show("wf-reset-av",          hasAv);
   _show("wf-reset-regen",       hasAv);
+  _show("wf-del-download",      hasDL);
+  _show("wf-del-panels",        hasPanels);
+  _show("wf-del-all",           hasAny);
+  _show("wf-purge-zip",         hasManga);
+  _show("wf-purge-narration",   hasManga);
+  _show("wf-purge-audio",       hasManga);
+  _show("wf-purge-video",       hasManga);
 }
 
 export async function refreshWorkflow() {
@@ -214,6 +224,50 @@ function makeResetBtn(id, { andRegen = false } = {}) {
   });
 }
 
+function _confirmBtn(btn, action) {
+  let timer = null;
+  btn.addEventListener("click", async () => {
+    if (!btn._confirming) {
+      btn._confirming = true;
+      btn._orig = btn.textContent.trim();
+      btn.textContent = "Sure? (click again)";
+      timer = setTimeout(() => { btn._confirming = false; btn.textContent = btn._orig; }, 3000);
+      return;
+    }
+    clearTimeout(timer);
+    btn._confirming = false;
+    btn.disabled = true;
+    btn.textContent = "Deleting…";
+    try { await action(); }
+    finally { btn.disabled = false; btn.textContent = btn._orig; }
+  });
+}
+
+function makeDeleteBtn(id, what) {
+  const btn = $(id);
+  if (!btn) return;
+  _confirmBtn(btn, async () => {
+    const ch = wf?.chapter ?? (parseInt($("wf-chapter").value, 10) || 1);
+    await api(`/api/workflow/chapters/${ch}/delete`, {
+      method: "POST", body: JSON.stringify({ what }),
+    });
+    appendLog("", `[delete] cleared ${what} for chapter ${String(ch).padStart(2, "0")}`);
+    await refreshWorkflow();
+  });
+}
+
+function makePurgeBtn(id, kind) {
+  const btn = $(id);
+  if (!btn) return;
+  _confirmBtn(btn, async () => {
+    const result = await api("/api/workflow/manga/purge", {
+      method: "POST", body: JSON.stringify({ kind }),
+    });
+    appendLog("", `[purge] ${kind}: removed ${result.removed} items across ${result.chapters} chapters`);
+    await refreshWorkflow();
+  });
+}
+
 function _initExportPdfBtn() {
   const btn = $("wf-narr-export-zip");
   btn.addEventListener("click", async () => {
@@ -249,6 +303,13 @@ export function initWorkflow() {
   makeNarrBtn("wf-narr-clear", "clear_text");
   makeNarrBtn("wf-narr-remove-empty", "remove_empty");
   _initExportPdfBtn();
+  makeDeleteBtn("wf-del-download", "download");
+  makeDeleteBtn("wf-del-panels",   "panels");
+  makeDeleteBtn("wf-del-all",      "all");
+  makePurgeBtn("wf-purge-zip",       "ai-zip");
+  makePurgeBtn("wf-purge-narration", "narration");
+  makePurgeBtn("wf-purge-audio",     "audio");
+  makePurgeBtn("wf-purge-video",     "video");
 
   document.querySelectorAll("[data-wf-open]").forEach((btn) =>
     btn.addEventListener("click", async () => {

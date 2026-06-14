@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 
 from mangaeasy import __version__
 from mangaeasy.web.app import jobs
+from mangaeasy.web.app.jobs import iter_lines
 from mangaeasy.web.app.state import lock, log, state
 
 bp = Blueprint("run", __name__)
@@ -72,8 +73,8 @@ def api_run_chain():
                 proc = jobs.spawn_cli(command, args, state["project_root"])
                 job["proc"] = proc  # so /api/stop terminates the current step
                 assert proc.stdout is not None
-                for line in proc.stdout:
-                    log(line.rstrip("\n"))
+                for line in iter_lines(proc.stdout):
+                    log(line)
                 code = proc.wait()
                 log(f"[{command}] finished with exit code {code}")
                 if code != 0:
@@ -140,8 +141,7 @@ def _pump_editor(proc, name: str) -> None:
     """Like jobs.pump but intercepts MANGAEASY_OPEN_URL: lines."""
     assert proc.stdout is not None
     opened = False
-    for line in proc.stdout:
-        line = line.rstrip("\n")
+    for line in iter_lines(proc.stdout):
         if line.startswith("MANGAEASY_OPEN_URL:"):
             url = line[len("MANGAEASY_OPEN_URL:"):]
             state["editor_urls"][name] = url

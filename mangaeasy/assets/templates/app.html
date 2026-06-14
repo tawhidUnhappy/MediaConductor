@@ -20,6 +20,7 @@
   </nav>
   <div id="job-indicator" class="idle">idle</div>
 </header>
+<div id="job-progress-wrap" style="display:none"><div id="job-progress-fill"></div></div>
 
 <main>
 
@@ -223,6 +224,47 @@
       <p class="hint">Audio clones your <b>voice reference</b> with IndexTTS, then the video is
         rendered from panels + audio and your <b>background music</b> is mixed in. The finished
         MP4 lands in the chapter folder. One job runs at a time — watch the log below.</p>
+
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:12px;color:#888;user-select:none">Delete chapter data…</summary>
+        <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+          <button id="wf-del-download" class="btn small danger" style="display:none"
+            title="Delete downloaded pages for this chapter. Click twice to confirm.">
+            ✕ Downloads
+          </button>
+          <button id="wf-del-panels" class="btn small danger" style="display:none"
+            title="Delete cut panels for this chapter. Click twice to confirm.">
+            ✕ Panels
+          </button>
+          <button id="wf-del-all" class="btn small danger" style="display:none"
+            title="Delete everything in this chapter folder (downloads, panels, audio, video). Click twice to confirm.">
+            ✕ Everything
+          </button>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel" style="border-top:2px solid #3a2020">
+      <h3>🧹 Cleanup all chapters</h3>
+      <p class="hint">Remove a file category from <b>every</b> chapter of this manga at once.</p>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        <button id="wf-purge-zip" class="btn small danger" style="display:none"
+          title="Delete all AI ZIP exports (*_panels_for_ai.zip) across every chapter. Click twice.">
+          ✕ All AI ZIPs
+        </button>
+        <button id="wf-purge-narration" class="btn small danger" style="display:none"
+          title="Delete all narration_*.json files across every chapter. Click twice.">
+          ✕ All narration files
+        </button>
+        <button id="wf-purge-audio" class="btn small danger" style="display:none"
+          title="Delete audio/ folders across every chapter. Click twice.">
+          ✕ All audio
+        </button>
+        <button id="wf-purge-video" class="btn small danger" style="display:none"
+          title="Delete all *.mp4 files across every chapter. Click twice.">
+          ✕ All video
+        </button>
+      </div>
     </div>
   </section>
 

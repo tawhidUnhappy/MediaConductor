@@ -18,7 +18,8 @@ from flask import Blueprint, jsonify, request
 
 from mangaeasy.web.app import jobs
 from mangaeasy.web.app.api_project import _read_json
-from mangaeasy.web.app.state import lock, log, state
+from mangaeasy.web.app.jobs import iter_lines
+from mangaeasy.web.app.state import lock, log, progress, state
 
 bp = Blueprint("workflow", __name__)
 
@@ -377,7 +378,7 @@ def api_panels_ai_zip():
 
     try:
         from mangaeasy.images.ai_zip import panels_to_ai_zip
-        n = panels_to_ai_zip(panels_path, out_path, log)
+        n = panels_to_ai_zip(panels_path, out_path, log=log, progress=progress)
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
     except Exception as exc:
@@ -444,8 +445,8 @@ def api_batch_download():
             proc = jobs.spawn_cli("download", dl_args, root)
             job["proc"] = proc
             assert proc.stdout is not None
-            for line in proc.stdout:
-                log(line.rstrip("\n"))
+            for line in iter_lines(proc.stdout):
+                log(line)
             code = proc.wait()
             log(f"[download] chapter {ch:02d} exit {code}")
             if code != 0:
@@ -472,3 +473,57 @@ def api_batch_download():
         thread.start()
 
     return jsonify({"started": True})
+
+
+@bp.route("/api/workflow/manga/purge", methods=["POST"])
+def api_manga_purge():
+    """Delete files of a given category from EVERY chapter of the current manga.
+
+    Body: {"kind": "ai-zip" | "narration" | "audio" | "video"}
+    """
+    body = request.get_json(silent=True) or {}
+    kind = str(body.get("kind", "")).strip()
+    valid_kinds = ("ai-zip", "narration", "audio", "video")
+    if kind not in valid_kinds:
+        return jsonify({"error": f"kind must be one of: {', '.join(valid_kinds)}"}), 400
+
+    root: Path = state["project_root"]
+    cfg = _read_json(root / "config.json") or {}
+    sys_cfg = _read_json(root / "config.system.json") or {}
+    dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+    name = str(dl.get("name") or "")
+    if not name:
+        return jsonify({"error": "no manga name configured"}), 400
+
+    paths_cfg = sys_cfg.get("paths") or {}
+    audio_sub = paths_cfg.get("audio_subdir", "audio")
+
+    lib = _library_dir(root, sys_cfg)
+    manga_dir = lib / name
+    if not manga_dir.is_dir():
+        return jsonify({"error": "manga folder not found"}), 404
+
+    chapter_dirs = sorted(d for d in manga_dir.iterdir() if d.is_dir() and d.name.isdigit())
+    removed = 0
+
+    for ch_dir in chapter_dirs:
+        if kind == "ai-zip":
+            for f in ch_dir.glob("*_panels_for_ai.zip"):
+                f.unlink()
+                removed += 1
+        elif kind == "narration":
+            for f in ch_dir.glob("narration_*.json"):
+                f.unlink()
+                removed += 1
+        elif kind == "audio":
+            audio_dir = ch_dir / audio_sub
+            if audio_dir.is_dir():
+                shutil.rmtree(audio_dir)
+                removed += 1
+        elif kind == "video":
+            for f in ch_dir.glob("*.mp4"):
+                f.unlink()
+                removed += 1
+
+    log(f"[purge] {kind}: {removed} items removed across {len(chapter_dirs)} chapters")
+    return jsonify({"ok": True, "kind": kind, "removed": removed, "chapters": len(chapter_dirs)})

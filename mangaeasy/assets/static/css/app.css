@@ -39,6 +39,22 @@ body {
 }
 #job-indicator.busy { background: #0e3a5e; color: #6cc0ff; }
 
+/* ── Progress bar strip ───────────────────────────────────────────────── */
+#job-progress-wrap {
+  height: 3px; background: #1a1a1a; position: relative; overflow: hidden; flex-shrink: 0;
+}
+#job-progress-fill {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  background: #007acc; width: 0%; transition: width 0.25s ease;
+}
+#job-progress-wrap.indeterminate #job-progress-fill {
+  width: 35%; animation: progress-slide 1.4s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  0%   { left: -35%; }
+  100% { left: 100%; }
+}
+
 /* ── Main / tabs ─────────────────────────────────────────────────────── */
 main { flex: 1; overflow-y: auto; padding: 18px 24px 24px; min-height: 0; }
 .tab-page { display: none; max-width: 980px; }

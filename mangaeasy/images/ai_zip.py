@@ -90,6 +90,7 @@ def panels_to_ai_zip(
     panels_dir: Path,
     out_path: Path,
     log: Callable[[str], None] = print,
+    progress: Callable[[int, int, str], None] | None = None,
 ) -> int:
     """Pack watermarked copies of all panels into *out_path* (ZIP).
 
@@ -100,6 +101,7 @@ def panels_to_ai_zip(
     if not files:
         raise FileNotFoundError(f"no panel images found in {panels_dir}")
 
+    total = len(files)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     count = 0
     # ZIP_STORED: images are already compressed — deflating gains nothing and wastes CPU.
@@ -119,10 +121,14 @@ def panels_to_ai_zip(
             zf.writestr(p.stem + out_ext, data)
             count += 1
             log(f"[ai-zip] {p.name}")
+            if progress:
+                progress(count, total, "Labelling panels")
 
     if count == 0:
         out_path.unlink(missing_ok=True)
         raise FileNotFoundError("all panel images failed to load")
 
     log(f"[ai-zip] ✓ {count} panels → {out_path.name}")
+    if progress:
+        progress(count, total, "Done")
     return count

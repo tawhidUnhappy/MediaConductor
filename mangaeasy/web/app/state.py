@@ -29,6 +29,11 @@ def action(name: str) -> None:
     broadcaster.broadcast_action(name)
 
 
+def progress(value: int, total: int, label: str = "") -> None:
+    """Push a progress update to all live SSE clients."""
+    broadcaster.broadcast_progress(value, total, label)
+
+
 def _load_app_state() -> dict:
     try:
         data = json.loads(APP_STATE_FILE.read_text(encoding="utf-8"))

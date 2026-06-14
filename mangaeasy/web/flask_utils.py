@@ -144,6 +144,21 @@ class LogBroadcaster:
                 except queue.Full:
                     pass
 
+    def broadcast_progress(self, value: int, total: int, label: str = "") -> None:
+        """Send a progress update to all SSE clients (not buffered in history).
+
+        value=0, total=0 → indeterminate animated bar.
+        value/total > 0  → determinate fill.
+        value == total   → 100 % complete.
+        """
+        entry = json.dumps({"progress": {"value": value, "total": total, "label": label}})
+        with self._lock:
+            for q in self._clients:
+                try:
+                    q.put_nowait(entry)
+                except queue.Full:
+                    pass
+
     def install(self) -> None:
         """Redirect sys.stdout and sys.stderr through this broadcaster."""
         broadcaster = self
