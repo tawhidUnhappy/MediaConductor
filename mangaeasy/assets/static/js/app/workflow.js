@@ -61,6 +61,20 @@ function render(data) {
   if (data.paths) {
     $("wf-narration-name").textContent = data.paths.narration.split(/[\\/]/).pop();
   }
+
+  // Show destructive buttons only when there is content to act on.
+  const hasPanels = (st.panels || 0) > 0;
+  const hasNarr   = !!st.narration && (st.narration_items || 0) > 0;
+  const hasAv     = (st.audio || 0) > 0 || !!st.video;
+  function _show(id, visible) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? "" : "none";
+  }
+  _show("wf-narr-export-pdf",   hasPanels);
+  _show("wf-narr-clear",        hasPanels);
+  _show("wf-narr-remove-empty", hasNarr);
+  _show("wf-reset-av",          hasAv);
+  _show("wf-reset-regen",       hasAv);
 }
 
 export async function refreshWorkflow() {
@@ -146,7 +160,7 @@ function makeNarrBtn(id, mode) {
         body: JSON.stringify({ mode }),
       });
       if (mode === "clear_text") {
-        appendLog("", `[narration] cleared text from ${result.entries} entries — ready for AI fill-in`);
+        appendLog("", `[narration] rebuilt from ${result.entries} panels — paste into AI to fill in narration`);
       } else {
         appendLog("", `[narration] removed ${result.removed} empty entries, ${result.remaining} remain`);
       }
@@ -200,6 +214,24 @@ function makeResetBtn(id, { andRegen = false } = {}) {
   });
 }
 
+function _initExportPdfBtn() {
+  const btn = $("wf-narr-export-pdf");
+  btn.addEventListener("click", async () => {
+    const orig = btn.textContent.trim();
+    btn.disabled = true;
+    btn.textContent = "Exporting…";
+    try {
+      const result = await api("/api/workflow/panels/ai-pdf", { method: "POST" });
+      appendLog("", `[ai-pdf] ✓ ${result.panels} panels exported — open the chapter folder to find the PDF`);
+    } catch (err) {
+      appendLog("", `[ai-pdf] failed: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  });
+}
+
 export function initWorkflow() {
   for (const id of ["wf-chapter", "wf-lang"]) {
     $(id).addEventListener("change", scheduleSave);
@@ -216,6 +248,7 @@ export function initWorkflow() {
   makeResetBtn("wf-reset-regen", { andRegen: true });
   makeNarrBtn("wf-narr-clear", "clear_text");
   makeNarrBtn("wf-narr-remove-empty", "remove_empty");
+  _initExportPdfBtn();
 
   document.querySelectorAll("[data-wf-open]").forEach((btn) =>
     btn.addEventListener("click", async () => {

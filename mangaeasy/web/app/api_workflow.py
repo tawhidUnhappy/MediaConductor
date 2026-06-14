@@ -283,8 +283,12 @@ def api_clean_narration():
     """Bulk-edit the chapter narration file.
 
     Body: {"mode": "clear_text" | "remove_empty"}
-      clear_text    — keep every image entry but set narration to ""
-      remove_empty  — drop entries where narration is blank/whitespace
+      clear_text    — rebuild narration.json from the panels/ folder: one
+                      entry per panel image, narration set to "". Creates
+                      the file if it doesn't exist yet. Ignores any previous
+                      narration.json so the count matches the actual panels.
+      remove_empty  — drop entries from the existing narration.json where
+                      narration is blank/whitespace.
     """
     body = request.get_json(silent=True) or {}
     mode = str(body.get("mode", "")).strip()
@@ -304,34 +308,84 @@ def api_clean_narration():
     if not name:
         return jsonify({"error": "no manga name configured"}), 400
 
-    narration = _library_dir(root, sys_cfg) / name / f"{chapter:02d}" / f"narration_{chapter:02d}.json"
-    if not narration.exists():
-        return jsonify({"error": "narration file not found"}), 404
-
-    try:
-        data = json.loads(narration.read_text(encoding="utf-8-sig"))
-    except Exception as exc:
-        return jsonify({"error": f"could not read narration file: {exc}"}), 400
-
-    if not isinstance(data, list):
-        return jsonify({"error": "narration file is not a JSON array"}), 400
-
-    original = len(data)
+    ch_dir = _library_dir(root, sys_cfg) / name / f"{chapter:02d}"
+    narration = ch_dir / f"narration_{chapter:02d}.json"
+    paths_cfg = sys_cfg.get("paths") or {}
 
     if mode == "clear_text":
-        for entry in data:
-            if isinstance(entry, dict):
-                entry["narration"] = ""
+        # Build the template from panel images, not from the existing narration file.
+        panels_dir = ch_dir / paths_cfg.get("panels_subdir", "panels")
+        if not panels_dir.is_dir():
+            return jsonify({"error": "panels folder not found — complete step 2 first"}), 404
+        panel_files = sorted(
+            p.name for p in panels_dir.iterdir()
+            if p.suffix.lower() in IMAGE_EXTS
+        )
+        if not panel_files:
+            return jsonify({"error": "no panel images found in panels folder"}), 404
+        data = [{"image": f, "narration": ""} for f in panel_files]
         narration.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        log(f"[narration] cleared text from {original} entries (ch{chapter:02d})")
-        return jsonify({"mode": mode, "entries": original})
+        log(f"[narration] created template: {len(data)} panels → {narration.name} (ch{chapter:02d})")
+        return jsonify({"mode": mode, "entries": len(data)})
 
     else:  # remove_empty
+        if not narration.exists():
+            return jsonify({"error": "narration file not found"}), 404
+        try:
+            data = json.loads(narration.read_text(encoding="utf-8-sig"))
+        except Exception as exc:
+            return jsonify({"error": f"could not read narration file: {exc}"}), 400
+        if not isinstance(data, list):
+            return jsonify({"error": "narration file is not a JSON array"}), 400
+        original = len(data)
         kept = [e for e in data if isinstance(e, dict) and str(e.get("narration", "")).strip()]
         removed = original - len(kept)
         narration.write_text(json.dumps(kept, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         log(f"[narration] removed {removed} empty entries, {len(kept)} remain (ch{chapter:02d})")
         return jsonify({"mode": mode, "original": original, "remaining": len(kept), "removed": removed})
+
+
+@bp.route("/api/workflow/panels/ai-pdf", methods=["POST"])
+def api_panels_ai_pdf():
+    """Export a labelled, normalised PDF of chapter panels for AI narration context.
+
+    Each panel gets a dark filename banner added above it (never overlapping
+    content).  All panels are resized to a consistent width.  Originals are
+    untouched.  The PDF lands in the chapter folder.
+    """
+    root: Path = state["project_root"]
+    cfg = _read_json(root / "config.json") or {}
+    sys_cfg = _read_json(root / "config.system.json") or {}
+    dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+    name = str(dl.get("name") or "")
+    try:
+        chapter = int(dl.get("chapter") or 1)
+    except (TypeError, ValueError):
+        chapter = 1
+
+    if not name:
+        return jsonify({"error": "no manga name configured"}), 400
+
+    paths_cfg = sys_cfg.get("paths") or {}
+    ch_dir = _library_dir(root, sys_cfg) / name / f"{chapter:02d}"
+    panels_path = ch_dir / paths_cfg.get("panels_subdir", "panels")
+
+    if not panels_path.is_dir():
+        return jsonify({"error": "panels folder not found — complete step 2 first"}), 404
+
+    safe_name = name.replace(" ", "_")
+    out_path = ch_dir / f"{safe_name}_ch{chapter:02d}_panels_for_ai.pdf"
+
+    try:
+        from mangaeasy.images.ai_pdf import panels_to_ai_pdf
+        n = panels_to_ai_pdf(panels_path, out_path, log)
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        log(f"[ai-pdf] error: {exc}")
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({"ok": True, "panels": n, "path": str(out_path)})
 
 
 @bp.route("/api/workflow/batch-download", methods=["POST"])
