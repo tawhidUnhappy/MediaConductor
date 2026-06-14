@@ -228,7 +228,7 @@ def api_delete_chapter_data(chapter_num: int):
     """
     body = request.get_json(silent=True) or {}
     what = str(body.get("what", "")).strip()
-    valid = {"download", "panels", "audio", "video", "all"}
+    valid = {"download", "panels", "audio", "video", "av", "all"}
     if what not in valid:
         return jsonify({"error": f"'what' must be one of: {', '.join(sorted(valid))}"}), 400
 
@@ -267,9 +267,9 @@ def api_delete_chapter_data(chapter_num: int):
         rm_tree(ch_dir / "download")
     if what in ("panels", "all"):
         rm_tree(ch_dir / panels_sub)
-    if what in ("audio", "all"):
+    if what in ("audio", "av", "all"):
         rm_tree(ch_dir / audio_sub)
-    if what in ("video", "all"):
+    if what in ("video", "av", "all"):
         rm_glob("*.mp4")
     if what == "all":
         rm_tree(ch_dir / "work")

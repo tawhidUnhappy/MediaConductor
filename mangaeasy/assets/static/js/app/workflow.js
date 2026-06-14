@@ -122,6 +122,46 @@ function videoSteps() {
   return steps;
 }
 
+function makeResetBtn(id, { andRegen = false } = {}) {
+  const btn = $(id);
+  let timer = null;
+  btn.addEventListener("click", async () => {
+    if (!btn._confirming) {
+      btn._confirming = true;
+      const orig = btn.textContent.trim();
+      btn._orig = orig;
+      btn.textContent = "Sure? (click again)";
+      timer = setTimeout(() => {
+        btn._confirming = false;
+        btn.textContent = btn._orig;
+      }, 3000);
+      return;
+    }
+    clearTimeout(timer);
+    btn._confirming = false;
+    btn.disabled = true;
+    btn.textContent = "Deleting…";
+    try {
+      const ch = wf?.chapter ?? (parseInt($("wf-chapter").value, 10) || 1);
+      await api(`/api/workflow/chapters/${ch}/delete`, {
+        method: "POST",
+        body: JSON.stringify({ what: "av" }),
+      });
+      appendLog("", `[reset] cleared audio + video for chapter ${String(ch).padStart(2, "0")}`);
+      await refreshWorkflow();
+      if (andRegen) {
+        await save();
+        runChain(["index-tts", ...videoSteps()]);
+      }
+    } catch (err) {
+      appendLog("", `reset failed: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = btn._orig;
+    }
+  });
+}
+
 export function initWorkflow() {
   for (const id of ["wf-chapter", "wf-lang"]) {
     $(id).addEventListener("change", scheduleSave);
@@ -134,6 +174,8 @@ export function initWorkflow() {
   $("wf-audio").addEventListener("click", () => runSingle("index-tts"));
   $("wf-video").addEventListener("click", () => runChain(videoSteps()));
   $("wf-all").addEventListener("click", () => runChain(["index-tts", ...videoSteps()]));
+  makeResetBtn("wf-reset-av");
+  makeResetBtn("wf-reset-regen", { andRegen: true });
 
   document.querySelectorAll("[data-wf-open]").forEach((btn) =>
     btn.addEventListener("click", async () => {

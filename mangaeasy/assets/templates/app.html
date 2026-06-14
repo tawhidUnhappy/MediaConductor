@@ -196,6 +196,16 @@
         <label title="After rendering, run two-pass EBU R 128 loudness normalization (−14 LUFS integrated, −1.5 dBTP) on the final chapter video — the YouTube standard. The original is kept as a .before_normalize.mp4 backup.">
           <input type="checkbox" id="wf-normalize"> YouTube loudness (−14 LUFS)</label>
       </div>
+      <div class="row" style="margin-top:8px;gap:6px">
+        <button id="wf-reset-av" class="btn small danger"
+          title="Delete all generated audio and video for this chapter, keeping pages and panels. Click twice to confirm.">
+          ↺ Reset audio &amp; video
+        </button>
+        <button id="wf-reset-regen" class="btn small danger"
+          title="Delete audio and video, then immediately re-run Generate everything. Click twice to confirm.">
+          ↺ Reset &amp; re-generate
+        </button>
+      </div>
       <p class="hint">Audio clones your <b>voice reference</b> with IndexTTS, then the video is
         rendered from panels + audio and your <b>background music</b> is mixed in. The finished
         MP4 lands in the chapter folder. One job runs at a time — watch the log below.</p>
