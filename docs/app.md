@@ -39,7 +39,7 @@ folder when the current directory doesn't look like a project.
 ### 1 · Setup
 
 - Prerequisite checks: git, git-lfs, uv, uvx, FFmpeg, FFprobe, NVIDIA GPU.
-- One card per external AI tool (IndexTTS, MAGI v3, Kokoro) showing
+- One card per external AI tool (IndexTTS, MAGI v3, GOT-OCR 2.0, Kokoro) showing
   whether it is installed and where it resolved.
 - **Install / Reinstall** buttons run `mangaeasy install-tool` for you, with the
   full output streaming into the log console. Options: *CPU-only* and *Skip

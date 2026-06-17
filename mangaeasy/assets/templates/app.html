@@ -180,6 +180,7 @@
       <h3><span class="step-no">3</span> Write the narration <span id="wf-st-narration" class="badge wf-badge"></span></h3>
       <div class="row">
         <button id="wf-narrate" class="btn primary">📝 Open narration editor</button>
+        <button id="wf-ocr" class="btn" style="display:none">Run GOT-OCR</button>
         <button class="btn" data-wf-open="chapter">Open chapter folder</button>
       </div>
       <div class="row" style="margin-top:8px;gap:6px">
@@ -306,6 +307,7 @@
           <select id="run-step">
             <option value="video">Everything — audio + videos + long video</option>
             <option value="video-check">Check my files first (no changes)</option>
+            <option value="got-ocr2">Fill OCR fields (GOT-OCR 2.0)</option>
             <option value="video-audio">Only generate audio (Kokoro)</option>
             <option value="video-audio-indextts">Only generate audio (IndexTTS)</option>
             <option value="video-render">Only render item videos</option>

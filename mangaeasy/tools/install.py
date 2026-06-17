@@ -1,6 +1,6 @@
 """mangaeasy.tools.install — provision the external AI tool environments.
 
-These heavy tools (IndexTTS, MAGI v3, Kokoro) are deliberately kept in
+These heavy tools (IndexTTS, MAGI v3, GOT-OCR 2.0, Kokoro) are deliberately kept in
 their own isolated ``uv`` environments instead of being dependencies of
 mangaeasy, so their conflicting torch/transformers stacks never clash with the
 core install. This module clones / sets them up into the managed tools dir
@@ -110,6 +110,27 @@ TOOLS: dict[str, ToolSpec] = {
         verify_import="transformers",
         needs_gpu=True,
         notes="Detects manga panels. The magiv3 model + code download from Hugging Face on first run.",
+    ),
+    "got-ocr2": ToolSpec(
+        key="got-ocr2",
+        title="GOT-OCR 2.0",
+        kind="managed_env",
+        git_url=None,
+        model_repo="stepfun-ai/GOT-OCR-2.0-hf",
+        model_subdir="model",
+        env_deps=[
+            "torch>=2.5.0",
+            "torchvision>=0.20.0",
+            "transformers>=4.49,<5.0",
+            "accelerate>=0.28.0",
+            "safetensors>=0.4.0",
+            "pillow>=10.0.0",
+            "numpy>=1.24.0",
+            "tiktoken>=0.6.0",
+        ],
+        verify_import="transformers",
+        needs_gpu=True,
+        notes="Panel OCR with the Hugging Face Transformers model stepfun-ai/GOT-OCR-2.0-hf. Writes an `ocr` field into narration JSON files. Model downloads from Hugging Face; no GitHub clone is needed.",
     ),
     "kokoro-82m": ToolSpec(
         key="kokoro-82m",
@@ -466,7 +487,13 @@ def _write_managed_pyproject(spec: ToolSpec, dest: Path, gpu_mode: str) -> None:
 
 
 def _install_managed_env(
-    spec: ToolSpec, dest: Path, gpu_mode: str, clone: bool, ref: str | None, log: LogFn
+    spec: ToolSpec,
+    dest: Path,
+    gpu_mode: str,
+    clone: bool,
+    ref: str | None,
+    skip_model: bool,
+    log: LogFn,
 ) -> None:
     _require(["uv"], log)
     dest.mkdir(parents=True, exist_ok=True)
@@ -493,7 +520,13 @@ def _install_managed_env(
     _run(["uv", "sync"], log, cwd=dest)
     if spec.verify_import:
         _verify_tool_python(dest, spec.verify_import, log)
-    log("Model weights/code download from Hugging Face on first run.")
+    if spec.model_repo:
+        if skip_model:
+            log("Skipping model download (--skip-model). Model weights will download from Hugging Face on first run.")
+        else:
+            _download_model(spec, dest, log)
+    else:
+        log("Model weights/code download from Hugging Face on first run.")
 
 
 def install_tool(
@@ -527,7 +560,7 @@ def install_tool(
     if spec.kind == "uv_project":
         _install_uv_project(spec, target, ref or spec.ref, skip_model, log, gpu_mode)
     else:
-        _install_managed_env(spec, target, gpu_mode, clone, ref or spec.ref, log)
+        _install_managed_env(spec, target, gpu_mode, clone, ref or spec.ref, skip_model, log)
 
     log(f"=== Done. mangaeasy resolves '{spec.key}' at: {target} ===")
     return target

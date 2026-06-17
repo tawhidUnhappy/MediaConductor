@@ -49,6 +49,8 @@ function buildRunArgs() {
     if ($("run-ow-audio").checked) args.push("--overwrite");
   } else if (step === "video-audio-indextts") {
     if ($("run-ow-audio").checked) args.push("--overwrite");
+  } else if (step === "got-ocr2") {
+    args.push("--device", $("run-device").value);
   } else if (step === "video-render") {
     args.push("--encoder", $("run-encoder").value);
     if ($("run-ow-video").checked) args.push("--overwrite");

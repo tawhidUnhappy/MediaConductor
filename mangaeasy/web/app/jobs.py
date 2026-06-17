@@ -3,13 +3,76 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Iterator
 
 from mangaeasy.runtime import cli_command, popen_kwargs
+from mangaeasy.web.app import state as app_state
 from mangaeasy.web.app.state import log, state
 from mangaeasy.web.flask_utils import terminal_broadcaster
+
+_ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+_COUNT_RE = re.compile(r"(?<!\d)(\d{1,6})\s*/\s*(\d{1,6})(?!\d)")
+_PENDING_RE = re.compile(
+    r"(\d{1,6})\s+(?:panel(?:\(s\)|s)?|page(?:s)?|file(?:s)?|item(?:s)?|audio|frame(?:s)?|clip(?:s)?)\s+"
+    r"(?:pending|to\s+download|to\s+process)",
+    re.I,
+)
+
+
+def _progress_label(line: str, fallback: str) -> str:
+    lower = f"{line} {fallback}".lower()
+    if "got-ocr" in lower or "ocr" in lower:
+        return "OCR panels"
+    if "[frame]" in lower or "render" in lower:
+        return "Rendering frames"
+    if "[pcm]" in lower or "fade" in lower:
+        return "Preparing audio"
+    if "download" in lower or "skip (exists)" in lower:
+        return "Downloading pages"
+    if "kokoro" in lower or "tts" in lower or "audio" in lower:
+        return "Generating audio"
+    if "panel" in lower:
+        return "Processing panels"
+    return fallback
+
+
+def report_progress_from_line(line: str, fallback_label: str) -> None:
+    """Extract simple x/y CLI progress and send it to the app progress bar."""
+    text = _ANSI_RE.sub("", line).strip()
+    if not text:
+        return
+
+    pending = _PENDING_RE.search(text)
+    if pending:
+        total = int(pending.group(1))
+        if total > 0:
+            app_state.progress(0, total, _progress_label(text, fallback_label))
+        return
+
+    match = _COUNT_RE.search(text)
+    if not match:
+        return
+    value = int(match.group(1))
+    total = int(match.group(2))
+    if total <= 0:
+        return
+    app_state.progress(max(0, min(value, total)), total, _progress_label(text, fallback_label))
+
+
+def _parse_progress_buffer(buffer: bytes, fallback_label: str) -> bytes:
+    while True:
+        positions = [pos for pos in (buffer.find(b"\n"), buffer.find(b"\r")) if pos >= 0]
+        if not positions:
+            break
+        pos = min(positions)
+        raw, buffer = buffer[:pos], buffer[pos + 1:]
+        line = raw.decode("utf-8", errors="replace").strip()
+        if line:
+            report_progress_from_line(line, fallback_label)
+    return buffer[-8192:]
 
 
 def job_running() -> bool:
@@ -84,13 +147,19 @@ def spawn_cli(command: str, args: list[str], cwd: Path) -> subprocess.Popen:
 
 def pump(proc: subprocess.Popen, label: str) -> None:
     assert proc.stdout is not None
+    app_state.progress(0, 0, f"Starting {label}")
+    buffer = b""
     while True:
         chunk = proc.stdout.read(512)
         if not chunk:
             break
         terminal_broadcaster.write_raw(chunk)
+        buffer = _parse_progress_buffer(buffer + chunk, label)
+    if buffer.strip():
+        report_progress_from_line(buffer.decode("utf-8", errors="replace"), label)
     code = proc.wait()
     color = "\x1b[32m" if code == 0 else "\x1b[31m"
+    app_state.progress(1, 1, f"{label} {'done' if code == 0 else 'failed'}")
     log(f"{color}[{label}] finished (exit {code})\x1b[0m")
 
 

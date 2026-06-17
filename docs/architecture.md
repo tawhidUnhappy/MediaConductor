@@ -29,7 +29,7 @@ The default project root is the current working directory. Set
 
 ## External tools
 
-Kokoro, IndexTTS, and MAGI can each keep their own Python, CUDA, Torch,
+Kokoro, IndexTTS, MAGI, and GOT-OCR can each keep their own Python, CUDA, Torch,
 and Transformers dependencies as isolated `uv` projects:
 
 ```text
@@ -37,6 +37,7 @@ and Transformers dependencies as isolated `uv` projects:
   kokoro-82m/
   index-tts/
   magi-v3/
+  got-ocr2/
 ```
 
 This avoids dependency conflicts while still allowing full GPU acceleration.
@@ -50,6 +51,12 @@ Tool installs (`mangaeasy install-tool`):
 - Auto-detects hardware: CUDA torch builds only on Windows/Linux with an
   NVIDIA GPU; standard CPU builds everywhere else (macOS, AMD, plain CPU).
 - Force a choice with `--cuda` or `--cpu`.
+
+OCR:
+
+- `mangaeasy got-ocr2` runs inside the isolated GOT-OCR 2.0 environment and
+  writes an `ocr` field into narration JSON entries.
+- `--device auto` uses CUDA when the tool env can see it, otherwise CPU.
 
 Audio:
 

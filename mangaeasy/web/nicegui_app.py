@@ -13,11 +13,12 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from nicegui import run as ni_run, ui
 
 from mangaeasy import __version__
+from mangaeasy.utils import numeric_sort_key
 from mangaeasy.web.app import jobs
 from mangaeasy.web.app.state import lock, log, save_app_state, state
 from mangaeasy.web.flask_utils import terminal_broadcaster
@@ -44,7 +45,7 @@ terminal_broadcaster.install_tee()
 # ---------------------------------------------------------------------------
 import mangaeasy.web.app.state as _st
 
-_prog: dict = {"v": 0, "t": 0, "label": ""}
+_prog: dict = {"v": 0, "t": 0, "label": "", "active": False, "done_until": 0.0}
 _prog_start: Optional[float] = None
 _real_prog = _st.progress
 
@@ -52,12 +53,27 @@ _real_prog = _st.progress
 def _prog_hook(value: int, total: int, label: str = "") -> None:
     global _prog_start
     _real_prog(value, total, label)
-    if value > 0 and _prog_start is None:
+    active = total <= 0 or value < total
+    if active and _prog_start is None:
         _prog_start = time.monotonic()
-    _prog.update({"v": value, "t": total, "label": label})
+    _prog.update({
+        "v": value,
+        "t": total,
+        "label": label,
+        "active": active,
+        "done_until": time.monotonic() + 2.0 if total > 0 and value >= total else 0.0,
+    })
 
 
 _st.progress = _prog_hook
+
+
+def _begin_progress(label: str) -> None:
+    _prog_hook(0, 0, label)
+
+
+def _finish_progress(label: str = "Done") -> None:
+    _prog_hook(1, 1, label)
 
 # ---------------------------------------------------------------------------
 # Job runners
@@ -70,6 +86,7 @@ def _run_job(command: str, args: list[str] | None = None) -> None:
         if jobs.job_running():
             ui.notify("Another job is already running", type="warning")
             return
+        _begin_progress(f"Starting {command}")
         proc = jobs.spawn_cli(command, args, state["project_root"])
         t = threading.Thread(target=jobs.pump, args=(proc, command), daemon=True)
         state["job"] = {"kind": "run", "name": command, "thread": t, "proc": proc}
@@ -82,21 +99,24 @@ def _run_chain(commands: list[str]) -> None:
             ui.notify("Another job is already running", type="warning")
             return
         label = " → ".join(commands)
+        _begin_progress(f"Starting {label}")
         job: dict = {"kind": "run", "name": label, "thread": None, "proc": None}
 
         def _work() -> None:
-            for cmd in commands:
+            for index, cmd in enumerate(commands, 1):
+                _st.progress(index - 1, len(commands), f"Step {index}/{len(commands)}: {cmd}")
                 proc = jobs.spawn_cli(cmd, [], state["project_root"])
                 job["proc"] = proc
-                assert proc.stdout
-                while chunk := proc.stdout.read(512):
-                    terminal_broadcaster.write_raw(chunk)
-                code = proc.wait()
+                jobs.pump(proc, cmd)
+                code = proc.returncode
                 col = "\x1b[32m" if code == 0 else "\x1b[31m"
                 log(f"{col}[{cmd}] exit {code}\x1b[0m")
                 if code != 0:
+                    _finish_progress(f"{cmd} failed")
                     log("\x1b[31m[chain] stopped\x1b[0m")
                     return
+                _st.progress(index, len(commands), f"Finished {cmd}")
+            _finish_progress("Chain complete")
             log("\x1b[32m[chain] all steps done ✓\x1b[0m")
 
         t = threading.Thread(target=_work, daemon=True)
@@ -111,6 +131,7 @@ def _batch_download(start: int, end: int, fresh: bool) -> None:
         if jobs.job_running():
             ui.notify("Another job is already running", type="warning")
             return
+        _begin_progress(f"Downloading chapters {start:02d}-{end:02d}")
         root = state["project_root"]
         cfg_path = root / "config.json"
         job: dict = {"kind": "batch-download", "name": f"ch{start:02d}–{end:02d}",
@@ -124,7 +145,9 @@ def _batch_download(start: int, end: int, fresh: bool) -> None:
             name = str(dl0.get("name") or "")
             lib  = _library_dir(root, sc) if name else None
 
+            total = max(1, end - start + 1)
             for i, ch in enumerate(range(start, end + 1), 1):
+                _st.progress(i - 1, total, f"Chapter {ch:02d}")
                 if lib and name:
                     dl_dir = lib / name / f"{ch:02d}" / "download"
                     if _count_files(dl_dir, IMAGE_EXTS) > 0:
@@ -138,18 +161,20 @@ def _batch_download(start: int, end: int, fresh: bool) -> None:
                 cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
                 proc = jobs.spawn_cli("download", ["--fresh"] if fresh else [], root)
                 job["proc"] = proc
-                assert proc.stdout
-                while chunk := proc.stdout.read(512):
-                    terminal_broadcaster.write_raw(chunk)
-                code = proc.wait()
+                jobs.pump(proc, f"download ch{ch:02d}")
+                code = proc.returncode
                 col = "\x1b[32m" if code == 0 else "\x1b[31m"
                 log(f"{col}[download] ch{ch:02d} exit {code}\x1b[0m")
                 if code != 0:
+                    _finish_progress(f"ch{ch:02d} failed")
                     log("\x1b[31m[batch] stopped\x1b[0m")
                     return
+                _st.progress(i, total, f"Finished ch{ch:02d}")
                 if ch < end:
                     log("[batch] pausing 10 s…"); time.sleep(10)
             log(f"\x1b[32m[batch] done ✓\x1b[0m")
+
+            _finish_progress("Batch download complete")
 
         t = threading.Thread(target=_work, daemon=True)
         job["thread"] = t
@@ -161,6 +186,7 @@ def _stop_job() -> None:
     job = state.get("job")
     if job and job.get("proc"):
         job["proc"].terminate()
+    _finish_progress("Stop requested")
     ui.notify("Stop requested", type="warning")
 
 
@@ -303,6 +329,46 @@ def _export_ai_zip(chapter: int) -> None:
     log(f"[ai-zip] {n} panels → {out.name}")
 
 
+def _ensure_narration_for_ocr(chapter: int) -> Path | None:
+    """Return the current chapter narration JSON, creating a blank panel template if needed."""
+    from mangaeasy.web.app.api_workflow import _library_dir
+
+    root = state["project_root"]
+    cfg, sc = _read_config()
+    dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
+    name = str(dl.get("name") or "")
+    if not name:
+        log("[got-ocr2] no manga name configured")
+        return None
+
+    ch_dir = _library_dir(root, sc) / name / f"{chapter:02d}"
+    narr = ch_dir / f"narration_{chapter:02d}.json"
+    if narr.exists():
+        return narr
+
+    panels_sub = (sc.get("paths") or {}).get("panels_subdir", "panels")
+    panels_dir = ch_dir / panels_sub
+    if not panels_dir.is_dir():
+        log("[got-ocr2] panels folder not found; cut panels first")
+        return None
+
+    images = sorted(
+        [p.name for p in panels_dir.iterdir() if p.is_file() and p.suffix.lower() in _IMG],
+        key=numeric_sort_key,
+    )
+    if not images:
+        log("[got-ocr2] no panel images found")
+        return None
+
+    narr.parent.mkdir(parents=True, exist_ok=True)
+    narr.write_text(
+        json.dumps([{"image": image, "narration": ""} for image in images], indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    log(f"[got-ocr2] created {narr.name} from {len(images)} panels")
+    return narr
+
+
 # ---------------------------------------------------------------------------
 # File pickers (blocking — always call via ni_run.io_bound from async handlers)
 # ---------------------------------------------------------------------------
@@ -334,29 +400,60 @@ def _pick_file(*exts: str) -> Optional[str]:
 # Editor launcher (Flask-based editors open as browser pages)
 # ---------------------------------------------------------------------------
 
-def _launch_editor(name: str) -> None:
+def _expected_editor_url(name: str) -> str | None:
+    _, sc = _read_config()
+    ports = sc.get("ports") if isinstance(sc.get("ports"), dict) else {}
+    port_map = {
+        "cut-page": int(ports.get("cut_page", 5000)),
+        "panel-editor": 5000,
+        "narration-editor": int(ports.get("narration_editor", 5003)),
+        "narration-editor-all": int(ports.get("narration_editor_all", 5005)),
+        "narration-review": int(ports.get("narration_review", 5006)),
+    }
+    port = port_map.get(name)
+    return f"http://127.0.0.1:{port}/" if port else None
+
+
+_EDITOR_LABELS = {
+    "cut-page": "Crop",
+    "panel-editor": "Panel Editor",
+    "narration-editor": "Narration Writer",
+    "narration-editor-all": "Narration Writer (All)",
+    "narration-review": "Narration Review",
+}
+
+
+def _launch_editor(name: str, open_in_app: Callable[[str, str], None] | None = None) -> None:
+    label = _EDITOR_LABELS.get(name, name)
+    if open_in_app:
+        _begin_progress(f"Opening {label}")
     existing = state["editors"].get(name)
     if existing and existing.poll() is None:
-        url = state["editor_urls"].get(name)
+        url = state["editor_urls"].get(name) or _expected_editor_url(name)
         if url:
-            import webbrowser
-            webbrowser.open(url)
+            if open_in_app:
+                open_in_app(name, url)
+                _finish_progress(f"{label} open")
+            else:
+                ui.navigate.to(url, new_tab=True)
         return
 
     proc = jobs.spawn_cli(name, [], state["project_root"])
     state["editors"][name] = proc
+    url = _expected_editor_url(name)
+    if url:
+        if open_in_app:
+            open_in_app(name, url)
+            _finish_progress(f"{label} open")
+        else:
+            ui.navigate.to(url, new_tab=True)
 
     def _pump(p, n: str) -> None:
-        opened = False
         for line in jobs.iter_lines(p.stdout):
             if line.startswith("MANGAEASY_OPEN_URL:"):
                 url = line[len("MANGAEASY_OPEN_URL:"):]
                 state["editor_urls"][n] = url
                 log(f"[{n}] ready at {url}")
-                if not opened:
-                    import webbrowser
-                    webbrowser.open(url)
-                    opened = True
             else:
                 log(line)
         p.wait()
@@ -411,6 +508,19 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
       .mono { font-family:Consolas,'Courier New',monospace !important; font-size:12px; }
       .q-tab-panels { background:#1e1e1e !important; }
       .q-tab-panel { padding:18px 24px; max-width:980px; }
+
+      /* Fill the real window height instead of overflowing it (was hard-coded
+         vh-minus-pixels guesses that drifted whenever the header/progress bar
+         changed height — most visible when the window is maximized/fullscreen
+         and the slack shows up as dead space or a stray scrollbar). */
+      .q-page { height: calc(100vh - 52px) !important; overflow: hidden;
+                display: flex; flex-direction: column; }
+      .nicegui-content { display: flex; flex-direction: column; flex: 1 1 auto;
+                          min-height: 0; overflow: hidden; }
+      .q-tab-panels { flex: 1 1 auto; min-height: 0; }
+      .q-tab-panels .q-panel.scroll { height: 100%; }
+      .q-tab-panel { height: 100%; box-sizing: border-box; }
+      .q-tab-panel.full-bleed { padding: 0 !important; max-width: none !important; overflow: hidden; }
     </style>""")
 
     # ── header ────────────────────────────────────────────────────────────────
@@ -424,11 +534,14 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
     # ── slim progress bar below header ────────────────────────────────────────
     with ui.row().classes(
-        "w-full bg-[#161616] border-b border-[#222] px-4 items-center h-5"
+        "w-full bg-[#161616] border-b border-[#222] px-4 items-center gap-3 h-8"
     ) as prog_row:
         prog_row.visible = False
-        prog_bar = ui.linear_progress(0).props("rounded size=3px").classes("w-40")
-        prog_lbl = ui.label("").classes("text-[11px] text-gray-500 font-mono ml-2")
+        with ui.element("div").classes("flex-1 min-w-[180px]"):
+            prog_bar = ui.linear_progress(0).props("rounded size=6px").classes("w-full")
+            prog_busy = ui.linear_progress(0).props("indeterminate rounded size=6px").classes("w-full")
+            prog_busy.visible = False
+        prog_lbl = ui.label("").classes("text-[11px] text-gray-400 font-mono whitespace-nowrap")
 
     # ── tabs ──────────────────────────────────────────────────────────────────
     with ui.tabs().classes(
@@ -438,6 +551,7 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
         ui.tab("project",  label="2 · Project")
         ui.tab("workflow", label="3 · Make a video")
         ui.tab("run",      label="Batch videos")
+        ui.tab("editor",   label="Editor")
         ui.tab("terminal", label="Terminal")
 
     with ui.tab_panels(tabs, value="setup").classes("w-full flex-1 bg-[#1e1e1e]"):
@@ -464,9 +578,13 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                 async def _refresh_all() -> None:
                     from mangaeasy.tools.install import doctor
+                    _begin_progress("Checking tools")
                     prereq_spin.visible = True
-                    data = await ni_run.io_bound(doctor)
-                    prereq_spin.visible = False
+                    try:
+                        data = await ni_run.io_bound(doctor)
+                    finally:
+                        prereq_spin.visible = False
+                        _finish_progress("Tool check complete")
                     prereq_grid.clear()
                     with prereq_grid:
                         for exe, where in data.get("executables", {}).items():
@@ -510,9 +628,10 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                                             with lock:
                                                 if jobs.job_running():
                                                     ui.notify("Another job is running", type="warning")
-                                                    return
+                                                return
                                                 def _work(name: str = k) -> None:
                                                     try:
+                                                        _st.progress(0, 0, f"Installing {name}")
                                                         install_tool(
                                                             name,
                                                             gpu="cpu" if cpu_cb.value else "auto",
@@ -521,6 +640,9 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                                                         )
                                                     except Exception as exc:
                                                         log(f"[install] FAILED: {exc}")
+                                                        _finish_progress(f"{name} failed")
+                                                    else:
+                                                        _finish_progress(f"{name} installed")
                                                 t = threading.Thread(target=_work, daemon=True)
                                                 state["job"] = {"kind": "install", "name": k,
                                                                 "thread": t, "proc": None}
@@ -746,9 +868,9 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                 with ui.row().classes("gap-2"):
                     def _cut() -> None:
-                        _save_wf_cfg_now(); _launch_editor("cut-page")
+                        _save_wf_cfg_now(); _launch_editor("cut-page", _set_editor_frame)
                     def _arrange() -> None:
-                        _save_wf_cfg_now(); _launch_editor("panel-editor")
+                        _save_wf_cfg_now(); _launch_editor("panel-editor", _set_editor_frame)
                     ui.button("✂ Cut pages (manga / manhua)", on_click=_cut
                               ).props("color=primary dense")
                     ui.button("⬇ Arrange strips (webtoon)", on_click=_arrange
@@ -763,14 +885,36 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                 with ui.row().classes("gap-2"):
                     def _narr_edit() -> None:
-                        _save_wf_cfg_now(); _launch_editor("narration-editor")
+                        _save_wf_cfg_now()
+                        _ensure_narration_for_ocr(int(wf_ch.value or 1))
+                        _launch_editor("narration-editor", _set_editor_frame)
                     ui.button("\U0001f4dd Open narration editor", on_click=_narr_edit
                               ).props("color=primary dense")
 
+                    def _ocr_current(force: bool = False) -> None:
+                        _save_wf_cfg_now()
+                        narr = _ensure_narration_for_ocr(int(wf_ch.value or 1))
+                        if not narr:
+                            ui.notify("No panels/narration found for OCR", type="warning")
+                            return
+                        args = ["--narration", str(narr), "--device", "auto"]
+                        if force:
+                            args.append("--force")
+                        _run_job("got-ocr2", args)
+
+                    ui.button("Run GOT-OCR", on_click=lambda: _ocr_current(False)).props("flat dense")
+                    ui.button("Re-run GOT-OCR", on_click=lambda: _ocr_current(True)).props("flat dense")
+
                     async def _zip() -> None:
                         ch = int(wf_ch.value or 1)
-                        await ni_run.io_bound(_export_ai_zip, ch)
-                        ui.notify("ZIP exported", type="positive")
+                        _begin_progress("Exporting AI ZIP")
+                        try:
+                            await ni_run.io_bound(_export_ai_zip, ch)
+                            _finish_progress("ZIP exported")
+                            ui.notify("ZIP exported", type="positive")
+                        except Exception as exc:
+                            _finish_progress("ZIP export failed")
+                            ui.notify(f"ZIP export failed: {exc}", type="negative")
                     ui.button("⬇ Export ZIP for AI", on_click=_zip).props("flat dense size=sm")
 
             # ── Step 4: Generate ──────────────────────────────────────────────
@@ -897,6 +1041,7 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                     _PIPELINE_STEPS = {
                         "video":                 "Everything (audio + render + join)",
                         "video-check":           "Check items only",
+                        "got-ocr2":              "Fill OCR fields (GOT-OCR 2.0)",
                         "video-audio":           "Audio only (Kokoro)",
                         "video-audio-indextts":  "Audio only (IndexTTS)",
                         "video-render":          "Render videos only",
@@ -913,6 +1058,8 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 with ui.row().classes("gap-4 mt-2"):
                     long_cb  = ui.checkbox("Join into one long video", value=True).props("dense")
                     norm_bat = ui.checkbox("YouTube loudness", value=True).props("dense")
+                    ocr_force_cb = ui.checkbox("Redo all OCR (overwrite existing)", value=False).props("dense")
+                    ocr_force_cb.bind_visibility_from(step_sel, "value", backward=lambda v: v == "got-ocr2")
 
             with ui.card().classes("section w-full"):
                 ui.label("Output").classes("text-white font-semibold mb-2")
@@ -928,6 +1075,12 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                     ui.button("Browse…", on_click=_browse_out).props("flat dense size=sm")
 
                 def _batch_start() -> None:
+                    if step_sel.value == "got-ocr2":
+                        args = ["--device", "auto"]
+                        if ocr_force_cb.value:
+                            args.append("--force")
+                        _run_job("got-ocr2", args)
+                        return
                     args = ["--output", out_dir_inp.value, "--tts", tts_sel.value]
                     if not long_cb.value:   args.append("--no-long")
                     if norm_bat.value:      args.append("--normalize")
@@ -940,8 +1093,93 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
         # ══════════════════════════════════════════════════════════════════════
         # 5 · TERMINAL
         # ══════════════════════════════════════════════════════════════════════
-        with ui.tab_panel("terminal").classes("p-0"):
-            with ui.element("div").style("height:calc(100vh - 102px); width:100%"):
+        with ui.tab_panel("editor").classes("p-0 full-bleed"):
+            with ui.column().classes("w-full h-full gap-0"):
+                with ui.row().classes(
+                    "w-full h-10 bg-[#252526] border-b border-[#3e3e42] items-center px-3 gap-2"
+                ):
+                    editor_title = ui.label("Editor").classes("text-white text-sm font-semibold")
+                    ui.space()
+                    ui.button("Reload", on_click=lambda: _reload_editor_frame()).props("flat dense size=sm")
+                    ui.button("Close", on_click=lambda: _close_editor_frame()).props("flat dense size=sm color=negative")
+                editor_frame = ui.html(
+                    '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#777;">'
+                    'Open an editor from the workflow tab.</div>',
+                    sanitize=False,
+                ).classes("w-full flex-1")
+
+            current_editor = {"name": "", "url": ""}
+
+            def _set_editor_frame(name: str, url: str) -> None:
+                current_editor.update({"name": name, "url": url})
+                title = _EDITOR_LABELS.get(name, name)
+                editor_title.text = title
+                frame_url = json.dumps(url)
+                frame_title = json.dumps(title)
+                editor_frame.set_content(
+                    '<div style="height:100%;position:relative;background:#111;">'
+                    '<div id="editor-loading" style="position:absolute;inset:0;display:flex;'
+                    'align-items:center;justify-content:center;color:#888;font:13px Segoe UI,Arial;">'
+                    'Loading editor...</div>'
+                    '<iframe id="editor-frame" '
+                    'style="width:100%;height:100%;border:0;background:#111;" '
+                    f'title={frame_title}></iframe>'
+                    '</div>'
+                )
+                ui.run_javascript(
+                    # Probe the editor's own server in the background and point the
+                    # iframe at it exactly once it actually answers — repeatedly
+                    # reassigning frame.src (the old approach) forced a fresh reload
+                    # each attempt, which is what caused the visible flashing.
+                    '(() => {'
+                    f'const editorUrl = {frame_url};'
+                    'const frame = document.getElementById("editor-frame");'
+                    'const loading = document.getElementById("editor-loading");'
+                    'let attempts = 0;'
+                    'let started = false;'
+                    'function probe(){'
+                    '  if (started) return;'
+                    '  attempts += 1;'
+                    '  fetch(editorUrl, {mode: "no-cors", cache: "no-store"}).then(() => {'
+                    '    if (started) return;'
+                    '    started = true;'
+                    '    frame.src = editorUrl;'
+                    '  }).catch(() => {'
+                    '    if (attempts < 10) setTimeout(probe, 700);'
+                    '  });'
+                    '}'
+                    'frame.addEventListener("load", () => { loading.style.display = "none"; });'
+                    'probe();'
+                    '})();'
+                )
+                tabs.set_value("editor")
+
+            def _reload_editor_frame() -> None:
+                if current_editor["url"]:
+                    _set_editor_frame(current_editor["name"], current_editor["url"])
+
+            def _close_editor_frame() -> None:
+                name = current_editor.get("name")
+                if name:
+                    proc = state["editors"].get(name)
+                    if proc and proc.poll() is None:
+                        proc.terminate()
+                current_editor.update({"name": "", "url": ""})
+                editor_title.text = "Editor"
+                # WebView2 (the native window's renderer) can keep an iframe's
+                # last painted frame on screen until its src is cleared, even
+                # after the element itself is removed from the DOM.
+                ui.run_javascript(
+                    'const f = document.getElementById("editor-frame");'
+                    'if (f) f.src = "about:blank";'
+                )
+                editor_frame.set_content(
+                    '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#777;">'
+                    'Open an editor from the workflow tab.</div>'
+                )
+
+        with ui.tab_panel("terminal").classes("p-0 full-bleed"):
+            with ui.element("div").style("height:100%; width:100%"):
                 term = ui.xterm({
                     "cursorBlink": False,
                     "disableStdin": True,
@@ -975,18 +1213,31 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
             ui.timer(0.05, _drain)
 
+            # xterm.js sizes its canvas to its container only when told to —
+            # without this it keeps its initial (tiny) size, which looks
+            # especially broken once the window is maximized/fullscreen.
+            def _fit_terminal() -> None:
+                if tabs.value == "terminal":
+                    term.fit()
+
+            ui.timer(0.3, _fit_terminal, once=True)
+            ui.timer(1.0, _fit_terminal)
+
     # ── Global job-status timer ───────────────────────────────────────────────
     def _status_tick() -> None:
         global _prog_start
         running = jobs.job_running()
         job = state.get("job")
-        if running and job:
-            name = job.get("name", "job")[:45]
+        active = bool(running or _prog.get("active") or time.monotonic() < float(_prog.get("done_until") or 0.0))
+        if active:
+            name = str((job or {}).get("name") or _prog.get("label") or "working")[:45]
             job_badge.text = f"● {name}"
             job_badge.props("color=blue")
             prog_row.visible = True
             v, t, lbl = _prog["v"], _prog["t"], _prog["label"]
             if t > 0:
+                prog_bar.visible = True
+                prog_busy.visible = False
                 prog_bar.value = v / t
                 elapsed = _fmt(time.monotonic() - _prog_start) if _prog_start else ""
                 eta = ""
@@ -996,6 +1247,8 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 parts = [p for p in [lbl, f"{v}/{t} ({int(v/t*100)}%)", elapsed + eta] if p]
                 prog_lbl.text = "  ·  ".join(parts)
             else:
+                prog_bar.visible = False
+                prog_busy.visible = True
                 prog_bar.value = 0
                 prog_lbl.text = (lbl or "working…") + (
                     f"  ·  {_fmt(time.monotonic()-_prog_start)}" if _prog_start else "")
@@ -1004,10 +1257,12 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
             job_badge.props("color=grey")
             if not running:
                 prog_row.visible = False
+                prog_bar.visible = True
+                prog_busy.visible = False
                 _prog_start = None
-                _prog.update({"v": 0, "t": 0, "label": ""})
+                _prog.update({"v": 0, "t": 0, "label": "", "active": False, "done_until": 0.0})
 
-    ui.timer(2.0, _status_tick)
+    ui.timer(0.5, _status_tick)
 
 
 # ---------------------------------------------------------------------------

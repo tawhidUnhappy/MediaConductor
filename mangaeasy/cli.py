@@ -25,7 +25,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     # ── Setup & app ───────────────────────────────────────────────────────────
     "app":                  ("mangaeasy.web.app",                              "main",        "Setup & app",      "Open the mangaEasy control center (desktop app)."),
     "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup & app",      "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
-    "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, ...) from GitHub."),
+    "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, got-ocr2, ...) from GitHub/Hugging Face."),
 
     # ── General item-based video pipeline (the recommended workflow) ──────────
     "video":                ("mangaeasy.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: audio (IndexTTS on GPU, Kokoro otherwise), render, join."),
@@ -44,6 +44,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     # ── External AI tool environments ─────────────────────────────────────────
     "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI) resolve."),
     "index-tts":            ("mangaeasy.tools.index_tts",                      "main",        "External tools",   "Run IndexTTS inside its external uv env."),
+    "got-ocr2":             ("mangaeasy.tools.got_ocr2",                       "main",        "External tools",   "Run GOT-OCR 2.0 and write `ocr` fields into narration JSON files."),
 
     # ── Manga chapter workflow: acquire & edit ────────────────────────────────
     "download":             ("mangaeasy.download.mangadex",                    "main",        "Manga: acquire",   "Download a manga chapter from MangaDex."),

@@ -74,6 +74,7 @@ function render(data) {
     if (el) el.style.display = visible ? "" : "none";
   }
   _show("wf-narr-export-zip",   hasPanels);
+  _show("wf-ocr",               hasNarr);
   _show("wf-narr-clear",        hasPanels);
   _show("wf-narr-remove-empty", hasNarr);
   _show("wf-reset-av",          hasAv);
@@ -144,6 +145,14 @@ function videoSteps() {
   if (wf && wf.bgm_set) steps.push("add-bgm");
   if ($("wf-normalize").checked) steps.push("normalize-chapter-audio");
   return steps;
+}
+
+async function runCurrentOcr() {
+  if (!wf?.paths?.narration) {
+    appendLog("", "got-ocr2: narration file not found for the current chapter.");
+    return;
+  }
+  await runSingle("got-ocr2", ["--narration", wf.paths.narration, "--device", "auto"]);
 }
 
 function makeNarrBtn(id, mode) {
@@ -295,6 +304,7 @@ export function initWorkflow() {
   $("wf-cut").addEventListener("click", () => launchEditor("cut-page"));
   $("wf-arrange").addEventListener("click", () => launchEditor("panel-editor"));
   $("wf-narrate").addEventListener("click", () => launchEditor("narration-editor"));
+  $("wf-ocr").addEventListener("click", () => runCurrentOcr());
   $("wf-audio").addEventListener("click", () => runSingle("index-tts"));
   $("wf-video").addEventListener("click", () => runChain(videoSteps()));
   $("wf-all").addEventListener("click", () => runChain(["index-tts", ...videoSteps()]));

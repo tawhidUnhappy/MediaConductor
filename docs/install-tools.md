@@ -7,6 +7,7 @@ torch/transformers stacks never conflict with the main `mangaeasy` install.
 ```bash
 mangaeasy install-tool              # list available tools
 mangaeasy install-tool index-tts    # install one
+mangaeasy install-tool got-ocr2     # GOT-OCR 2.0 panel OCR
 mangaeasy doctor                    # check what's installed
 ```
 
@@ -68,6 +69,29 @@ first detection run. Pass `--clone` if you also want the upstream
 Used by: panel detection in `mangaeasy cut-page` (and anything calling
 `mangaeasy.panels.ai`).
 
+## got-ocr2 (GOT-OCR 2.0 panel OCR)
+
+GOT-OCR 2.0 is installed as a managed Hugging Face environment. It does not
+clone GitHub; the installer writes an isolated `pyproject.toml`, installs torch
+and transformers with the right CPU/CUDA build, and downloads
+`stepfun-ai/GOT-OCR-2.0-hf` into `got-ocr2/model`.
+
+```bash
+mangaeasy install-tool got-ocr2
+mangaeasy got-ocr2 --project-root content --item-range 01-24
+```
+
+The run command scans `narration.json` and `narration_*.json` files, resolves
+each entry's panel image, and writes:
+
+```json
+{ "image": "panel_001.png", "narration": "...", "ocr": "..." }
+```
+
+Existing `ocr` values are preserved; pass `--force` to regenerate them. Use
+`--device cuda` to fail fast if CUDA is not available, or leave the default
+`--device auto`.
+
 ## kokoro-82m (Kokoro, the default TTS)
 
 Kokoro ([hexgrad/kokoro](https://github.com/hexgrad/kokoro)) is pip-installable,
@@ -93,6 +117,6 @@ GPU, or when IndexTTS isn't set up), `mangaeasy video-audio`.
 
 - managed: `~/.mangaeasy/tools/<name>`
 - sibling: `./<name>` next to where you run `mangaeasy`
-- explicit: `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`
+- explicit: `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `GOT_OCR2_ROOT`
 
 Check resolution any time with `mangaeasy tools` or `mangaeasy doctor`.

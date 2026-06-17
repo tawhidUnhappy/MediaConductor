@@ -10,6 +10,7 @@ TOOL_ENVS = {
     "kokoro-82m": ("KOKORO_ROOT",),
     "index-tts": ("INDEX_TTS_ROOT", "INDEX_TTS_DIR"),
     "magi-v3": ("MAGI_V3_ROOT", "MAGI_V3_DIR"),
+    "got-ocr2": ("GOT_OCR2_ROOT", "GOT_OCR2_DIR", "GOT_OCR_ROOT"),
 }
 
 TOOL_ENV = {tool_name: env_vars[0] for tool_name, env_vars in TOOL_ENVS.items()}
