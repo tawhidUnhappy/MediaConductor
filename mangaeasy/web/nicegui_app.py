@@ -557,12 +557,19 @@ _LANGS = {
 def page() -> None:  # noqa: C901 PLR0912 PLR0915
     ui.dark_mode(True)
     stop_buttons = []
+    start_buttons = []
 
     def _stop_button(*, dense: bool = False):
         props = "color=negative" + (" dense" if dense else "")
         button = ui.button("■ Stop", on_click=_stop_job).props(props)
         button.visible = False
         stop_buttons.append(button)
+        return button
+
+    def _track_start_button(button):
+        """Disable a job-launching button while any job is running so Start/Stop
+        never both invite a click — only one job can run at a time anyway."""
+        start_buttons.append(button)
         return button
 
     ui.add_head_html("""<style>
@@ -765,11 +772,12 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 ui.button("Use this folder", on_click=_use_root).props("dense color=primary")
 
             ui.label("Manga settings").classes("text-white font-semibold mt-2")
+            ui.label(
+                "Chapter and language are picked per-run on the Make a video tab."
+            ).classes("text-gray-500 text-xs mb-1")
             with ui.grid(columns=2).classes("gap-3 mb-3 w-full"):
                 manga_id_inp = ui.input(label="Manga URL / ID").props("dense outlined")
                 name_inp     = ui.input(label="Name").props("dense outlined")
-                chapter_inp  = ui.number(label="Chapter", min=0, step=1, value=1).props("dense outlined")
-                lang_inp     = ui.select(_LANGS, value="en", label="Language").props("dense outlined")
 
             ui.label("Background music").classes("text-white font-semibold mt-1")
             with ui.row().classes("items-center gap-2 w-full mb-2"):
@@ -839,10 +847,8 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
             def _save_project() -> None:
                 cfg, sc = _read_config()
                 dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
-                dl["manga_id"]            = manga_id_inp.value
-                dl["name"]                = name_inp.value
-                dl["chapter"]             = int(chapter_inp.value or 1)
-                dl["translated_language"] = lang_inp.value
+                dl["manga_id"] = manga_id_inp.value
+                dl["name"]     = name_inp.value
                 cfg["download"] = dl
                 _sync_media_settings(cfg, sc)
                 _write_config(cfg, sc)
@@ -870,8 +876,6 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 dl = cfg.get("download") if isinstance(cfg.get("download"), dict) else {}
                 manga_id_inp.value = dl.get("manga_id", "")
                 name_inp.value     = dl.get("name", "")
-                chapter_inp.value  = dl.get("chapter", 1)
-                lang_inp.value     = dl.get("translated_language", "en")
                 bgm_cfg = sc.get("bgm") if isinstance(sc.get("bgm"), dict) else {}
                 audio_cfg = cfg.get("audio") if isinstance(cfg.get("audio"), dict) else {}
                 bgm_inp.value = bgm_cfg.get("file") or audio_cfg.get("bgm", "")
@@ -931,7 +935,8 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                         _run_job("download", ["--fresh"] if dl_fresh.value else [])
 
                 with ui.row().classes("gap-2 mt-1"):
-                    ui.button("⬇ Download", on_click=_dl_run).props("color=primary dense")
+                    _track_start_button(
+                        ui.button("⬇ Download", on_click=_dl_run).props("color=primary dense"))
                     _stop_button(dense=True)
 
             # ── Step 2: Panels ────────────────────────────────────────────────
@@ -977,8 +982,10 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                             args.append("--force")
                         _run_job("got-ocr2", args)
 
-                    ui.button("Run GOT-OCR", on_click=lambda: _ocr_current(False)).props("flat dense")
-                    ui.button("Re-run GOT-OCR", on_click=lambda: _ocr_current(True)).props("flat dense")
+                    _track_start_button(
+                        ui.button("Run GOT-OCR", on_click=lambda: _ocr_current(False)).props("flat dense"))
+                    _track_start_button(
+                        ui.button("Re-run GOT-OCR", on_click=lambda: _ocr_current(True)).props("flat dense"))
 
                     async def _zip() -> None:
                         ch = int(wf_ch.value or 1)
@@ -1018,10 +1025,13 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 def _rerender_video() -> None: _save_wf_cfg_now(); _run_chain(_video_steps(False))
 
                 with ui.row().classes("gap-2"):
-                    ui.button("▶ Everything", on_click=_gen_all).props("color=primary")
-                    ui.button("\U0001f399 Audio only", on_click=_gen_audio).props("flat dense")
-                    ui.button("\U0001f3ac Video only", on_click=_gen_video).props("flat dense")
-                    ui.button("Re-render video", on_click=_rerender_video).props("flat dense")
+                    _track_start_button(ui.button("▶ Everything", on_click=_gen_all).props("color=primary"))
+                    _track_start_button(
+                        ui.button("\U0001f399 Audio only", on_click=_gen_audio).props("flat dense"))
+                    _track_start_button(
+                        ui.button("\U0001f3ac Video only", on_click=_gen_video).props("flat dense"))
+                    _track_start_button(
+                        ui.button("Re-render video", on_click=_rerender_video).props("flat dense"))
 
                 with ui.expansion("Delete chapter data…", icon="delete"
                                   ).classes("mt-2 w-full"):
@@ -1359,7 +1369,7 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                 ui.timer(5.0, _refresh_batch_hints)
 
                 with ui.row().classes("gap-3 items-center"):
-                    ui.button("▶ Start", on_click=_batch_start).props("color=primary")
+                    _track_start_button(ui.button("▶ Start", on_click=_batch_start).props("color=primary"))
                     _stop_button()
 
         # ══════════════════════════════════════════════════════════════════════
@@ -1539,6 +1549,8 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
         job = state.get("job")
         for button in stop_buttons:
             button.visible = running
+        for button in start_buttons:
+            button.set_enabled(not running)
         active = bool(running or _prog.get("active") or time.monotonic() < float(_prog.get("done_until") or 0.0))
         if active:
             name = str((job or {}).get("name") or _prog.get("label") or "working")[:45]

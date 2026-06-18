@@ -76,8 +76,20 @@ def main() -> int:
 
     pipeline = KPipeline(lang_code=args.lang, repo_id=args.repo_id, device=device)
     entries = read_manifest(args.manifest)
+    chapter_names = list(dict.fromkeys(
+        (entry.get("label") or "").split(":", 1)[0] for entry in entries
+    ))
+    total_chapters = len(chapter_names) or 1
+    print(f"MANGAEASY_PROGRESS 0/{total_chapters} Generating audio", flush=True)
+    chapters_done = 0
+    current_chapter = None
     for index, entry in enumerate(entries, start=1):
         label = entry.get("label") or f"{index}/{len(entries)}"
+        chapter = label.split(":", 1)[0]
+        if current_chapter is not None and chapter != current_chapter:
+            chapters_done += 1
+            print(f"MANGAEASY_PROGRESS {chapters_done}/{total_chapters} Generated audio for {current_chapter}", flush=True)
+        current_chapter = chapter
         text = (entry.get("text") or "").strip()
         output = Path(entry.get("output") or "")
         if not text or not str(output):
@@ -86,6 +98,9 @@ def main() -> int:
         audio = synthesize(pipeline, text, args.voice, args.speed, args.split_pattern)
         sf.write(output, audio, SAMPLE_RATE)
         print(f"[{index:04d}/{len(entries):04d}] {label} -> {output}", flush=True)
+    if current_chapter is not None:
+        chapters_done += 1
+        print(f"MANGAEASY_PROGRESS {chapters_done}/{total_chapters} Generated audio for {current_chapter}", flush=True)
 
     if device == "cuda":
         torch.cuda.synchronize()

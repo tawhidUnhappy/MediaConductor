@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -377,13 +378,26 @@ def build_item_videos(config: VideoBuildConfig) -> Path:
     items = selected_item_dirs(config)
     if not items:
         raise FileNotFoundError(f"No item folders selected under {config.project_root.resolve()}")
-    if config.workers == 1 or len(items) <= 1:
-        for item_dir in items:
+    total = len(items)
+    print(f"MANGAEASY_PROGRESS 0/{total} Rendering videos", flush=True)
+    if config.workers == 1 or total <= 1:
+        for idx, item_dir in enumerate(items, start=1):
             build_one_chapter(item_dir, config)
+            print(f"MANGAEASY_PROGRESS {idx}/{total} Rendered {item_dir.name}", flush=True)
     else:
         print(f"Rendering with {config.workers} item worker(s).", flush=True)
+        done_count = 0
+        done_lock = threading.Lock()
+
+        def _render(item_dir: Path) -> None:
+            nonlocal done_count
+            build_one_chapter(item_dir, config)
+            with done_lock:
+                done_count += 1
+                print(f"MANGAEASY_PROGRESS {done_count}/{total} Rendered {item_dir.name}", flush=True)
+
         with ThreadPoolExecutor(max_workers=config.workers) as executor:
-            list(executor.map(lambda item_dir: build_one_chapter(item_dir, config), items))
+            list(executor.map(_render, items))
     output_dir = item_output_dir(config)
     print(f"\nVideos written to: {output_dir}", flush=True)
     return output_dir

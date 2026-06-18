@@ -144,12 +144,16 @@ def main() -> int:
         print(f"[FATAL] No item folders found in {project_root}")
         return 1
 
-    to_generate: list[tuple[str, Path]] = []
+    total_chapters = len(selected)
+    print(f"MANGAEASY_PROGRESS 0/{total_chapters} Generating audio", flush=True)
+
+    per_chapter: list[list[tuple[str, Path]]] = []
     for item_dir in selected:
         item_audio_dir = audio_root / name / item_dir.name
         item_audio_dir.mkdir(parents=True, exist_ok=True)
         narrations = load_narration(item_dir)
         print(f"\n[{item_dir.name}] {len(narrations)} narration item(s) -> {item_audio_dir}", flush=True)
+        jobs_for_item: list[tuple[str, Path]] = []
         for item in narrations:
             image_name = item.get("image")
             text = (item.get("narration") or item.get("text") or "").strip()
@@ -158,9 +162,12 @@ def main() -> int:
             dst = item_audio_dir / f"{Path(image_name).stem}.wav"
             if dst.exists() and not args.overwrite:
                 continue
-            to_generate.append((text, dst))
+            jobs_for_item.append((text, dst))
+        per_chapter.append(jobs_for_item)
 
+    to_generate = [job for jobs_for_item in per_chapter for job in jobs_for_item]
     if not to_generate:
+        print(f"MANGAEASY_PROGRESS {total_chapters}/{total_chapters} Audio already generated", flush=True)
         print("\n[INFO] All audio already generated.")
         return 0
 
@@ -178,20 +185,24 @@ def main() -> int:
 
     generated = 0
     failures: list[Path] = []
-    for i, (text, dst) in enumerate(to_generate, 1):
-        print(f"  [{i}/{len(to_generate)}] {dst.parent.name}/{dst.name}", flush=True)
-        try:
-            tts.infer(
-                spk_audio_prompt=str(speaker_wav),
-                text=text,
-                output_path=str(dst),
-                verbose=False,
-            )
-            generated += 1
-        except Exception as exc:
-            print(f"[ERROR] {dst.name}: {exc}")
-            traceback.print_exc()
-            failures.append(dst)
+    i = 0
+    for chapter_idx, (item_dir, jobs_for_item) in enumerate(zip(selected, per_chapter), start=1):
+        for text, dst in jobs_for_item:
+            i += 1
+            print(f"  [{i}/{len(to_generate)}] {dst.parent.name}/{dst.name}", flush=True)
+            try:
+                tts.infer(
+                    spk_audio_prompt=str(speaker_wav),
+                    text=text,
+                    output_path=str(dst),
+                    verbose=False,
+                )
+                generated += 1
+            except Exception as exc:
+                print(f"[ERROR] {dst.name}: {exc}")
+                traceback.print_exc()
+                failures.append(dst)
+        print(f"MANGAEASY_PROGRESS {chapter_idx}/{total_chapters} Generated audio for {item_dir.name}", flush=True)
 
     print(f"\n[INFO] Done. Generated {generated} file(s).")
     if failures:
