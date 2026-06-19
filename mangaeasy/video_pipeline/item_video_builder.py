@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+from mangaeasy.utils import archive_before_overwrite
 from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, project_name
 from mangaeasy.video_pipeline.item_assets import (
     IMAGE_EXTENSIONS,
@@ -327,9 +328,13 @@ def build_one_chapter(chapter_dir: Path, config: VideoBuildConfig) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     work_dir = project_work_dir(config) / chapter_dir.name
     output_path = output_dir / f"item_{chapter_dir.name}.mp4"
-    if output_path.exists() and not config.overwrite:
-        print(f"[{chapter_dir.name}] exists, skipping: {output_path}", flush=True)
-        return
+    if output_path.exists():
+        if not config.overwrite:
+            print(f"[{chapter_dir.name}] exists, skipping: {output_path}", flush=True)
+            return
+        archived = archive_before_overwrite(output_path)
+        if archived is not None:
+            print(f"[{chapter_dir.name}] archived previous render to: {archived}", flush=True)
     assets = collect_panel_assets(
         chapter_dir,
         project_root=config.project_root,

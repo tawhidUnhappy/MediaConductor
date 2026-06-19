@@ -4,6 +4,8 @@ import os
 import re
 from pathlib import Path
 
+from mangaeasy.utils import archive_into_run
+
 
 DEFAULT_PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "content"))
 DEFAULT_AUDIO_ROOT = Path(os.environ.get("AUDIO_ROOT", "audio"))
@@ -71,6 +73,36 @@ def _sort_key(path: Path) -> tuple[int, int, str]:
     has_number = any(ch.isdigit() for ch in path.name)
     number = item_number(path.name) if has_number else 10**9
     return (0 if has_number else 1, number, path.name.lower())
+
+
+def prune_recent_audio_for_resume(
+    ordered_paths: list[Path], lookback: int = 5, archive_run_dir: Path | None = None
+) -> list[Path]:
+    """Delete (or archive) the in-progress audio file plus the previous N by narration order.
+
+    ordered_paths is every expected audio file path in narration sequence order
+    (across all selected items). "Current" is the first one not on disk yet —
+    likely the file that was being written when the previous run stopped — or,
+    if every file is already present, the last one in the sequence. Removing it
+    and the lookback entries before it (so if current is index 5, previous is
+    4, 3, 2, 1, 0) forces them to regenerate even though some still exist,
+    instead of trusting file mtimes.
+
+    If archive_run_dir is given (audio is expensive to regenerate), files are
+    moved there under a subfolder named after their parent item folder instead
+    of being deleted outright.
+    """
+    if not ordered_paths:
+        return []
+    current_idx = next((i for i, path in enumerate(ordered_paths) if not path.exists()), len(ordered_paths) - 1)
+    start_idx = max(0, current_idx - lookback)
+    removed = [path for path in ordered_paths[start_idx:current_idx + 1] if path.exists()]
+    for path in removed:
+        if archive_run_dir is not None:
+            archive_into_run(path, archive_run_dir, subdir=path.parent.name)
+        else:
+            path.unlink(missing_ok=True)
+    return removed
 
 
 def item_dirs(root: Path, selected: list[str] | None = None) -> list[Path]:

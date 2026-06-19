@@ -4,7 +4,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from mangaeasy.video_pipeline.common import item_number, merge_item_selection, project_name
+from mangaeasy.utils import archive_before_overwrite
+from mangaeasy.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem, load_narration
+from mangaeasy.video_pipeline.common import item_dirs, item_number, merge_item_selection, project_name
 from mangaeasy.video_pipeline.ffmpeg_tools import (
     choose_h264_encoder,
     h264_encoder_args,
@@ -36,6 +38,7 @@ class LongVideoConfig:
     preset: str = "p1"
     cq: int = 18
     audio_bitrate: str = "128k"
+    audio_root: Path | None = None
     narration_dir: Path | None = None
     background_music: Path | None = None
     music_volume: float = 0.035
@@ -160,12 +163,78 @@ def validate_config(config: LongVideoConfig) -> None:
         raise ValueError("Audio volumes must be non-negative.")
 
 
+def validate_items_strict(config: LongVideoConfig, chapters: dict[int, Path], start: int, end: int) -> None:
+    """Check every item's panels, narration entries, audio, and rendered video.
+
+    The long video cannot be missing or mismatched content for any item, so
+    any problem stops the build instead of just warning. Panels are checked
+    before narration text because a missing panel image breaks rendering
+    outright, while a bad narration entry only affects that one audio line.
+    """
+    name = project_name(config.project_root, config.project_name_override)
+    audio_root = config.audio_root.resolve() if config.audio_root else None
+    problems: list[str] = []
+
+    for number in range(start, end + 1):
+        label = f"item {number:02d}"
+        found = item_dirs(config.project_root, [f"{number:02d}"])
+        if not found:
+            problems.append(f"{label}: no project item folder found")
+            continue
+        item_dir = found[0]
+
+        narration_path = item_dir / "narration.json"
+        if not narration_path.exists():
+            problems.append(f"{label}: missing narration.json")
+            continue
+        try:
+            narration = load_narration(narration_path)
+        except Exception as exc:
+            problems.append(f"{label}: could not read narration.json: {exc}")
+            continue
+
+        panels = files_by_stem(item_dir / "panels", IMAGE_EXTENSIONS)
+        narration_images = [entry.get("image", "") for entry in narration if isinstance(entry, dict)]
+        narration_stems = [Path(image).stem for image in narration_images if image]
+
+        missing_panels = sorted(set(narration_stems) - set(panels))
+        if missing_panels:
+            problems.append(f"{label}: missing panel image(s) for {', '.join(missing_panels[:10])}")
+
+        missing_text = [
+            Path(entry.get("image", "")).stem or f"#{idx}"
+            for idx, entry in enumerate(narration, start=1)
+            if isinstance(entry, dict) and not (entry.get("narration") or entry.get("text") or "").strip()
+        ]
+        if missing_text:
+            problems.append(f"{label}: empty narration text for {', '.join(missing_text[:10])}")
+
+        if audio_root is not None:
+            audios = files_by_stem(audio_root / name / item_dir.name, AUDIO_EXTENSIONS)
+            missing_audio = sorted(set(narration_stems) - set(audios))
+            if missing_audio:
+                problems.append(f"{label}: missing audio for {', '.join(missing_audio[:10])}")
+
+        if number not in chapters:
+            problems.append(f"{label}: missing rendered item video")
+
+    if problems:
+        raise FileNotFoundError(
+            "Long video build stopped: it cannot be missing any panel, narration entry, "
+            "audio file, or item video. Problems found:\n  " + "\n  ".join(problems)
+        )
+
+
 def build_long_video(config: LongVideoConfig) -> Path:
     validate_config(config)
     out_path = output_path(config)
     work_dir = project_work_dir(config)
-    if out_path.exists() and not config.overwrite:
-        raise FileExistsError(f"Output exists. Use --overwrite: {out_path}")
+    if out_path.exists():
+        if not config.overwrite:
+            raise FileExistsError(f"Output exists. Use --overwrite: {out_path}")
+        archived = archive_before_overwrite(out_path)
+        if archived is not None:
+            print(f"Archived previous long video to: {archived}", flush=True)
 
     chapters = discover_chapters(input_dir(config))
     if not chapters:
@@ -174,6 +243,7 @@ def build_long_video(config: LongVideoConfig) -> Path:
     missing = [n for n in range(start, end + 1) if n not in chapters]
     if missing:
         raise FileNotFoundError("Missing item videos: " + ", ".join(f"{n:02d}" for n in missing))
+    validate_items_strict(config, chapters, start, end)
 
     selected = [chapters[n] for n in range(start, end + 1)]
     for path in selected:

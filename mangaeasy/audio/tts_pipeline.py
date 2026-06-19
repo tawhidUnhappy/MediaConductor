@@ -31,7 +31,13 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.append(str(_PROJECT_ROOT))
 
 from mangaeasy.config import HF_CACHE_DIR
-from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, project_name
+from mangaeasy.utils import archive_into_run, next_archive_run_dir
+from mangaeasy.video_pipeline.common import (
+    item_dirs,
+    merge_item_selection,
+    project_name,
+    prune_recent_audio_for_resume,
+)
 
 os.environ["HF_HOME"] = str(HF_CACHE_DIR)
 os.environ["HUGGINGFACE_HUB_CACHE"] = str(HF_CACHE_DIR)
@@ -116,6 +122,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--item-range")
     parser.add_argument("--speaker-wav", type=Path, required=True)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--resume", action="store_true",
+                        help="Delete the most recently generated audio file plus the previous 5 before "
+                             "generating, in case the last run was interrupted mid-write, then continue "
+                             "with anything still missing.")
+    parser.add_argument("--archive-audio", action="store_true",
+                        help="Audio is expensive to regenerate, so instead of deleting/overwriting any "
+                             "existing file (via --overwrite or --resume), move it into "
+                             "<audio-root>/<project>/old/run_NNNN/ first.")
     return parser.parse_args()
 
 
@@ -123,6 +137,23 @@ def load_narration(item_dir: Path) -> list[dict]:
     path = item_dir / "narration.json"
     with path.open("r", encoding="utf-8-sig") as f:
         return json.load(f)
+
+
+def ordered_audio_paths(audio_root: Path, name: str, selected: list[Path]) -> list[Path]:
+    """Every expected audio file path, in narration sequence order, across selected items."""
+    paths: list[Path] = []
+    for item_dir in selected:
+        item_audio_dir = audio_root / name / item_dir.name
+        try:
+            narration = load_narration(item_dir)
+        except Exception:
+            continue
+        for item in narration:
+            image_name = item.get("image") if isinstance(item, dict) else None
+            if not image_name:
+                continue
+            paths.append(item_audio_dir / f"{Path(image_name).stem}.wav")
+    return paths
 
 
 def main() -> int:
@@ -147,6 +178,23 @@ def main() -> int:
     total_chapters = len(selected)
     print(f"MANGAEASY_PROGRESS 0/{total_chapters} Generating audio", flush=True)
 
+    archive_run_dir = None
+    if args.archive_audio:
+        archive_run_dir = next_archive_run_dir(audio_root / name / "old")
+        print(f"Archiving any overwritten/resumed audio to: {archive_run_dir}", flush=True)
+
+    if args.resume:
+        removed = prune_recent_audio_for_resume(
+            ordered_audio_paths(audio_root, name, selected), archive_run_dir=archive_run_dir
+        )
+        if removed:
+            verb = "archived" if archive_run_dir else "deleted"
+            print(
+                f"Resume: {verb} {len(removed)} most recent audio file(s) to re-verify: "
+                + ", ".join(p.name for p in removed),
+                flush=True,
+            )
+
     per_chapter: list[list[tuple[str, Path]]] = []
     for item_dir in selected:
         item_audio_dir = audio_root / name / item_dir.name
@@ -160,8 +208,11 @@ def main() -> int:
             if not image_name or not text:
                 continue
             dst = item_audio_dir / f"{Path(image_name).stem}.wav"
-            if dst.exists() and not args.overwrite:
-                continue
+            if dst.exists():
+                if not args.overwrite:
+                    continue
+                if archive_run_dir is not None:
+                    archive_into_run(dst, archive_run_dir, subdir=item_dir.name)
             jobs_for_item.append((text, dst))
         per_chapter.append(jobs_for_item)
 

@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from mangaeasy.tools.external import python_command, resolve_tool_dir, tool_env
+from mangaeasy.utils import archive_into_run, next_archive_run_dir
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
     DEFAULT_KOKORO_ROOT,
@@ -17,6 +18,7 @@ from mangaeasy.video_pipeline.common import (
     item_dirs,
     merge_item_selection,
     project_name,
+    prune_recent_audio_for_resume,
 )
 
 
@@ -33,6 +35,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--items", nargs="*", help="Item folder names or ranges, for example: 01 02 05-08.")
     parser.add_argument("--item-range", help="Convenience range, for example: 01-12.")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--resume", action="store_true",
+                        help="Delete the most recently generated audio file plus the previous 5 before "
+                             "generating, in case the last run was interrupted mid-write, then continue "
+                             "with anything still missing.")
+    parser.add_argument("--archive-audio", action="store_true",
+                        help="Audio is expensive to regenerate, so instead of deleting/overwriting any "
+                             "existing file (via --overwrite or --resume), move it into "
+                             "<audio-root>/<project>/old/run_NNNN/ first.")
     parser.add_argument("--voice", default="af_heart", help="Kokoro voice name or .pt voice tensor path.")
     parser.add_argument("--lang", default="a", help="Kokoro language code, for example a, b, en-us, fr-fr.")
     parser.add_argument("--speed", type=float, default=1.0)
@@ -94,7 +104,26 @@ def selected_kokoro_root(configured: Path) -> Path:
     return configured.expanduser().resolve()
 
 
-def build_manifest(args: argparse.Namespace, selected_items: list[Path]) -> tuple[list[dict[str, str]], int]:
+def ordered_audio_paths(args: argparse.Namespace, selected_items: list[Path]) -> list[Path]:
+    """Every expected audio file path, in narration sequence order, across selected_items."""
+    paths: list[Path] = []
+    for item_dir in selected_items:
+        audio_dir = item_audio_dir(args, item_dir)
+        try:
+            narration = load_narration(item_dir)
+        except Exception:
+            continue
+        for item in narration:
+            image_name = item.get("image") if isinstance(item, dict) else None
+            if not image_name:
+                continue
+            paths.append(audio_dir / f"{Path(image_name).stem}.wav")
+    return paths
+
+
+def build_manifest(
+    args: argparse.Namespace, selected_items: list[Path], archive_run_dir: Path | None = None
+) -> tuple[list[dict[str, str]], int]:
     manifest: list[dict[str, str]] = []
     skipped = 0
 
@@ -121,9 +150,12 @@ def build_manifest(args: argparse.Namespace, selected_items: list[Path]) -> tupl
                 raise ValueError(f"Bad narration entry {idx} in {item_dir / 'narration.json'}")
             validate_panel(item_dir, image_name)
             output_path = audio_dir / f"{Path(image_name).stem}.wav"
-            if output_path.exists() and not args.overwrite:
-                skipped += 1
-                continue
+            if output_path.exists():
+                if not args.overwrite:
+                    skipped += 1
+                    continue
+                if archive_run_dir is not None:
+                    archive_into_run(output_path, archive_run_dir, subdir=item_dir.name)
             manifest.append(
                 {
                     "label": f"{item_dir.name}:{idx:03d}/{len(narration):03d}",
@@ -189,7 +221,26 @@ def main() -> int:
         print("Audio device: CUDA requested for Kokoro.", flush=True)
     print(f"Kokoro root: {selected_kokoro_root(args.kokoro_root)}", flush=True)
 
-    manifest, skipped = build_manifest(args, selected_items)
+    archive_run_dir = None
+    if args.archive_audio:
+        archive_run_dir = next_archive_run_dir(
+            args.audio_root.resolve() / project_name(args.project_root, args.project_name) / "old"
+        )
+        print(f"Archiving any overwritten/resumed audio to: {archive_run_dir}", flush=True)
+
+    if args.resume:
+        removed = prune_recent_audio_for_resume(
+            ordered_audio_paths(args, selected_items), archive_run_dir=archive_run_dir
+        )
+        if removed:
+            verb = "archived" if archive_run_dir else "deleted"
+            print(
+                f"Resume: {verb} {len(removed)} most recent audio file(s) to re-verify: "
+                + ", ".join(p.name for p in removed),
+                flush=True,
+            )
+
+    manifest, skipped = build_manifest(args, selected_items, archive_run_dir)
     if not manifest:
         print(
             f"\nAudio already complete for {len(selected_items)} item folder(s); "

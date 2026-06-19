@@ -1008,10 +1008,30 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
 
                 norm_cb = ui.checkbox("YouTube loudness (−14 LUFS)").props("dense")
 
+                _init_cfg, _init_sc = _read_config()
+                _wf_audio_source_default = str((_init_sc.get("video") or {}).get("audio_source", "raw"))
+                if _wf_audio_source_default not in ("raw", "faded"):
+                    _wf_audio_source_default = "raw"
+                wf_audio_source_sel = ui.select(
+                    {"raw": "Raw audio", "faded": "Faded audio (de-click)"},
+                    value=_wf_audio_source_default, label="Audio source",
+                ).props("dense outlined")
+                wf_audio_source_sel.tooltip(
+                    "Faded copies have tiny fade-in/out to remove clicks/pops. The raw audio is "
+                    "never deleted — this only picks which copy gets rendered into the video."
+                )
+
+                def _save_wf_audio_source() -> None:
+                    cfg, sc = _read_config()
+                    video_cfg = sc.get("video") if isinstance(sc.get("video"), dict) else {}
+                    video_cfg["audio_source"] = wf_audio_source_sel.value
+                    sc["video"] = video_cfg
+                    _write_config(None, sc)
+
                 def _video_steps(include_audio_prep: bool = True) -> list[str]:
                     cfg, sc = _read_config()
                     steps = ["render-video"]
-                    if include_audio_prep:
+                    if include_audio_prep and wf_audio_source_sel.value == "faded":
                         steps.insert(0, "fade-audio")
                     if _configured_bgm_file(cfg, sc):
                         steps.append("add-bgm")
@@ -1019,10 +1039,16 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                         steps.append("normalize-chapter-audio")
                     return steps
 
-                def _gen_all()   -> None: _save_wf_cfg_now(); _run_chain(["index-tts"] + _video_steps())
+                def _gen_all() -> None:
+                    _save_wf_cfg_now(); _save_wf_audio_source()
+                    _run_chain(["index-tts"] + _video_steps())
                 def _gen_audio() -> None: _save_wf_cfg_now(); _run_job("index-tts")
-                def _gen_video() -> None: _save_wf_cfg_now(); _run_chain(_video_steps())
-                def _rerender_video() -> None: _save_wf_cfg_now(); _run_chain(_video_steps(False))
+                def _gen_video() -> None:
+                    _save_wf_cfg_now(); _save_wf_audio_source()
+                    _run_chain(_video_steps())
+                def _rerender_video() -> None:
+                    _save_wf_cfg_now(); _save_wf_audio_source()
+                    _run_chain(_video_steps(False))
 
                 with ui.row().classes("gap-2"):
                     _track_start_button(ui.button("▶ Everything", on_click=_gen_all).props("color=primary"))
@@ -1152,6 +1178,7 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                         "got-ocr2":              "Fill OCR fields (GOT-OCR 2.0)",
                         "video-audio":           "Audio only (Kokoro)",
                         "video-audio-indextts":  "Audio only (IndexTTS)",
+                        "video-fade-audio":      "Create faded audio copies (de-click)",
                         "video-render":          "Render videos only",
                         "video-join":            "Join into one long video",
                         "video-normalize-audio": "Loudness-normalize joined audio",
@@ -1164,10 +1191,49 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                     _TTS = {"auto": "Auto", "indextts": "IndexTTS", "kokoro": "Kokoro"}
                     tts_sel = ui.select(_TTS, value="indextts",
                                         label="Voice engine").props("dense outlined")
+                    _AUDIO_SOURCES = {"raw": "Raw audio", "faded": "Faded audio (de-click)"}
+                    audio_source_sel = ui.select(_AUDIO_SOURCES, value="raw",
+                                                  label="Audio source").props("dense outlined")
+                    audio_source_sel.tooltip(
+                        "Faded copies have tiny fade-in/out to remove clicks/pops. The raw audio is "
+                        "never deleted — faded copies are written alongside it in a separate folder."
+                    )
+                    audio_source_sel.bind_visibility_from(
+                        step_sel, "value",
+                        backward=lambda v: v in (
+                            "video", "video-render", "video-join",
+                            "video-check", "video-validate", "video-clean-audio",
+                        ),
+                    )
                 with ui.row().classes("gap-4 mt-2"):
                     long_cb  = ui.checkbox("Generate one long video", value=True).props("dense")
                     norm_bat = ui.checkbox("YouTube loudness", value=True).props("dense")
                     bgm_cb   = ui.checkbox("Background music", value=True).props("dense")
+                    resume_cb = ui.checkbox("Resume (re-verify last 5 audio)", value=False).props("dense")
+                    resume_cb.tooltip(
+                        "If a previous audio run was interrupted, delete the most recent audio file "
+                        "plus the previous 5 and regenerate them, then continue with anything missing."
+                    )
+                    resume_cb.bind_visibility_from(
+                        step_sel, "value",
+                        backward=lambda v: v in ("video", "video-audio", "video-audio-indextts"),
+                    )
+                    archive_audio_cb = ui.checkbox("Archive overwritten audio (don't lose it)", value=False).props("dense")
+                    archive_audio_cb.tooltip(
+                        "Audio is expensive to regenerate. When checked, any audio file that would be "
+                        "overwritten or deleted by --overwrite/Resume is moved into "
+                        "<audio root>/old/run_NNNN/ instead, never lost."
+                    )
+                    archive_audio_cb.bind_visibility_from(
+                        step_sel, "value",
+                        backward=lambda v: v in ("video", "video-audio", "video-audio-indextts"),
+                    )
+                    skip_audio_cb = ui.checkbox("Regenerate video only (reuse existing audio)", value=False).props("dense")
+                    skip_audio_cb.tooltip(
+                        "Skip narration audio generation entirely and just re-render + re-join "
+                        "using whatever audio already exists on disk."
+                    )
+                    skip_audio_cb.bind_visibility_from(step_sel, "value", backward=lambda v: v == "video")
                     ocr_force_cb = ui.checkbox("Redo all OCR (overwrite existing)", value=False).props("dense")
                     ocr_force_cb.bind_visibility_from(step_sel, "value", backward=lambda v: v == "got-ocr2")
                 bgm_hint = ui.label("").classes("text-gray-500 text-xs mt-1")
@@ -1215,6 +1281,10 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                     project_output = _batch_project_output_dir(manga_path)
                     return None if project_output is None else project_output / "audio"
 
+                def _batch_faded_audio_root(manga_path: Path | None = None) -> Path | None:
+                    raw_root = _batch_audio_root(manga_path)
+                    return None if raw_root is None else raw_root.with_name(raw_root.name + "_faded")
+
                 def _batch_range_arg() -> str | None:
                     if not use_range_cb.value:
                         return None
@@ -1237,7 +1307,10 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                     return args
 
                 def _append_audio_root(args: list[str], manga_path: Path | None = None) -> None:
-                    audio_root = _batch_audio_root(manga_path)
+                    audio_root = (
+                        _batch_faded_audio_root(manga_path) if audio_source_sel.value == "faded"
+                        else _batch_audio_root(manga_path)
+                    )
                     if audio_root is not None:
                         args += ["--audio-root", str(audio_root)]
 
@@ -1300,8 +1373,18 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                         args = _batch_base_args(output=True, items=True)
                         if args is None:
                             return
-                        _append_audio_root(args)
+                        raw_audio_root = _batch_audio_root()
+                        if raw_audio_root is not None:
+                            args += ["--audio-root", str(raw_audio_root)]
                         args += ["--tts", tts_sel.value, "--background-style", "blur", "--blur-backend", "auto"]
+                        if audio_source_sel.value == "faded":
+                            args += ["--audio-source", "faded"]
+                        if resume_cb.value:
+                            args.append("--resume-audio")
+                        if archive_audio_cb.value:
+                            args.append("--archive-audio")
+                        if skip_audio_cb.value:
+                            args.append("--skip-audio")
                         if long_cb.value:
                             args.append("--build-long-video")
                             _append_bgm(args)
@@ -1323,6 +1406,7 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                         args = _batch_base_args(output=True, items=True)
                         if args is None:
                             return
+                        _append_audio_root(args)
                         args.append("--overwrite")
                         _append_bgm(args)
                         _run_job(step, args)
@@ -1342,6 +1426,10 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                             return
                         _append_audio_root(args)
                         args += ["--device", "auto"]
+                        if resume_cb.value:
+                            args.append("--resume")
+                        if archive_audio_cb.value:
+                            args.append("--archive-audio")
                         _run_job(step, args)
                         return
 
@@ -1350,6 +1438,24 @@ def page() -> None:  # noqa: C901 PLR0912 PLR0915
                         if args is None:
                             return
                         _append_audio_root(args)
+                        if resume_cb.value:
+                            args.append("--resume")
+                        if archive_audio_cb.value:
+                            args.append("--archive-audio")
+                        _run_job(step, args)
+                        return
+
+                    if step == "video-fade-audio":
+                        args = _batch_base_args(items=True)
+                        if args is None:
+                            return
+                        raw_audio_root = _batch_audio_root()
+                        faded_audio_root = _batch_faded_audio_root()
+                        if raw_audio_root is not None:
+                            args += ["--source-audio-root", str(raw_audio_root)]
+                        if faded_audio_root is not None:
+                            args += ["--output-audio-root", str(faded_audio_root)]
+                        args.append("--overwrite")
                         _run_job(step, args)
                         return
 

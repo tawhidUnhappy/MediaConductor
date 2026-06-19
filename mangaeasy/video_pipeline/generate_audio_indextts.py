@@ -27,6 +27,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--index-tts-root", type=Path, default=None,
                         help="Path to index-tts directory. Auto-detected if omitted.")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--resume", action="store_true",
+                        help="Delete the most recently generated audio file plus the previous 5 before "
+                             "generating, in case the last run was interrupted mid-write.")
+    parser.add_argument("--archive-audio", action="store_true",
+                        help="Archive any overwritten/resumed audio instead of deleting it, since "
+                             "audio is expensive to regenerate.")
     return parser.parse_args()
 
 
@@ -63,6 +69,10 @@ def main() -> int:
         cmd += ["--item-range", args.item_range]
     if args.overwrite:
         cmd.append("--overwrite")
+    if args.resume:
+        cmd.append("--resume")
+    if args.archive_audio:
+        cmd.append("--archive-audio")
 
     print(f"[tool:index-tts] {tool_dir}", flush=True)
     result = subprocess.run(cmd, cwd=tool_dir, env=env)

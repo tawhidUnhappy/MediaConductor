@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from mangaeasy.video_pipeline.common import DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
+from mangaeasy.video_pipeline.common import DEFAULT_AUDIO_ROOT, DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
 from mangaeasy.video_pipeline.long_video_builder import LongVideoConfig, build_long_video
 
 
@@ -26,6 +26,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--preset", default="p1")
     parser.add_argument("--cq", type=int, default=18)
     parser.add_argument("--audio-bitrate", default="128k")
+    parser.add_argument("--audio-root", type=Path, default=DEFAULT_AUDIO_ROOT,
+                        help="Used to strictly check every item has a matching audio file before joining.")
     parser.add_argument("--narration-dir", type=Path, default=None)
     parser.add_argument("--background-music", type=Path, default=None)
     parser.add_argument("--music-volume", type=float, default=0.035)
@@ -54,6 +56,7 @@ def main() -> int:
             preset=args.preset,
             cq=args.cq,
             audio_bitrate=args.audio_bitrate,
+            audio_root=args.audio_root,
             narration_dir=args.narration_dir,
             background_music=args.background_music,
             music_volume=args.music_volume,

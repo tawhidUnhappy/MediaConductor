@@ -28,6 +28,7 @@ from PIL import Image, ImageOps
 
 from mangaeasy.config import PROJECT_ROOT, load_download_config, load_system_config
 from mangaeasy.images.watermark_util import apply_watermark
+from mangaeasy.utils import archive_before_overwrite
 from mangaeasy.paths import (
     chapter_dir as _chapter_dir,
     panels_dir,
@@ -350,14 +351,23 @@ def main() -> None:
         raise SystemExit(f"[FATAL] Panel folder not found: {paths['image_root']}")
     faded = paths["faded_audio_root"]
     raw   = paths["raw_audio_root"]
-    if faded.exists() and any(faded.iterdir()):
+    # Explicit choice (config.system.json -> video.audio_source), not an automatic
+    # "prefer faded if it happens to exist" — the raw audio is always kept on disk
+    # either way, so switching sources never loses anything.
+    audio_source = str(vid_cfg.get("audio_source", "raw")).lower()
+    if audio_source == "faded":
+        if not (faded.exists() and any(faded.iterdir())):
+            raise SystemExit(
+                f"[FATAL] audio_source=faded but no faded audio found in {faded}. "
+                "Run the fade-audio step first."
+            )
         audio_root = faded
-    elif raw.exists() and any(raw.iterdir()):
-        audio_root = raw
     else:
-        raise SystemExit(f"[FATAL] No audio found in {faded} or {raw}")
+        if not (raw.exists() and any(raw.iterdir())):
+            raise SystemExit(f"[FATAL] No raw audio found in {raw}")
+        audio_root = raw
 
-    print(f"[INFO] Audio source: {audio_root.name}")
+    print(f"[INFO] Audio source: {audio_root.name} (configured: {audio_source})")
 
     for d in (paths["frames_dir"], paths["pcm_dir"], paths["lists_dir"], paths["build_dir"]):
         d.mkdir(parents=True, exist_ok=True)
@@ -396,6 +406,9 @@ def main() -> None:
     video_only   = paths["build_dir"] / "chapter_video_only.mp4"
     build_video_only(frame_paths, durations, video_concat, video_only, total_dur, fps, enc_cfg)
 
+    archived = archive_before_overwrite(paths["output_path"])
+    if archived is not None:
+        print(f"[INFO] Archived previous render to: {archived}")
     mux_video_and_audio(video_only, loud_audio, paths["output_path"], aac_bitrate, sample_rate)
     print(f"[DONE] {paths['output_path']}")
 

@@ -69,6 +69,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--item-range", help="Convenience range, for example: 01-12.")
     parser.add_argument("--overwrite-audio", action="store_true")
     parser.add_argument("--overwrite-video", action="store_true")
+    parser.add_argument("--resume-audio", action="store_true",
+                        help="Delete the most recently generated audio file plus the previous 5 before "
+                             "generating, in case the last run was interrupted mid-write.")
+    parser.add_argument("--skip-audio", action="store_true",
+                        help="Skip narration audio generation entirely and reuse whatever audio "
+                             "already exists on disk; just re-render and re-join the video.")
+    parser.add_argument("--archive-audio", action="store_true",
+                        help="Audio is expensive to regenerate, so instead of deleting/overwriting any "
+                             "existing file (via --overwrite-audio or --resume-audio), move it into "
+                             "<audio-root>/<project>/old/run_NNNN/ first.")
+    parser.add_argument("--audio-source", choices=("raw", "faded"), default="raw",
+                        help="Which audio render/join read. 'raw' is the straight TTS output. "
+                             "'faded' adds tiny fade-in/out copies (removes edge clicks/pops) written "
+                             "to a sibling folder; the raw audio is never deleted.")
     parser.add_argument("--voice", default="af_heart")
     parser.add_argument("--lang", default="a")
     parser.add_argument("--speed", type=float, default=1.0)
@@ -132,13 +146,33 @@ def main() -> int:
         audio_cmd += ["--project-name", args.project_name]
     if args.overwrite_audio:
         audio_cmd.append("--overwrite")
+    if args.resume_audio:
+        audio_cmd.append("--resume")
+    if args.archive_audio:
+        audio_cmd.append("--archive-audio")
     if selected_items:
         audio_cmd += ["--items", *selected_items]
+
+    effective_audio_root = args.audio_root.resolve()
+    fade_cmd: list[str] | None = None
+    if args.audio_source == "faded":
+        effective_audio_root = effective_audio_root.with_name(effective_audio_root.name + "_faded")
+        fade_cmd = cli_command(
+            "video-fade-audio",
+            "--project-root", str(args.project_root),
+            "--source-audio-root", str(args.audio_root),
+            "--output-audio-root", str(effective_audio_root),
+            "--overwrite",
+        )
+        if args.project_name:
+            fade_cmd += ["--project-name", args.project_name]
+        if selected_items:
+            fade_cmd += ["--items", *selected_items]
 
     video_cmd = cli_command(
         "video-render",
         "--project-root", str(args.project_root),
-        "--audio-root", str(args.audio_root),
+        "--audio-root", str(effective_audio_root),
         "--output-root", str(args.output_root),
         "--work-dir", str(args.work_dir),
         "--background-style", args.background_style,
@@ -159,12 +193,17 @@ def main() -> int:
         video_cmd += ["--project-name", args.project_name]
     if args.background_image is not None:
         video_cmd += ["--background-image", str(args.background_image)]
-    if args.overwrite_video:
+    if args.overwrite_video or args.skip_audio:
         video_cmd.append("--overwrite")
     if selected_items:
         video_cmd += ["--items", *selected_items]
 
-    run(audio_cmd, cwd)
+    if args.skip_audio:
+        print("\n[skip-audio] Reusing existing narration audio; not regenerating it.", flush=True)
+    else:
+        run(audio_cmd, cwd)
+    if fade_cmd is not None:
+        run(fade_cmd, cwd)
     run(video_cmd, cwd)
     if args.build_long_video:
         name = project_name(args.project_root, args.project_name)
@@ -173,7 +212,8 @@ def main() -> int:
             "--project-root", str(args.project_root),
             "--output-root", str(args.output_root),
             "--work-dir", str(args.work_dir),
-            "--narration-dir", str(args.audio_root.resolve() / name / "_items"),
+            "--narration-dir", str(effective_audio_root / name / "_items"),
+            "--audio-root", str(effective_audio_root),
             "--audio-bitrate", args.audio_bitrate,
             "--overwrite",
         )
