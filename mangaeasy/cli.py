@@ -19,6 +19,13 @@ import importlib
 import sys
 
 from mangaeasy import __version__
+from mangaeasy.tools.vendored import ensure_vendored_path
+
+# Every existing and future bare-name subprocess call (`"ffmpeg"`, `"uv"`,
+# `"git-lfs"`, ...) picks up a vendored copy automatically once this runs —
+# see mangaeasy/tools/vendored.py. Pure filesystem check, no network access,
+# safe to run unconditionally on every invocation.
+ensure_vendored_path()
 
 # command name -> (module path, function, group, one-line help)
 COMMANDS: dict[str, tuple[str, str, str, str]] = {
@@ -26,6 +33,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "app":                  ("mangaeasy.web.app",                              "main",        "Setup & app",      "Open the mangaEasy control center (desktop app)."),
     "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup & app",      "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
     "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, got-ocr2, ...) from GitHub/Hugging Face."),
+    "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup & app",   "Vendor ffmpeg/uv/git-lfs into this install's own tools dir (CI runs this at build time)."),
 
     # ── General item-based video pipeline (the recommended workflow) ──────────
     "video":                ("mangaeasy.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: audio (IndexTTS on GPU, Kokoro otherwise), render, join."),
@@ -75,6 +83,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "to-pdf-lossless":      ("mangaeasy.images.pdf_lossless",                  "main",        "Manga: render",    "Export images to a lossless PDF."),
     "convert-images":       ("mangaeasy.images.convert",                       "main",        "Manga: render",    "Convert / normalize image formats."),
     "watermark":            ("mangaeasy.images.watermark",                     "main",        "Manga: render",    "Apply a text watermark to images."),
+    "ai-zip":               ("mangaeasy.images.ai_zip_cli",                    "main",        "Manga: render",    "Pack chapter panels into a labelled ZIP for AI context."),
 
     # ── Chapter bookkeeping ───────────────────────────────────────────────────
     "init-chapter":         ("mangaeasy.utils.init_chapter",                   "main",        "Manga: chapters",  "Create folders for a new chapter."),

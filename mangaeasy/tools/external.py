@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from mangaeasy.runtime import is_frozen
+
 
 TOOL_ENVS = {
     "kokoro-82m": ("KOKORO_ROOT",),
@@ -20,19 +22,43 @@ def package_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def app_root() -> Path:
+    """Directory this install of mangaEasy lives in.
+
+    Frozen build: the folder containing the running executable (so a
+    PyInstaller backend embedded inside the Electron app resolves to that
+    app's own install/portable folder, not the user's home directory).
+    Dev checkout: the repo root (parent of the ``mangaeasy`` package).
+    Electron sets MANGAEASY_ROOT explicitly when it spawns the backend, so
+    that always wins when present.
+    """
+    configured = os.environ.get("MANGAEASY_ROOT")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    if is_frozen():
+        return Path(sys.executable).resolve().parent
+    return package_root()
+
+
 def mangaeasy_home() -> Path:
-    """Per-user mangaEasy data dir (default ~/.mangaeasy, override MANGAEASY_HOME)."""
+    """This install's own data dir: AI tool envs, app state, shared caches.
+
+    Lives at ``<app_root>/.mangaeasy`` so deleting the install/repo folder
+    removes it too — nothing is written to the user's home directory.
+    Override with MANGAEASY_HOME (e.g. to share tool installs across
+    multiple dev checkouts).
+    """
     configured = os.environ.get("MANGAEASY_HOME")
     if configured:
         return Path(configured).expanduser().resolve()
-    return (Path.home() / ".mangaeasy").resolve()
+    return (app_root() / ".mangaeasy").resolve()
 
 
 def tools_home() -> Path:
     """Managed dir where `mangaeasy install-tool` puts external tool envs.
 
-    Default ~/.mangaeasy/tools so a globally-installed mangaeasy can find the
-    tools from any working directory. Override with MANGAEASY_TOOLS_DIR.
+    Default `<app_root>/.mangaeasy/tools` — self-contained, deleted along
+    with the install/repo folder. Override with MANGAEASY_TOOLS_DIR.
     """
     configured = os.environ.get("MANGAEASY_TOOLS_DIR")
     if configured:
@@ -90,10 +116,20 @@ def python_command(tool_dir: Path) -> list[str]:
 
 
 def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    """Env for subprocesses that run inside an isolated tool venv.
+
+    Every cache an external tool (or `uv` itself) might write lives under
+    this install's own `.mangaeasy/` dir, never the user's home directory —
+    `setdefault` so an explicit shell export still wins.
+    """
     env = dict(base or os.environ)
-    hf_cache = Path.cwd().resolve() / ".hf_cache"
-    if "HF_HOME" not in env:
-        env["HF_HOME"] = str(hf_cache)
+    hf_cache = mangaeasy_home() / "hf_cache"
+    env.setdefault("HF_HOME", str(hf_cache))
+    env.setdefault("HF_HUB_CACHE", str(hf_cache / "hub"))
+    env.setdefault("TRANSFORMERS_CACHE", str(hf_cache / "hub"))
+    env.setdefault("TORCH_HOME", str(mangaeasy_home() / "torch_cache"))
+    env.setdefault("UV_CACHE_DIR", str(mangaeasy_home() / "uv_cache"))
+    env.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
     env.setdefault("HF_XET_HIGH_PERFORMANCE", "1")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")
 
@@ -102,6 +138,27 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
         env["PATH"] = f"{espeak_root}{os.pathsep}{env.get('PATH', '')}"
         env.setdefault("ESPEAK_DATA_PATH", str(espeak_root / "espeak-ng-data"))
     return env
+
+
+def resolve_device(requested: str) -> str:
+    """Resolve a `--device {auto,cuda,mps,cpu}`-style flag against this machine.
+
+    `auto` prefers CUDA (NVIDIA), then MPS (Apple Silicon), then CPU. AMD
+    ROCm / non-NVIDIA Linux GPUs aren't probed for — they fall through to
+    CPU, same as today.
+    """
+    if requested != "auto":
+        return requested
+    try:
+        import torch  # type: ignore[import-untyped]
+    except ImportError:
+        return "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    if sys.platform == "darwin" and getattr(torch.backends, "mps", None) is not None \
+            and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 def run_tool_python(tool_name: str, script: Path, args: list[str], *, env_var: str | None = None) -> None:
