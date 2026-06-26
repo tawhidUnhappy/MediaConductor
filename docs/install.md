@@ -4,9 +4,10 @@ Three ways to get mangaEasy, from easiest to most hands-on.
 
 ---
 
-## Option 1 — Download the standalone app (recommended for most users)
+## Option 1 — Download the desktop app (recommended for most users)
 
-No Python, no uv, no dependencies. Just download, extract, and run.
+No Python, no uv, no ffmpeg, no dependencies — the Electron app bundles the
+Python backend inside it. Just download, extract/install, and run.
 
 ### Step 1: Download
 
@@ -16,84 +17,74 @@ and download the file for your platform:
 #### Windows
 | File | Type | Notes |
 |---|---|---|
-| `mangaEasy-Setup-vX.Y.Z.exe` | **Installer** | Installs to Program Files, adds Start Menu shortcut |
-| `mangaEasy-windows.zip` | Portable | Extract anywhere, run without installing |
-
-#### Linux (x64)
-| File | Type | Notes |
-|---|---|---|
-| `mangaEasy-linux.deb` | **Installer** | For Ubuntu / Debian and derivatives |
-| `mangaEasy-linux.tar.gz` | Portable | Works on any Linux distro |
+| `mangaeasy-desktop-X.Y.Z-setup.exe` | **Installer** | Per-user install (no admin needed), Start Menu shortcut |
+| `mangaeasy-desktop-X.Y.Z-portable.exe` | Portable | Run directly, no install |
 
 #### macOS
 | File | Type | Notes |
 |---|---|---|
-| `mangaEasy-macos.pkg` | **Installer** | Standard macOS installer wizard |
-| `mangaEasy-macos.tar.gz` | Portable | Extract and run without installing |
+| `mangaeasy-desktop-X.Y.Z.dmg` | **Installer** | Drag to Applications |
+| `mangaeasy-desktop-X.Y.Z-mac.zip` | Portable | Extract and run without installing |
+
+#### Linux
+| File | Type | Notes |
+|---|---|---|
+| `mangaeasy-desktop-X.Y.Z.AppImage` | Portable | `chmod +x`, run — no install |
+| `mangaeasy-desktop-X.Y.Z.deb` | **Installer** | For Ubuntu / Debian and derivatives |
+| `mangaeasy-desktop-X.Y.Z.tar.gz` | Portable | Works on any Linux distro |
 
 ### Step 2: Install or extract
 
 **Windows — Installer**
-- Double-click `mangaEasy-Setup-vX.Y.Z.exe` and follow the wizard.
-- Installs to `C:\Program Files\mangaEasy\`, adds a Start Menu shortcut,
-  and optionally adds `mangaeasy` to your system PATH.
+- Run `mangaeasy-desktop-X.Y.Z-setup.exe`.
+- Installs per-user (no admin prompt), adds a Start Menu shortcut.
 
-**Windows — Portable zip**
-- Right-click → *Extract All* → choose any permanent folder.
-- You get a `mangaEasy\` folder. Move it wherever you like.
+**Windows — Portable exe**
+- Just run `mangaeasy-desktop-X.Y.Z-portable.exe` from wherever you put it.
 
 **Linux — .deb installer (Ubuntu / Debian)**
 ```bash
-sudo dpkg -i mangaEasy-linux.deb
-# mangaeasy is now on your PATH
-mangaeasy app
+sudo dpkg -i mangaeasy-desktop-X.Y.Z.deb
+mangaeasy-desktop
 ```
 
-**Linux — Portable tar.gz (any distro)**
+**Linux — AppImage / tar.gz (any distro)**
 ```bash
-tar -xzf mangaEasy-linux.tar.gz
-chmod +x mangaEasy/mangaeasy
-./mangaEasy/mangaeasy
+chmod +x mangaeasy-desktop-X.Y.Z.AppImage
+./mangaeasy-desktop-X.Y.Z.AppImage
 ```
 
-**macOS — .pkg installer**
-- Double-click `mangaEasy-macos.pkg` and follow the installer.
-- Installs to `/opt/mangaEasy/` and adds `mangaeasy` to `/usr/local/bin/`.
+**macOS — .dmg installer**
+- Open the `.dmg`, drag mangaEasy to Applications.
 - If Gatekeeper blocks it: System Settings → Privacy & Security → Allow.
 
-**macOS — Portable tar.gz**
+**macOS — Portable zip**
 ```bash
-tar -xzf mangaEasy-macos.tar.gz
-xattr -cr mangaEasy          # clear Gatekeeper quarantine
-./mangaEasy/mangaeasy
+unzip mangaeasy-desktop-X.Y.Z-mac.zip
+xattr -cr mangaEasy.app      # clear Gatekeeper quarantine
+open mangaEasy.app
 ```
 
 ### Step 3: Run
 
-| Platform | How to start |
-|---|---|
-| Windows (installer) | Start Menu → **mangaEasy**, or `mangaeasy app` in any terminal |
-| Windows (portable) | Double-click **`mangaeasy.exe`** inside the `mangaEasy\` folder |
-| Linux (installed) | `mangaeasy app` in any terminal |
-| Linux (portable) | `./mangaEasy/mangaeasy` |
-| macOS (installed) | `mangaeasy app` in any terminal |
-| macOS (portable) | `./mangaEasy/mangaeasy` |
-
-The control centre opens automatically in your browser at `http://127.0.0.1:5000`.
+The app opens as a native window — there's no browser, no local web server,
+and (for the installer/portable downloads above) no need to ever type
+`mangaeasy app` in a terminal; that command is only relevant if you're running
+from source (see Option 2/3 below).
 
 ### First-run checklist
 
 The **Setup** tab guides you through the rest:
 
-1. **ffmpeg** — click **Install ffmpeg** (or install it yourself and put it on
-   your `PATH`; the app checks automatically).
+1. **ffmpeg** — already bundled, nothing to do.
 2. **Kokoro TTS** — lightweight voice, runs on any CPU. Click **Install**.
-3. **IndexTTS** (optional) — high-quality voice cloning; requires an NVIDIA GPU.
-   Click **Install** if you want it.
+3. **IndexTTS** (optional) — high-quality voice cloning; works best with an
+   NVIDIA GPU. Click **Install** if you want it.
 4. **MAGI v3** (optional) — automatic panel detection for manga pages.
 
-These tools download once into `~/.mangaeasy/tools/` and are shared across all
-your projects.
+These tools download once into `<install folder>/.mangaeasy/tools/` and are shared across all
+your projects. GPU acceleration (NVIDIA CUDA / Apple Silicon MPS) is detected
+and configured automatically — nothing to choose.
 
 ### Platform notes
 
@@ -101,24 +92,17 @@ your projects.
 - Windows may show a SmartScreen warning the first time ("Windows protected your
   PC"). Click *More info* → *Run anyway*. This happens because the exe is not
   code-signed.
-- The console window that opens alongside the app is normal — it shows logs.
-  Don't close it while the app is running.
 
 **macOS**
-- macOS Gatekeeper may block the binary. Right-click → *Open* and confirm, **or**
-  run this once in Terminal after extracting:
+- macOS Gatekeeper may block the app. Right-click → *Open* and confirm, **or**
+  run this once in Terminal after extracting the portable zip:
   ```bash
-  xattr -cr mangaEasy
-  ./mangaEasy/mangaeasy
+  xattr -cr mangaEasy.app
+  open mangaEasy.app
   ```
 
 **Linux**
-- Make the binary executable first:
-  ```bash
-  chmod +x mangaEasy/mangaeasy
-  ./mangaEasy/mangaeasy
-  ```
-- If the browser doesn't open automatically, navigate to `http://127.0.0.1:5000`.
+- AppImage: `chmod +x` then run it directly, no install step.
 
 ---
 
@@ -153,22 +137,36 @@ uv sync
 uv run mangaeasy --help
 ```
 
-Build the standalone bundle yourself (requires PyInstaller, included as a dev dep):
+Build the desktop app yourself: PyInstaller bundles the Python backend, then
+electron-builder wraps it into the installer/portable app —
+`desktop/scripts/bundle-backend.mjs` runs the first step for you.
 
 ```bash
 uv sync --dev
-uv run pyinstaller packaging/mangaeasy.spec --distpath dist --workpath build-tmp --noconfirm
-# The ready-to-run folder is at dist/mangaEasy/
+cd desktop
+npm install
+npm run build:win    # or build:mac / build:linux
+# Installer + portable output land in desktop/dist/
 ```
+
+(`npm run build:win` etc. internally run `bundle:backend`, which builds
+`packaging/mangaeasy.spec` and copies the result into `desktop/resources/backend/`
+before electron-builder packages everything.)
 
 ---
 
 ## Updating
 
-### Standalone download
-Download the latest release from the Releases page and replace your old
-`mangaEasy/` folder. Your project files and the AI tools in `~/.mangaeasy/tools/`
-are untouched.
+### Desktop app — installer
+Run the new version's installer over the existing install — it only replaces
+the app's own files and leaves `<install folder>/.mangaeasy/` (your installed
+AI tools, models, app state) exactly where it was.
+
+### Desktop app — portable
+Download the new portable build and copy your old install's `.mangaeasy/`
+folder into the new one if you want to keep your installed AI tools without
+re-downloading them; otherwise just run the new build and reinstall tools as
+needed.
 
 ### uv tool
 ```bash
@@ -179,15 +177,14 @@ uv tool upgrade mangaeasy
 
 ## Uninstalling
 
-### Standalone download
-Delete the `mangaEasy/` folder. To also remove the AI tools and app state:
-```bash
-# All platforms
-rm -rf ~/.mangaeasy
-```
+### Desktop app
+Uninstall it the normal way for your OS (or just delete the portable folder).
+**Everything mangaEasy ever wrote lives under that same install folder's
+`.mangaeasy/` subdirectory** — deleting/uninstalling the app removes it too;
+nothing is left in your home directory or anywhere else on the machine.
 
 ### uv tool
 ```bash
 uv tool uninstall mangaeasy
-rm -rf ~/.mangaeasy   # optional: removes AI tools + app state
+rm -rf <install folder>/.mangaeasy   # the self-contained data dir, if you ran it from a checkout
 ```

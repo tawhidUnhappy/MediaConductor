@@ -33,7 +33,7 @@ Kokoro, IndexTTS, MAGI, and GOT-OCR can each keep their own Python, CUDA, Torch,
 and Transformers dependencies as isolated `uv` projects:
 
 ```text
-~/.mangaeasy/tools/   (or siblings of your project)
+<install folder>/.mangaeasy/tools/   (or siblings of your project)
   kokoro-82m/
   index-tts/
   magi-v3/

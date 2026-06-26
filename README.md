@@ -66,42 +66,49 @@ Usage:
   narration web editors, watermarking, PDF export, and more.
 - **Cross-platform** — Windows, macOS, and Linux.
 
-## Download — no Python needed
+## Download — nothing to install, nothing left behind
 
-The easiest way to get mangaEasy is to download the pre-built standalone app
-from the [**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest).
-Python and uv are **not required** — everything is bundled.
+The easiest way to get mangaEasy is to download the desktop app from the
+[**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest).
+It's a self-contained Electron app with the Python backend bundled inside —
+**no Python, uv, or ffmpeg required**, and it auto-detects your GPU (NVIDIA
+CUDA, Apple Silicon, or CPU-only) with no setup. Plain `git` is the one thing
+still expected on your system (used to fetch the optional AI tools).
 
 **Windows**
 
 | File | Type | How to use |
 |---|---|---|
-| `mangaEasy-Setup-vX.Y.Z.exe` | Installer | Run wizard — installs to Program Files, Start Menu shortcut |
-| `mangaEasy-windows.zip` | Portable | Extract anywhere, double-click `mangaeasy.exe` |
-
-**Linux (x64)**
-
-| File | Type | How to use |
-|---|---|---|
-| `mangaEasy-linux.deb` | Installer | `sudo dpkg -i mangaEasy-linux.deb` then `mangaeasy app` |
-| `mangaEasy-linux.tar.gz` | Portable | Extract, `chmod +x mangaEasy/mangaeasy`, run it |
+| `mangaeasy-desktop-X.Y.Z-setup.exe` | Installer | Run it — Start Menu shortcut, installs per-user (no admin needed) |
+| `mangaeasy-desktop-X.Y.Z-portable.exe` | Portable | No install — just run it |
 
 **macOS**
 
 | File | Type | How to use |
 |---|---|---|
-| `mangaEasy-macos.pkg` | Installer | Double-click — installs to `/opt/mangaEasy/` |
-| `mangaEasy-macos.tar.gz` | Portable | Extract, `xattr -cr mangaEasy`, run it |
+| `mangaeasy-desktop-X.Y.Z.dmg` | Installer | Drag to Applications |
+| `mangaeasy-desktop-X.Y.Z-mac.zip` | Portable | Extract, `xattr -cr mangaEasy.app`, run it |
 
-Double-clicking the exe (or running it with no arguments) opens the control
-centre in your browser at `http://127.0.0.1:5000`. From there, use **Setup**
-to download ffmpeg and the AI tools on first launch.
+**Linux**
+
+| File | Type | How to use |
+|---|---|---|
+| `mangaeasy-desktop-X.Y.Z.AppImage` | Portable | `chmod +x`, run it — no install |
+| `mangaeasy-desktop-X.Y.Z.deb` | Installer | `sudo dpkg -i mangaeasy-desktop-*.deb` |
+| `mangaeasy-desktop-X.Y.Z.tar.gz` | Portable | Extract, run the binary inside |
+
+Launch the app and use the **Setup** tab to install whichever AI tools you
+want (index-tts, kokoro, magi-v3, got-ocr2) — each downloads on demand into
+the app's own self-contained data folder, never your home directory.
+
+**Everything mangaEasy ever writes lives under `<install folder>/.mangaeasy/`**
+— AI tool installs, model weights, Hugging Face/torch/uv caches, app state.
+Delete the install folder (or uninstall) and nothing is left anywhere else on
+the machine.
 
 > **macOS Gatekeeper note:** the first time you may need to right-click → Open
 > to bypass the "unidentified developer" warning, or run
-> `xattr -cr mangaEasy` in the terminal after extracting.
-
-> **Linux:** make the file executable first: `chmod +x mangaEasy/mangaeasy`
+> `xattr -cr mangaEasy.app` in the terminal after extracting.
 
 See [docs/install.md](docs/install.md) for full installation instructions.
 
@@ -109,18 +116,24 @@ See [docs/install.md](docs/install.md) for full installation instructions.
 
 ## Requirements
 
+**Using the desktop app from the Releases page:** just `git` — used to fetch
+the optional AI tools. Nothing else; Python, uv, and ffmpeg ship inside the app.
+
+**Running from source / as a CLI tool (developers):**
+
 - Python **3.10+**
-- [`uv`](https://docs.astral.sh/uv/) (recommended installer/runner)
-- **FFmpeg** and **FFprobe** on your `PATH`
+- [`uv`](https://docs.astral.sh/uv/) (recommended installer/runner) — or let
+  `mangaeasy bootstrap-tools` vendor a copy into the self-contained data folder
+- `git` (plain git stays a real system prerequisite either way)
 - *(optional)* external TTS / detection tools — installed for you by
   [`mangaeasy install-tool`](#install-the-ai-tools-one-command)
 
 **A GPU is not required.** Everything runs on plain CPUs (Windows, macOS,
-Linux): video encoding falls back to `libx264`, and the AI tool installers
-automatically pick CPU builds when no NVIDIA GPU is present. With an NVIDIA /
-AMD / Intel / Apple GPU you get hardware video encoding, and with an NVIDIA GPU
-the TTS and panel-detection models run much faster — but none of it is needed
-to use the tool.
+Linux): video encoding falls back to `libx264`, and `mangaeasy doctor` /
+`install-tool` auto-detect NVIDIA CUDA, Apple Silicon (MPS), or CPU-only and
+configure themselves accordingly — no flags to pass. With a GPU you get
+hardware video encoding and much faster TTS/panel-detection; without one,
+everything still works, just slower.
 
 ## Install (developers / advanced)
 
@@ -166,17 +179,20 @@ uv sync --extra all        # everything above
 mangaeasy app
 ```
 
-Opens a native window (falls back to your browser with `--browser` or when no GUI
-backend is available) with everything in one place:
+Opens the native Electron desktop app (the same app the Releases page ships)
+with everything in one place:
 
-- **Setup** — checks git / uv / FFmpeg / GPU, shows which AI tools are installed,
-  and installs them with one click while streaming the logs live.
+- **Setup** — checks git / GPU, shows which AI tools are installed, installs
+  or updates them with one click while streaming the logs live in the
+  built-in terminal.
 - **Project** — pick your project folder with a real folder dialog and edit
-  `config.json` / `config.system.json` with forms, no manual JSON wrangling.
-- **Create videos** — choose your manga folder and output folder with
-  Browse… buttons, pick what to run, press Start; watch progress in the
-  built-in log console. Your folder choices are remembered between launches.
-- **Editors** — launch the panel / narration web editors with one click.
+  `config.json` / `config.system.json` with forms (or the raw JSON via a
+  Monaco editor), no manual JSON wrangling.
+- **Make a video** / **Batch videos** — choose your manga folder and output
+  folder with Browse… buttons, pick what to run, press Start; watch progress
+  in the built-in terminal. Your folder choices are remembered between launches.
+- **Editor** — launch the panel / narration web editors with one click,
+  embedded right in the app window.
 
 See [docs/app.md](docs/app.md) for details.
 
@@ -193,12 +209,13 @@ mangaeasy install-tool magi-v3    # MAGI v3 manga panel detection (env + adapter
 mangaeasy install-tool got-ocr2   # GOT-OCR 2.0 panel OCR (HF model + env)
 ```
 
-Tools install into `~/.mangaeasy/tools` and are found automatically from any
-folder. The installer **detects your hardware**: with an NVIDIA GPU it uses
-CUDA builds, otherwise it picks CPU builds that work on any machine (force
-either with `--cuda` / `--cpu`). Other flags: `--ref <branch/tag>` to pin a
-version, `--skip-model` to skip the big weight download. The same installs are
-available as buttons in `mangaeasy app`.
+Tools install into `<install folder>/.mangaeasy/tools` and are found automatically from any
+folder. The installer **detects your hardware**: NVIDIA GPU → CUDA builds,
+Apple Silicon → MPS-enabled builds, otherwise CPU builds that work on any
+machine (force one with `--cuda` / `--cpu`). Other flags: `--ref <branch/tag>`
+to pin a version, `--skip-model` to skip the big weight download, `--update`
+to pull the latest version of an already-installed tool. The same installs
+(and updates) are available as buttons in `mangaeasy app`'s Setup tab.
 
 See [docs/install-tools.md](docs/install-tools.md) for what each installer does.
 
@@ -285,7 +302,7 @@ easiest way to get them is [`mangaeasy install-tool`](#install-the-ai-tools-one-
 which puts them in the managed folder:
 
 ```text
-~/.mangaeasy/tools/
+<install folder>/.mangaeasy/tools/
   index-tts/      # IndexTTS-2  (cloned uv project + model checkpoints)
   magi-v3/        # MAGI v3 panel detection (generated env + detect_magi.py)
   got-ocr2/       # GOT-OCR 2.0 panel OCR (generated env + HF model)

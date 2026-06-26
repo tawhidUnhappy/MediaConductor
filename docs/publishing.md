@@ -17,6 +17,8 @@ Make sure these are **not** committed (they are git-ignored by default):
 - user media: `library/` (chapters; `manga/` on old projects), `music/`, `fonts/`, `background_image/`, `vocal/`
 - local `config.json` and `config.system.json`
 - sibling external tools: `kokoro-82m/`, `index-tts/`, `magi-v3/`, `got-ocr2/`
+- this install's own self-contained data dir: `.mangaeasy/`
+- Electron build output/deps: `desktop/node_modules/`, `desktop/out/`, `desktop/dist/`, `desktop/resources/backend/`
 
 ## First publish
 
@@ -40,10 +42,14 @@ git push -u origin main
    git push origin main
    git push origin vX.Y.Z
    ```
-3. GitHub Actions (`.github/workflows/release.yml`) picks up the `v*` tag and:
-   - Builds the standalone bundle on `windows-latest`, `ubuntu-latest`, `macos-latest`
-   - Packages each as `mangaEasy-windows.zip`, `mangaEasy-linux.tar.gz`, `mangaEasy-macos.tar.gz`
-   - Creates a GitHub Release and uploads all three as downloadable assets
+3. GitHub Actions (`.github/workflows/release.yml`) picks up the `v*` tag and,
+   on `windows-latest`/`ubuntu-22.04`/`macos-latest`:
+   - Vendors ffmpeg/uv/git-lfs (`mangaeasy bootstrap-tools`)
+   - Builds the PyInstaller Python backend and bundles it into the Electron
+     app via `desktop/scripts/bundle-backend.mjs`
+   - Runs `electron-builder` for that platform (installer + portable build)
+   - Creates a GitHub Release and uploads every platform's installer +
+     portable artifacts as downloadable assets
 
 Monitor the build at `https://github.com/tawhidUnhappy/mangaEasy/actions`.
 The Release page appears at `https://github.com/tawhidUnhappy/mangaEasy/releases`

@@ -19,7 +19,7 @@ The resolver checks, in order:
    - `INDEX_TTS_ROOT` (or legacy `INDEX_TTS_DIR`)
    - `MAGI_V3_ROOT` (or legacy `MAGI_V3_DIR`)
    - `GOT_OCR2_ROOT` (or `GOT_OCR2_DIR`, `GOT_OCR_ROOT`)
-2. The managed tools dir: `~/.mangaeasy/tools/<name>`
+2. The managed tools dir: `<install folder>/.mangaeasy/tools/<name>`
    (override with `MANGAEASY_TOOLS_DIR`)
 3. A folder named `<name>` in the current directory, its parent, or next to the
    installed package

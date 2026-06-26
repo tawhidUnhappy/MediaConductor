@@ -4,46 +4,39 @@
 mangaeasy app
 ```
 
-Opens the mangaEasy control center in a native desktop window (pywebview). The
-window wraps a local web UI served on `127.0.0.1:5010`; nothing is exposed to
-the network.
-
-Options:
-
-```bash
-mangaeasy app --browser     # open in your default browser instead of a window
-mangaeasy app --port 5050   # use a different local port
-```
-
-On Linux/macOS, pywebview may need a system GTK/Qt backend; if no GUI backend is
-available the app automatically falls back to the browser.
+Opens the mangaEasy control center as a real native Electron window (the same
+app the Releases page ships) — no browser, no local web server exposed to
+anything. Tabs are React views talking to the Python backend purely through
+IPC: every "Start"/"Install" button spawns a `mangaeasy <command>` subprocess
+and streams its output into the built-in terminal pane at the bottom of the
+window.
 
 ## Choosing folders
 
 Every folder field (project folder, manga folder, output folder) has a
 **Browse…** button:
 
-- In the desktop window it opens the **native OS folder dialog**.
-- In browser mode it opens a small **in-app folder browser** (drives, home
-  shortcut, click-to-enter folders).
+- Opens the **native OS folder dialog** (Electron's `dialog.showOpenDialog`).
 
 Next to each field, **Open** shows the folder in your file manager — handy for
 finding the finished videos.
 
 Folder choices and run options are **remembered between launches** in
-`~/.mangaeasy/app_state.json`. On start the app also reuses your last project
+`<install folder>/.mangaeasy/app_state.json`. On start the app also reuses your last project
 folder when the current directory doesn't look like a project.
 
 ## Tabs
 
 ### 1 · Setup
 
-- Prerequisite checks: git, git-lfs, uv, uvx, FFmpeg, FFprobe, NVIDIA GPU.
+- Prerequisite checks: git, git-lfs, uv, ffmpeg, ffprobe, GPU (NVIDIA CUDA or
+  Apple Silicon MPS, auto-detected).
 - One card per external AI tool (IndexTTS, MAGI v3, GOT-OCR 2.0, Kokoro) showing
   whether it is installed and where it resolved.
-- **Install / Reinstall** buttons run `mangaeasy install-tool` for you, with the
-  full output streaming into the log console. Options: *CPU-only* and *Skip
-  model download*.
+- **Install** buttons run `mangaeasy install-tool` for you, with the full
+  output streaming into the terminal pane. **Check for updates** queries
+  whether a newer version is available for each installed tool and turns the
+  button into **Update** when one is.
 
 ### 2 · Project
 
@@ -108,7 +101,8 @@ One-click launch for the existing web editors (`cut-page`, `panel-editor`,
 `narration-editor`, `narration-editor-all`, `narration-review`). Each editor
 opens automatically in your browser and can be stopped from the same card.
 
-## Log console
+## Terminal
 
-The bottom panel streams everything — installer output, pipeline progress,
-editor logs — over server-sent events. It can be cleared or collapsed.
+The bottom panel is a real `xterm.js` terminal that streams everything —
+installer output, pipeline progress, editor logs — straight from each
+subprocess's stdout/stderr over Electron IPC.

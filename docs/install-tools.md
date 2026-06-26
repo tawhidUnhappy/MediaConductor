@@ -11,7 +11,7 @@ mangaeasy install-tool got-ocr2     # GOT-OCR 2.0 panel OCR
 mangaeasy doctor                    # check what's installed
 ```
 
-All tools go into the managed folder `~/.mangaeasy/tools` (override with
+All tools go into the managed folder `<install folder>/.mangaeasy/tools` (override with
 `MANGAEASY_TOOLS_DIR`), so a globally-installed `mangaeasy` finds them from any
 working directory. Re-running an install updates an existing clone in place —
 that's also how you pull the **latest version** later.
@@ -115,7 +115,7 @@ GPU, or when IndexTTS isn't set up), `mangaeasy video-audio`.
 `install-tool` is a convenience, not a requirement. Any folder that contains a
 `.venv` (or is a uv project) with the right name works:
 
-- managed: `~/.mangaeasy/tools/<name>`
+- managed: `<install folder>/.mangaeasy/tools/<name>`
 - sibling: `./<name>` next to where you run `mangaeasy`
 - explicit: `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `GOT_OCR2_ROOT`
 
