@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,7 +10,9 @@ from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, pro
 from mangaeasy.video_pipeline.item_assets import (
     IMAGE_EXTENSIONS,
     PanelAsset,
+    item_audio_dir,
     item_narration_path,
+    load_narration,
     collect_panel_assets,
 )
 from mangaeasy.video_pipeline.ffmpeg_tools import (
@@ -378,11 +380,43 @@ def validate_config(config: VideoBuildConfig) -> None:
             raise ValueError(f"Unsupported background image type: {config.background_image}")
 
 
+def _missing_audio(items: list[Path], config: VideoBuildConfig) -> list[str]:
+    """Every narration entry across `items` whose audio file doesn't exist yet.
+
+    Checked upfront so a gap (e.g. an intro.json added after audio was last
+    generated) is reported as one clear list before any GPU work starts,
+    instead of surfacing mid-render as a crash on whichever item happens to
+    need it -- which, under --workers > 1, can look like the whole run froze
+    even though other items keep completing in the background.
+    """
+    missing: list[str] = []
+    for item_dir in items:
+        audio_dir = item_audio_dir(config.audio_root, config.project_root, config.project_name_override, item_dir)
+        for entry in load_narration(item_dir):
+            image_name = entry.get("image") if isinstance(entry, dict) else None
+            if not image_name:
+                continue
+            audio_path = audio_dir / f"{Path(image_name).stem}.wav"
+            if not audio_path.exists():
+                missing.append(f"{item_dir.name}: {audio_path.name}")
+    return missing
+
+
 def build_item_videos(config: VideoBuildConfig) -> Path:
     validate_config(config)
     items = selected_item_dirs(config)
     if not items:
         raise FileNotFoundError(f"No item folders selected under {config.project_root.resolve()}")
+
+    missing = _missing_audio(items, config)
+    if missing:
+        preview = "\n".join(f"  {m}" for m in missing[:20])
+        more = f"\n  ... and {len(missing) - 20} more" if len(missing) > 20 else ""
+        raise FileNotFoundError(
+            f"{len(missing)} narration entry(ies) have no audio yet -- run audio generation first "
+            f"(narration.json/intro.json changed since audio was last generated?):\n{preview}{more}"
+        )
+
     total = len(items)
     print(f"MANGAEASY_PROGRESS 0/{total} Rendering videos", flush=True)
     if config.workers == 1 or total <= 1:
@@ -402,7 +436,15 @@ def build_item_videos(config: VideoBuildConfig) -> Path:
                 print(f"MANGAEASY_PROGRESS {done_count}/{total} Rendered {item_dir.name}", flush=True)
 
         with ThreadPoolExecutor(max_workers=config.workers) as executor:
-            list(executor.map(_render, items))
+            futures = {executor.submit(_render, item_dir): item_dir for item_dir in items}
+            for future in as_completed(futures):
+                # as_completed surfaces whichever item finishes (or raises)
+                # first, regardless of submission order -- unlike
+                # executor.map(), one slow/stuck item no longer blocks
+                # reporting on items that are done, and an error surfaces
+                # the moment it happens instead of waiting for items ahead
+                # of it in the original list.
+                future.result()
     output_dir = item_output_dir(config)
     print(f"\nVideos written to: {output_dir}", flush=True)
     return output_dir

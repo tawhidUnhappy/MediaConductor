@@ -60,7 +60,7 @@ function loadPrefs(): Partial<BatchPrefs> {
  * (`_batch_base_args`/`_append_audio_root`/`_append_bgm`) 1:1 so the CLI
  * contract stays identical. */
 export function Batch(): React.JSX.Element {
-  const { run, running } = useJob()
+  const { run, runChain, running } = useJob()
   const initialPrefs = useState(loadPrefs)[0]
   const [entries, setEntries] = useState<LibraryEntry[]>([])
   const [mangaPath, setMangaPath] = useState(initialPrefs.mangaPath ?? '')
@@ -200,12 +200,33 @@ export function Batch(): React.JSX.Element {
     }
 
     if (step === 'video-render') {
-      const args = baseArgs({ output: true, items: true })
-      if (!args) return
-      appendAudioRoot(args)
-      args.push('--background-style', 'blur', '--blur-backend', 'auto')
-      args.push('--workers', String(renderWorkers))
-      await run(step, args)
+      const renderArgs = baseArgs({ output: true, items: true })
+      if (!renderArgs) return
+      appendAudioRoot(renderArgs)
+      renderArgs.push('--background-style', 'blur', '--blur-backend', 'auto')
+      renderArgs.push('--workers', String(renderWorkers))
+
+      // Rendering needs every narration entry's audio to already exist (this
+      // is the only step where mismatches actually surface, as a crash
+      // rather than a hang -- see the chapter1_trailer_*.wav incident). Rather
+      // than make the user remember to run audio generation again whenever
+      // narration/intro.json changes, backfill whatever's missing first --
+      // a no-op if everything's already there, since these steps skip
+      // existing files by default.
+      const backfillArgs = baseArgs({ items: true })
+      if (!backfillArgs) return
+      backfillArgs.push('--audio-root', audioRoot(false), '--device', 'auto')
+      const chain = [{ command: 'video-audio', args: backfillArgs }]
+      if (audioSource === 'faded') {
+        const fadeArgs = baseArgs({ items: true }) ?? []
+        fadeArgs.push(
+          '--source-audio-root', audioRoot(false),
+          '--output-audio-root', audioRoot(true),
+        )
+        chain.push({ command: 'video-fade-audio', args: fadeArgs })
+      }
+      chain.push({ command: step, args: renderArgs })
+      await runChain(chain)
       return
     }
 
