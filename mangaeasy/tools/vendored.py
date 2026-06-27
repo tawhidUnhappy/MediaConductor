@@ -218,9 +218,21 @@ def bootstrap_main() -> int:
     so the shipped installer never needs to download them; anyone else can
     run it by hand for the same effect on a dev checkout."""
     results = ensure_core_tools(print)
-    ok = all(results.values())
+    # ffmpeg has no vendored macOS build (see fetch_ffmpeg's docstring) --
+    # that's an accepted, documented gap, not a build failure. macOS users
+    # get a clear `brew install ffmpeg` message instead. uv/git-lfs are
+    # vendorable on every platform and must still succeed everywhere.
+    on_macos_ffmpeg_gap = platform.system().lower() == "darwin" and not results.get("ffmpeg", True)
+    required = {
+        name: success for name, success in results.items()
+        if not (name == "ffmpeg" and on_macos_ffmpeg_gap)
+    }
+    ok = all(required.values())
     for name, success in results.items():
-        print(f"  {name:10s} {'ok' if success else 'FAILED (see warning above)'}")
+        status = "ok" if success else "FAILED (see warning above)"
+        if name == "ffmpeg" and on_macos_ffmpeg_gap:
+            status = "not vendored (macOS) -- end users need `brew install ffmpeg`"
+        print(f"  {name:10s} {status}")
     return 0 if ok else 1
 
 

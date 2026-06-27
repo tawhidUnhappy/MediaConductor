@@ -6,8 +6,10 @@ Three ways to get mangaEasy, from easiest to most hands-on.
 
 ## Option 1 — Download the desktop app (recommended for most users)
 
-No Python, no uv, no ffmpeg, no dependencies — the Electron app bundles the
-Python backend inside it. Just download, extract/install, and run.
+No Python, no uv, no dependencies — the Electron app bundles the Python
+backend inside it. Just download, extract/install, and run. ffmpeg is
+bundled too on Windows and Linux; on macOS run `brew install ffmpeg` once
+(no trusted static macOS ffmpeg build exists to bundle yet).
 
 ### Step 1: Download
 
@@ -76,7 +78,8 @@ from source (see Option 2/3 below).
 
 The **Setup** tab guides you through the rest:
 
-1. **ffmpeg** — already bundled, nothing to do.
+1. **ffmpeg** — already bundled on Windows/Linux, nothing to do. On macOS,
+   run `brew install ffmpeg` once (the Setup tab flags it if it's missing).
 2. **Kokoro TTS** — lightweight voice, runs on any CPU. Click **Install**.
 3. **IndexTTS** (optional) — high-quality voice cloning; works best with an
    NVIDIA GPU. Click **Install** if you want it.

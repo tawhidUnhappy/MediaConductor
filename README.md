@@ -71,9 +71,12 @@ Usage:
 The easiest way to get mangaEasy is to download the desktop app from the
 [**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest).
 It's a self-contained Electron app with the Python backend bundled inside —
-**no Python, uv, or ffmpeg required**, and it auto-detects your GPU (NVIDIA
-CUDA, Apple Silicon, or CPU-only) with no setup. Plain `git` is the one thing
+**no Python or uv required**, and it auto-detects your GPU (NVIDIA CUDA,
+Apple Silicon, or CPU-only) with no setup. Plain `git` is the one thing
 still expected on your system (used to fetch the optional AI tools).
+**ffmpeg ships bundled on Windows and Linux; on macOS there's no trusted
+static build to bundle yet, so `brew install ffmpeg` is required** (the app
+will tell you if it's missing).
 
 **Windows**
 
@@ -125,7 +128,9 @@ See [docs/install.md](docs/install.md) for full installation instructions.
 ## Requirements
 
 **Using the desktop app from the Releases page:** just `git` — used to fetch
-the optional AI tools. Nothing else; Python, uv, and ffmpeg ship inside the app.
+the optional AI tools. Python and uv ship inside the app on every platform;
+ffmpeg ships inside the app on Windows and Linux. On macOS, install it once
+with `brew install ffmpeg`.
 
 **Running from source / as a CLI tool (developers):**
 
