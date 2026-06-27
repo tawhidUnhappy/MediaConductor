@@ -135,7 +135,14 @@ export function Workflow(): React.JSX.Element {
   }
   const genVideo = async (): Promise<void> => {
     await saveWfConfig()
-    await runChain(videoSteps(true))
+    // Rendering (raw OR faded source) and fading both require raw audio to
+    // already exist on disk -- on a chapter that's never had audio generated,
+    // jumping straight to fade-audio/render-video would just fail with
+    // "no raw audio found". Generate it first instead of making the user
+    // remember to click "Generate audio" before this.
+    const liveStatus = await window.api.getChapterStatus(mangaName, chapter)
+    const steps = liveStatus.audio === 0 ? [{ command: 'index-tts', args: [] }, ...videoSteps(true)] : videoSteps(true)
+    await runChain(steps)
     refreshStatus()
   }
   const rerenderVideo = async (): Promise<void> => {
