@@ -6,7 +6,6 @@ Invoked automatically by mangaeasy video-audio-indextts.
 """
 
 import argparse
-import json
 import os
 import sys
 import traceback
@@ -32,6 +31,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from mangaeasy.config import HF_CACHE_DIR
 from mangaeasy.utils import LazyArchiveRunDir, archive_into_run
+from mangaeasy.video_pipeline.item_assets import load_narration
 from mangaeasy.video_pipeline.common import (
     item_dirs,
     merge_item_selection,
@@ -127,12 +127,6 @@ def parse_args() -> argparse.Namespace:
                              "generating, in case the last run was interrupted mid-write, then continue "
                              "with anything still missing.")
     return parser.parse_args()
-
-
-def load_narration(item_dir: Path) -> list[dict]:
-    path = item_dir / "narration.json"
-    with path.open("r", encoding="utf-8-sig") as f:
-        return json.load(f)
 
 
 def ordered_audio_paths(audio_root: Path, name: str, selected: list[Path]) -> list[Path]:

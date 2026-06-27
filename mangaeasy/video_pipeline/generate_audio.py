@@ -10,6 +10,7 @@ from pathlib import Path
 
 from mangaeasy.tools.external import python_command, resolve_tool_dir, tool_env
 from mangaeasy.utils import LazyArchiveRunDir, archive_into_run
+from mangaeasy.video_pipeline.item_assets import load_narration
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
     DEFAULT_KOKORO_ROOT,
@@ -54,15 +55,6 @@ def parse_args() -> argparse.Namespace:
 
 def item_audio_dir(args: argparse.Namespace, item_dir: Path) -> Path:
     return args.audio_root.resolve() / project_name(args.project_root, args.project_name) / item_dir.name
-
-
-def load_narration(item_dir: Path) -> list[dict[str, str]]:
-    path = item_dir / "narration.json"
-    with path.open("r", encoding="utf-8-sig") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError(f"{path} must contain a JSON array.")
-    return data
 
 
 def validate_panel(item_dir: Path, image_name: str) -> Path:

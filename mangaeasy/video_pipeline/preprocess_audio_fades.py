@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import shlex
 import subprocess
 from pathlib import Path
@@ -13,6 +12,7 @@ from mangaeasy.video_pipeline.common import (
     merge_item_selection,
     project_name,
 )
+from mangaeasy.video_pipeline.item_assets import load_narration
 
 
 DEFAULT_OUTPUT_AUDIO_ROOT = Path("audio_preprocessed")
@@ -47,15 +47,6 @@ def run(command: list[str], *, capture: bool = False, print_command: bool = True
         encoding="utf-8",
         errors="replace",
     )
-
-
-def load_narration(chapter_dir: Path) -> list[dict[str, str]]:
-    path = chapter_dir / "narration.json"
-    with path.open("r", encoding="utf-8-sig") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError(f"{path} must contain a JSON array.")
-    return data
 
 
 def audio_duration(path: Path) -> float:
