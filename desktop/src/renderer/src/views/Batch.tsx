@@ -38,6 +38,7 @@ export function Batch(): React.JSX.Element {
   const [normalize, setNormalize] = useState(true)
   const [bgm, setBgm] = useState(true)
   const [resume, setResume] = useState(false)
+  const [overwriteAudio, setOverwriteAudio] = useState(false)
   const [skipAudio, setSkipAudio] = useState(false)
   const [takes, setTakes] = useState<AudioTakesStatus | null>(null)
   const [takesLoading, setTakesLoading] = useState(false)
@@ -134,6 +135,12 @@ export function Batch(): React.JSX.Element {
       args.push('--video-workers', String(renderWorkers))
       if (gpuWorkers !== 1) args.push('--gpu-workers', String(gpuWorkers))
       if (audioSource === 'faded') args.push('--audio-source', 'faded')
+      if (overwriteAudio) {
+        // Forcing fresh audio but not the video re-render would leave the
+        // rendered/joined video stuck on the stale narration -- the render
+        // step skips already-existing item videos by default.
+        args.push('--overwrite-audio', '--overwrite-video')
+      }
       if (resume) args.push('--resume-audio')
       if (skipAudio) args.push('--skip-audio')
       if (longVideo) {
@@ -178,6 +185,7 @@ export function Batch(): React.JSX.Element {
       if (!args) return
       appendAudioRoot(args)
       args.push('--device', 'auto')
+      if (overwriteAudio) args.push('--overwrite')
       if (resume) args.push('--resume')
       if (gpuWorkers !== 1) args.push('--gpu-workers', String(gpuWorkers))
       await run(step, args)
@@ -188,6 +196,7 @@ export function Batch(): React.JSX.Element {
       const args = baseArgs({ items: true })
       if (!args) return
       appendAudioRoot(args)
+      if (overwriteAudio) args.push('--overwrite')
       if (resume) args.push('--resume')
       if (gpuWorkers !== 1) args.push('--gpu-workers', String(gpuWorkers))
       await run(step, args)
@@ -293,9 +302,14 @@ export function Batch(): React.JSX.Element {
             <input type="checkbox" checked={bgm} onChange={(e) => setBgm(e.target.checked)} /> Background music
           </label>
           {showResume && (
-            <label title="If a previous audio run was interrupted, re-verify the most recent audio file plus the previous 5 (archived first, then regenerated).">
-              <input type="checkbox" checked={resume} onChange={(e) => setResume(e.target.checked)} /> Resume (re-verify last 5 audio)
-            </label>
+            <>
+              <label title="Force narration audio to regenerate even if a file already exists for it (e.g. after fixing a narration line). The previous take is archived first, never lost -- see 'Previous audio takes' below.">
+                <input type="checkbox" checked={overwriteAudio} onChange={(e) => setOverwriteAudio(e.target.checked)} /> Regenerate audio
+              </label>
+              <label title="If a previous audio run was interrupted, re-verify the most recent audio file plus the previous 5 (archived first, then regenerated).">
+                <input type="checkbox" checked={resume} onChange={(e) => setResume(e.target.checked)} /> Resume (re-verify last 5 audio)
+              </label>
+            </>
           )}
           {showSkipAudio && (
             <label title="Skip narration audio generation entirely and just re-render + re-join using whatever audio already exists.">
