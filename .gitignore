@@ -6,8 +6,8 @@ __pycache__/
 
 # Build / env
 .venv/
-dist/
-build/
+/dist/
+/build/
 build-tmp/
 *.egg-info/
 
@@ -70,5 +70,3 @@ desktop/dist/
 .claude/
 .idea/
 .vscode/
-/dist/
-/build/

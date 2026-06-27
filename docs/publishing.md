@@ -47,9 +47,11 @@ git push -u origin main
    - Vendors ffmpeg/uv/git-lfs (`mangaeasy bootstrap-tools`)
    - Builds the PyInstaller Python backend and bundles it into the Electron
      app via `desktop/scripts/bundle-backend.mjs`
-   - Runs `electron-builder` for that platform (installer + portable build)
-   - Creates a GitHub Release and uploads every platform's installer +
-     portable artifacts as downloadable assets
+   - Runs `electron-builder` for that platform (Windows: portable only —
+     no nsis installer, so the install folder is the only trace on disk;
+     macOS/Linux: installer + portable, per `electron-builder.yml`)
+   - Creates a GitHub Release and uploads every platform's build artifacts
+     as downloadable assets
 
 Monitor the build at `https://github.com/tawhidUnhappy/mangaEasy/actions`.
 The Release page appears at `https://github.com/tawhidUnhappy/mangaEasy/releases`

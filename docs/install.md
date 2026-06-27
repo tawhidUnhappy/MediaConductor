@@ -17,8 +17,12 @@ and download the file for your platform:
 #### Windows
 | File | Type | Notes |
 |---|---|---|
-| `mangaeasy-desktop-X.Y.Z-setup.exe` | **Installer** | Per-user install (no admin needed), Start Menu shortcut |
 | `mangaeasy-desktop-X.Y.Z-portable.exe` | Portable | Run directly, no install |
+
+There is no Windows `.exe` installer by design — an installer would write a
+registry uninstall key and Start Menu shortcut outside the folder you put
+the app in, so deleting that folder wouldn't fully remove it. Portable-only
+keeps "delete the folder, it's gone" literally true.
 
 #### macOS
 | File | Type | Notes |
@@ -34,10 +38,6 @@ and download the file for your platform:
 | `mangaeasy-desktop-X.Y.Z.tar.gz` | Portable | Works on any Linux distro |
 
 ### Step 2: Install or extract
-
-**Windows — Installer**
-- Run `mangaeasy-desktop-X.Y.Z-setup.exe`.
-- Installs per-user (no admin prompt), adds a Start Menu shortcut.
 
 **Windows — Portable exe**
 - Just run `mangaeasy-desktop-X.Y.Z-portable.exe` from wherever you put it.
@@ -137,16 +137,21 @@ uv sync
 uv run mangaeasy --help
 ```
 
+Or skip the manual steps below and just run `./run.sh` (macOS/Linux) /
+`run.bat` (Windows) from the repo root — it runs `uv sync`, builds the
+desktop app's dev bundle the first time, and launches `mangaeasy app`.
+
 Build the desktop app yourself: PyInstaller bundles the Python backend, then
-electron-builder wraps it into the installer/portable app —
-`desktop/scripts/bundle-backend.mjs` runs the first step for you.
+electron-builder wraps it into the portable app (plus a macOS `.dmg`/Linux
+`.deb` if you build those targets) — `desktop/scripts/bundle-backend.mjs`
+runs the first step for you.
 
 ```bash
 uv sync --dev
 cd desktop
 npm install
 npm run build:win    # or build:mac / build:linux
-# Installer + portable output land in desktop/dist/
+# Output lands in desktop/dist/
 ```
 
 (`npm run build:win` etc. internally run `bundle:backend`, which builds
@@ -157,16 +162,12 @@ before electron-builder packages everything.)
 
 ## Updating
 
-### Desktop app — installer
-Run the new version's installer over the existing install — it only replaces
-the app's own files and leaves `<install folder>/.mangaeasy/` (your installed
-AI tools, models, app state) exactly where it was.
-
-### Desktop app — portable
-Download the new portable build and copy your old install's `.mangaeasy/`
-folder into the new one if you want to keep your installed AI tools without
+### Desktop app (Windows portable / macOS / Linux)
+Download the new build and copy your old install's `.mangaeasy/` folder into
+the new one if you want to keep your installed AI tools without
 re-downloading them; otherwise just run the new build and reinstall tools as
-needed.
+needed. On macOS/Linux, installing the new `.dmg`/`.deb` over the old one
+leaves `<install folder>/.mangaeasy/` untouched the same way.
 
 ### uv tool
 ```bash
@@ -178,10 +179,16 @@ uv tool upgrade mangaeasy
 ## Uninstalling
 
 ### Desktop app
-Uninstall it the normal way for your OS (or just delete the portable folder).
-**Everything mangaEasy ever wrote lives under that same install folder's
-`.mangaeasy/` subdirectory** — deleting/uninstalling the app removes it too;
-nothing is left in your home directory or anywhere else on the machine.
+**Windows / portable macOS-Linux builds:** just delete the folder. There's no
+installer step on Windows and no system registration for the portable
+zip/AppImage/tar.gz builds, so deleting the folder removes everything,
+including `<install folder>/.mangaeasy/` (AI tools, models, app state) — that
+subdirectory is where everything mangaEasy ever writes lives.
+
+**macOS `.dmg` / Linux `.deb` installs:** uninstall it the normal way for
+your OS (drag the app to Trash, or `sudo dpkg -r mangaeasy-desktop`) — that
+also removes its `.mangaeasy/` folder since it lives inside the app's own
+install location.
 
 ### uv tool
 ```bash

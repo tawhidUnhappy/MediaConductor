@@ -79,8 +79,13 @@ still expected on your system (used to fetch the optional AI tools).
 
 | File | Type | How to use |
 |---|---|---|
-| `mangaeasy-desktop-X.Y.Z-setup.exe` | Installer | Run it — Start Menu shortcut, installs per-user (no admin needed) |
 | `mangaeasy-desktop-X.Y.Z-portable.exe` | Portable | No install — just run it |
+
+There is deliberately no Windows installer (`.exe` setup). An installer would
+write a registry uninstall key and a Start Menu shortcut outside wherever you
+put the app, and those wouldn't go away if you just delete the folder. The
+portable build keeps the promise below literal: drop the folder anywhere,
+run the exe, delete the folder when you're done.
 
 **macOS**
 
@@ -103,8 +108,11 @@ the app's own self-contained data folder, never your home directory.
 
 **Everything mangaEasy ever writes lives under `<install folder>/.mangaeasy/`**
 — AI tool installs, model weights, Hugging Face/torch/uv caches, app state.
-Delete the install folder (or uninstall) and nothing is left anywhere else on
-the machine.
+Delete the install folder and nothing is left anywhere else on the machine.
+(macOS `.dmg` and Linux `.deb` are still OS-native installers and register
+with `Applications`/`dpkg` as usual — use the `.zip`/`.AppImage`/`.tar.gz`
+portable builds on those platforms for the same "delete the folder, it's
+gone" guarantee Windows portable gives you.)
 
 > **macOS Gatekeeper note:** the first time you may need to right-click → Open
 > to bypass the "unidentified developer" warning, or run
@@ -163,6 +171,10 @@ cd mangaEasy
 uv sync
 uv run mangaeasy --help
 ```
+
+Or just run `./run.sh` (macOS/Linux) or `run.bat` (Windows) from the repo
+root — it syncs Python deps, builds the desktop app on first run, and opens
+`mangaeasy app` for you in one step.
 
 Optional extras (only if you want heavy models *inside* the main env instead of
 as isolated sibling tools — most users should not need these):

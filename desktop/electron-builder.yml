@@ -20,14 +20,12 @@ extraResources:
     to: backend
 win:
   executableName: mangaeasy-desktop
+  # Portable only — deliberately no nsis target. An installer writes a
+  # registry uninstall key + Start Menu shortcut outside the install folder,
+  # which would survive deleting that folder. Portable keeps the promise
+  # that deleting the folder removes everything mangaEasy ever touched.
   target:
-    - nsis
     - portable
-nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
 portable:
   artifactName: ${name}-${version}-portable.${ext}
 mac:

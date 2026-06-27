@@ -80,7 +80,7 @@ jobs:
         working-directory: desktop
         run: npm run bundle:backend
 
-      - name: Build Electron app (installer + portable)
+      - name: Build Electron app
         working-directory: desktop
         run: npm run build && npx electron-builder ${{ matrix.electron-builder-flag }}
 
@@ -133,8 +133,7 @@ jobs:
             ### Downloads
 
             #### Windows
-            - `*-setup.exe` — installer
-            - `*-portable.exe` — no install, just run it
+            - `*-portable.exe` — no install, just run it. Delete the folder and nothing is left on the machine.
 
             #### macOS
             - `*.dmg` — installer
