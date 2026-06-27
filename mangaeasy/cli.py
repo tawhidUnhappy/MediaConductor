@@ -34,6 +34,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup & app",      "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
     "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, got-ocr2, ...) from GitHub/Hugging Face."),
     "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup & app",   "Vendor ffmpeg/uv/git-lfs into this install's own tools dir (CI runs this at build time)."),
+    "ensure-node":          ("mangaeasy.tools.vendored",                       "ensure_node_main", "Setup & app", "Vendor a portable Node.js/npm on demand (run.sh/run.bat use this to build the desktop app from source)."),
 
     # ── General item-based video pipeline (the recommended workflow) ──────────
     "video":                ("mangaeasy.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: audio (IndexTTS on GPU, Kokoro otherwise), render, join."),
