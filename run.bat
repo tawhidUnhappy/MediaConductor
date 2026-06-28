@@ -1,6 +1,6 @@
 @echo off
 REM One-command launcher for mangaEasy from a source checkout (Windows).
-REM Syncs Python deps, builds the desktop app if needed, then opens it.
+REM Syncs Python deps, rebuilds the desktop app, then opens it.
 REM
 REM Usage: double-click run.bat (or a shortcut to it), or run it from a
 REM terminal in the repo root.
@@ -33,11 +33,6 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist "desktop\out\main\index.js" goto build_desktop
-if not exist "desktop\node_modules\electron" goto build_desktop
-goto launch
-
-:build_desktop
 where npm >nul 2>nul
 if not errorlevel 1 goto have_npm
 
@@ -65,8 +60,8 @@ if errorlevel 1 (
 )
 
 :have_npm
-echo ==^> Desktop app isn't built yet, building it (first run only)...
 pushd desktop
+if exist "node_modules\electron" goto skip_npm_install
 call npm install
 if errorlevel 1 (
   popd
@@ -75,6 +70,13 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+
+:skip_npm_install
+REM Always rebuild, every launch -- a stale desktop\out\ from a previous
+REM source change is otherwise silent: the app still runs, it just runs old
+REM code with no error to flag it. electron-vite is fast (a couple seconds)
+REM so paying that cost every launch is cheap insurance against that.
+echo ==^> Building desktop app...
 call npm run build
 if errorlevel 1 (
   popd
@@ -85,7 +87,6 @@ if errorlevel 1 (
 )
 popd
 
-:launch
 echo ==^> Launching mangaEasy...
 call uv run mangaeasy app
 if errorlevel 1 (
