@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -48,7 +49,13 @@ def configure_torch(device: str) -> None:
         raise RuntimeError("MPS was requested, but PyTorch cannot see an Apple Silicon GPU.")
     if torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.benchmark = True
+        # cudnn.benchmark autotunes per unique input shape, but narration text
+        # length varies on nearly every call -- it rarely gets to reuse a
+        # cached algorithm, so there's little to gain. With several
+        # --gpu-workers processes hitting the same GPU at once, that constant
+        # re-benchmarking is also a plausible contributor to the sporadic
+        # CUDNN_STATUS_EXECUTION_FAILED crashes seen at higher worker counts.
+        torch.backends.cudnn.benchmark = False
         torch.set_float32_matmul_precision("high")
 
 
@@ -74,6 +81,25 @@ def synthesize(pipeline: KPipeline, text: str, voice: str, speed: float, split_p
     return np.concatenate(chunks)
 
 
+def build_pipeline(lang: str, repo_id: str, device: str) -> KPipeline:
+    """Construct KPipeline, preferring the local Hugging Face cache.
+
+    Every call otherwise hits the Hub for a freshness check (the
+    "unauthenticated requests" warning) even when the model is already fully
+    cached -- wasteful on its own, and with several --gpu-workers processes
+    doing it concurrently it adds avoidable network round-trips right as
+    each worker is starting up. Try fully offline first; if anything's
+    actually missing from the cache (first run, a new voice, etc.), retry
+    once with network access so it can be fetched as before.
+    """
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    try:
+        return KPipeline(lang_code=lang, repo_id=repo_id, device=device)
+    except Exception:
+        os.environ["HF_HUB_OFFLINE"] = "0"
+        return KPipeline(lang_code=lang, repo_id=repo_id, device=device)
+
+
 def main() -> int:
     args = parse_args()
     device = resolve_device(args.device)
@@ -86,7 +112,7 @@ def main() -> int:
     print(f"Voice: {args.voice}", flush=True)
     print(f"Language: {args.lang}", flush=True)
 
-    pipeline = KPipeline(lang_code=args.lang, repo_id=args.repo_id, device=device)
+    pipeline = build_pipeline(args.lang, args.repo_id, device)
     entries = read_manifest(args.manifest)
     chapter_names = list(dict.fromkeys(
         (entry.get("label") or "").split(":", 1)[0] for entry in entries
