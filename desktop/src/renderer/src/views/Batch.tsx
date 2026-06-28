@@ -11,6 +11,7 @@ const STEPS: Record<string, string> = {
   'video-fade-audio': 'Create faded audio copies (de-click)',
   'video-render': 'Render videos only',
   'video-join': 'Join into one long video',
+  'video-add-bgm': 'Add background music to long video',
   'video-normalize-audio': 'Loudness-normalize joined audio',
   'video-clean-audio': 'Clear generated audio (kept, restorable later)',
   'video-clean-video': 'Delete rendered videos',
@@ -257,7 +258,24 @@ export function Batch(): React.JSX.Element {
       if (!args) return
       appendAudioRoot(args)
       args.push('--overwrite')
-      appendBgm(args)
+      await run(step, args)
+      return
+    }
+
+    if (step === 'video-add-bgm') {
+      // A separate step from video-join on purpose: re-running the full join
+      // (re-concatenating every item clip) just to change the music or its
+      // volume is wasteful when only the music layer actually changed. This
+      // mixes into the already-joined video directly, archiving the
+      // previous one first the same way every other generation step does.
+      if (!bgmFile) {
+        window.alert('Set a background music file first (Browse… below).')
+        return
+      }
+      const args = baseArgs({ output: true, items: false })
+      if (!args) return
+      args.push('--background-music', bgmFile)
+      if (bgmVolumeDb !== null) args.push('--music-volume-db', String(bgmVolumeDb))
       await run(step, args)
       return
     }
@@ -452,7 +470,7 @@ export function Batch(): React.JSX.Element {
             </label>
           )}
         </div>
-        {bgm && (
+        {(bgm || step === 'video-add-bgm') && (
           <div className="row" style={{ marginTop: 4, alignItems: 'center' }}>
             <p className="hint mono" style={{ flex: 1, margin: 0 }}>
               {bgmFile || 'No background music file selected'}

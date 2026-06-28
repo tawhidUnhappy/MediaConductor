@@ -211,6 +211,14 @@ def main() -> int:
     run(video_cmd, cwd)
     if args.build_long_video:
         name = project_name(args.project_root, args.project_name)
+        # Always join without background music first, even when one is
+        # configured -- a clean, narration-only long video is the one thing
+        # every later step (re-normalizing, swapping in different music,
+        # retrying just the music mix) should be able to build from without
+        # re-joining every item clip from scratch. Background music is
+        # layered on last, via video-add-bgm, after normalization, so the
+        # narration gets normalized to target loudness on its own and the
+        # music isn't pulled up to that same level underneath it.
         long_cmd = cli_command(
             "video-join",
             "--project-root", str(args.project_root),
@@ -223,12 +231,6 @@ def main() -> int:
         )
         if args.project_name:
             long_cmd += ["--project-name", args.project_name]
-        if args.background_music is not None:
-            long_cmd += [
-                "--background-music", str(args.background_music),
-                "--music-volume-db", str(args.music_volume_db),
-                "--narration-volume", str(args.narration_volume),
-            ]
         if selected_items:
             long_cmd += ["--items", *selected_items]
         run(long_cmd, cwd)
@@ -243,6 +245,19 @@ def main() -> int:
             if args.project_name:
                 norm_cmd += ["--project-name", args.project_name]
             run(norm_cmd, cwd)
+
+        if args.background_music is not None:
+            bgm_cmd = cli_command(
+                "video-add-bgm",
+                "--project-root", str(args.project_root),
+                "--output-root", str(args.output_root),
+                "--background-music", str(args.background_music),
+                "--music-volume-db", str(args.music_volume_db),
+                "--narration-volume", str(args.narration_volume),
+            )
+            if args.project_name:
+                bgm_cmd += ["--project-name", args.project_name]
+            run(bgm_cmd, cwd)
     return 0
 
 
