@@ -16,6 +16,7 @@ from mangaeasy.video_pipeline.common import (
     DEFAULT_KOKORO_ROOT,
     DEFAULT_PROJECT_ROOT,
     DEFAULT_WORK_DIR,
+    chunk_list,
     item_dirs,
     merge_item_selection,
     project_name,
@@ -169,11 +170,7 @@ def write_manifest(args: argparse.Namespace, manifest: list[dict[str, str]], suf
 
 def shard_manifest(manifest: list[dict[str, str]], shards: int) -> list[list[dict[str, str]]]:
     """Split into `shards` roughly-equal, non-empty chunks (fewer if the manifest is small)."""
-    if shards <= 1 or len(manifest) <= 1:
-        return [manifest]
-    size = -(-len(manifest) // shards)  # ceil division
-    chunks = [manifest[i:i + size] for i in range(0, len(manifest), size)]
-    return chunks
+    return chunk_list(manifest, shards)
 
 
 def kokoro_worker_command(args: argparse.Namespace, manifest_path: Path) -> tuple[list[str], Path]:
@@ -258,7 +255,9 @@ def main() -> int:
     )
 
     if args.resume:
-        removed = prune_recent_audio_for_resume(ordered_audio_paths(args, selected_items), archive_run_dir)
+        removed = prune_recent_audio_for_resume(
+            ordered_audio_paths(args, selected_items), archive_run_dir, shards=args.gpu_workers
+        )
         if removed:
             print(
                 f"Resume: archived {len(removed)} most recent audio file(s) to re-verify: "

@@ -75,10 +75,34 @@ def _sort_key(path: Path) -> tuple[int, int, str]:
     return (0 if has_number else 1, number, path.name.lower())
 
 
-def prune_recent_audio_for_resume(
-    ordered_paths: list[Path], archive_run_dir: LazyArchiveRunDir, lookback: int = 5
+def chunk_list(items: list, shards: int) -> list[list]:
+    """Split into `shards` roughly-equal, contiguous, non-empty chunks (fewer if too small)."""
+    if shards <= 1 or len(items) <= 1:
+        return [items]
+    size = -(-len(items) // shards)  # ceil division
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+
+def _prune_recent_audio_in_sequence(
+    ordered_paths: list[Path], archive_run_dir: LazyArchiveRunDir, lookback: int
 ) -> list[Path]:
-    """Archive the in-progress audio file plus the previous N by narration order.
+    if not ordered_paths:
+        return []
+    current_idx = next((i for i, path in enumerate(ordered_paths) if not path.exists()), len(ordered_paths) - 1)
+    start_idx = max(0, current_idx - lookback)
+    removed = [path for path in ordered_paths[start_idx:current_idx + 1] if path.exists()]
+    for path in removed:
+        archive_into_run(path, archive_run_dir.dir, subdir=path.parent.name)
+    return removed
+
+
+def prune_recent_audio_for_resume(
+    ordered_paths: list[Path],
+    archive_run_dir: LazyArchiveRunDir,
+    lookback: int = 5,
+    shards: int = 1,
+) -> list[Path]:
+    """Archive the in-progress audio file(s) plus the previous N by narration order.
 
     ordered_paths is every expected audio file path in narration sequence order
     (across all selected items). "Current" is the first one not on disk yet —
@@ -88,19 +112,24 @@ def prune_recent_audio_for_resume(
     4, 3, 2, 1, 0) forces them to regenerate even though some still exist,
     instead of trusting file mtimes.
 
+    With --gpu-workers > 1, generation splits ordered_paths into that many
+    contiguous shards (matching shard_manifest's split) and runs them in
+    parallel -- so there isn't one in-progress file at the moment of
+    interruption, there's one per worker, each at a different position in
+    its own shard. Treating the whole list as a single sequence would only
+    find the earliest shard's boundary and miss the rest, which already
+    "exist" on disk past that point. Pass the same shard count used for
+    generation so each shard's own boundary gets checked independently.
+
     Audio is expensive to regenerate, so files are always moved into
     archive_run_dir (under a subfolder named after their parent item folder)
     rather than deleted outright -- archive_run_dir only allocates its
     run_NNNN/ folder on first use, so a resume that finds nothing to prune
     never creates an empty one.
     """
-    if not ordered_paths:
-        return []
-    current_idx = next((i for i, path in enumerate(ordered_paths) if not path.exists()), len(ordered_paths) - 1)
-    start_idx = max(0, current_idx - lookback)
-    removed = [path for path in ordered_paths[start_idx:current_idx + 1] if path.exists()]
-    for path in removed:
-        archive_into_run(path, archive_run_dir.dir, subdir=path.parent.name)
+    removed: list[Path] = []
+    for chunk in chunk_list(ordered_paths, shards):
+        removed.extend(_prune_recent_audio_in_sequence(chunk, archive_run_dir, lookback))
     return removed
 
 
