@@ -83,6 +83,7 @@ export function Batch(): React.JSX.Element {
   const [gpuWorkers, setGpuWorkers] = useState(initialPrefs.gpuWorkers ?? 1)
   const [outDir, setOutDir] = useState(initialPrefs.outDir ?? 'output')
   const [bgmFile, setBgmFile] = useState('')
+  const [bgmVolumeDb, setBgmVolumeDb] = useState<number | null>(null)
   const [paths, setPaths] = useState({ outputRoot: '', projectOutputDir: '', audioRoot: '', fadedAudioRoot: '' })
 
   useEffect(() => {
@@ -109,6 +110,7 @@ export function Batch(): React.JSX.Element {
     refreshMangas()
     window.api.getConfig().then(({ systemConfig }) => {
       setBgmFile(systemConfig.bgm?.file ?? '')
+      setBgmVolumeDb(systemConfig.bgm?.volume_db ?? -25)
     })
   }, [refreshMangas])
 
@@ -161,7 +163,17 @@ export function Batch(): React.JSX.Element {
     args.push('--audio-root', audioRoot(audioSource === 'faded'))
   }
   const appendBgm = (args: string[]): void => {
-    if (bgm && bgmFile) args.push('--background-music', bgmFile)
+    if (!bgm || !bgmFile) return
+    args.push('--background-music', bgmFile)
+    // Project tab exposes this as dB (matches how everyone thinks about
+    // music volume), but --music-volume is a linear gain factor applied
+    // directly in ffmpeg's volume= filter -- convert here so the dB value
+    // actually reaches the mix instead of silently falling back to the
+    // CLI's own default every time.
+    if (bgmVolumeDb !== null) {
+      const linearGain = 10 ** (bgmVolumeDb / 20)
+      args.push('--music-volume', linearGain.toFixed(6))
+    }
   }
 
   const start = async (): Promise<void> => {

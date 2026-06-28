@@ -38,14 +38,28 @@ export function Project(): React.JSX.Element {
     load()
   }
 
+  // The structured fields below (BGM file/volume, voice WAV) edit systemConfig,
+  // but Save always writes sysJsonText (the raw Monaco editor's own state) --
+  // those never synced automatically, so structured edits were silently
+  // discarded on save unless the JSON text happened to already match. Route
+  // every structured-field edit through here so sysJsonText always reflects
+  // the latest value too.
+  const updateSystemConfig = (updater: (sc: SystemConfig) => SystemConfig): void => {
+    setSystemConfig((sc) => {
+      const next = updater(sc)
+      setSysJsonText(JSON.stringify(next, null, 2))
+      return next
+    })
+  }
+
   const browseBgm = async (): Promise<void> => {
     const picked = await window.api.pickAudioFile()
-    if (picked) setSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, file: picked } }))
+    if (picked) updateSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, file: picked } }))
   }
 
   const browseVoice = async (): Promise<void> => {
     const picked = await window.api.pickAudioFile()
-    if (picked) setSystemConfig((sc) => ({ ...sc, tts: { ...sc.tts, speaker_wav: picked } }))
+    if (picked) updateSystemConfig((sc) => ({ ...sc, tts: { ...sc.tts, speaker_wav: picked } }))
   }
 
   const save = async (): Promise<void> => {
@@ -116,7 +130,7 @@ export function Project(): React.JSX.Element {
             className="flex-1 mono"
             type="text"
             value={systemConfig.bgm?.file ?? ''}
-            onChange={(e) => setSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, file: e.target.value } }))}
+            onChange={(e) => updateSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, file: e.target.value } }))}
           />
           <button onClick={browseBgm}>Browse…</button>
           <label>
@@ -126,7 +140,7 @@ export function Project(): React.JSX.Element {
               style={{ width: 70 }}
               value={systemConfig.bgm?.volume_db ?? -25}
               onChange={(e) =>
-                setSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, volume_db: Number(e.target.value) } }))
+                updateSystemConfig((sc) => ({ ...sc, bgm: { ...sc.bgm, volume_db: Number(e.target.value) } }))
               }
             />
           </label>
@@ -140,7 +154,7 @@ export function Project(): React.JSX.Element {
             className="flex-1 mono"
             type="text"
             value={systemConfig.tts?.speaker_wav ?? ''}
-            onChange={(e) => setSystemConfig((sc) => ({ ...sc, tts: { ...sc.tts, speaker_wav: e.target.value } }))}
+            onChange={(e) => updateSystemConfig((sc) => ({ ...sc, tts: { ...sc.tts, speaker_wav: e.target.value } }))}
           />
           <button onClick={browseVoice}>Browse…</button>
         </div>
