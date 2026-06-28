@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import os
 import sys
@@ -13,6 +14,7 @@ from kokoro import KPipeline
 
 
 SAMPLE_RATE = 24000
+CACHE_RELEASE_INTERVAL = 25
 
 
 def parse_args() -> argparse.Namespace:
@@ -136,6 +138,17 @@ def main() -> int:
         audio = synthesize(pipeline, text, args.voice, args.speed, args.split_pattern)
         sf.write(output, audio, SAMPLE_RATE)
         print(f"[{index:04d}/{len(entries):04d}] {label} -> {output}", flush=True)
+
+        # Every narration line is a different length, so each call asks the
+        # CUDA caching allocator for a differently-shaped tensor. PyTorch
+        # never returns that memory to the driver on its own -- it just
+        # keeps caching more blocks it can't reuse, so usage climbs over a
+        # long run even though nothing is actually leaking. Periodically
+        # force a real release so it plateaus instead.
+        if index % CACHE_RELEASE_INTERVAL == 0:
+            gc.collect()
+            if device == "cuda":
+                torch.cuda.empty_cache()
     if current_chapter is not None:
         chapters_done += 1
         print(f"MANGAEASY_PROGRESS {chapters_done}/{total_chapters} Generated audio for {current_chapter}", flush=True)
