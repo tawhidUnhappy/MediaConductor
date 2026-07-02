@@ -61,8 +61,16 @@ const api = {
   resolveBatchPaths: (
     outDir: string,
     mangaPath: string
-  ): Promise<{ outputRoot: string; projectOutputDir: string; audioRoot: string; fadedAudioRoot: string }> =>
-    ipcRenderer.invoke('batch:resolve-paths', outDir, mangaPath),
+  ): Promise<{
+    outputRoot: string
+    projectOutputDir: string
+    audioRoot: string
+    fadedAudioRoot: string
+    longVideoDir: string
+    latestLongVideoPath: string | null
+  }> => ipcRenderer.invoke('batch:resolve-paths', outDir, mangaPath),
+  listBatchVideos: (longVideoDir: string): Promise<{ path: string; label: string; mtimeMs: number }[]> =>
+    ipcRenderer.invoke('batch:list-videos', longVideoDir),
 
   // Editors
   launchEditor: (name: string): Promise<string> => ipcRenderer.invoke('editor:launch', name),

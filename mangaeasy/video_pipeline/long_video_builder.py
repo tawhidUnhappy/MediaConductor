@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from mangaeasy.utils import archive_before_overwrite
@@ -45,9 +46,18 @@ class LongVideoConfig:
     narration_volume: float = 1.0
 
 
+def default_output_name(name: str) -> str:
+    """Each join gets its own timestamped filename instead of one fixed
+    name -- re-running the join (e.g. after fixing a chapter) never
+    overwrites a previous long video; both stay on disk side by side. See
+    common.find_latest_long_video for how later steps locate the newest one."""
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"{name}_full_{timestamp}.mp4"
+
+
 def output_path(config: LongVideoConfig) -> Path:
     name = project_name(config.project_root, config.project_name_override)
-    return (config.output or (config.output_root / name / f"{name}_full.mp4")).resolve()
+    return (config.output or (config.output_root / name / default_output_name(name))).resolve()
 
 
 def project_work_dir(config: LongVideoConfig) -> Path:

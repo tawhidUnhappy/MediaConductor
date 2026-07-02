@@ -1,0 +1,316 @@
+# mangaEasy — guide for AI agents working on this codebase
+
+This file is the onboarding doc for any AI (Claude or otherwise) picking up
+work on `D:\mangaEasy`. It describes what the app does, how the pieces fit
+together, the conventions that matter, and the gotchas that have bitten past
+sessions. Read this before making changes. `docs/architecture.md`,
+`docs/app.md`, `docs/install.md`, `docs/external-tools.md`, and
+`docs/publishing.md` are supplementary — this file is the map.
+
+## What this app does
+
+mangaEasy turns a manga chapter (a folder of panel images + a narration
+script) into a narrated video, and can chain many chapters into one long
+"recap" video with background music, ready for YouTube. There are two
+front ends to the same backend:
+
+- **CLI**: a single `mangaeasy` command with ~50 subcommands.
+- **Desktop app** (`desktop/`): an Electron app that shells out to the same
+  `mangaeasy` CLI commands and shows live progress. This is what most users
+  actually run (`run.bat` / `run.sh`).
+
+## The one-CLI pattern
+
+Everything is dispatched from `mangaeasy/cli.py`'s `COMMANDS` dict:
+`command name -> (module path, function name, help-group, one-line help)`.
+Modules are imported **lazily** (only when that command runs), so
+`mangaeasy --help` stays instant and never pulls in torch/opencv/flask.
+
+To add a new command: write a module with a `main()` (or similarly named)
+function that does its own `argparse`, then add one line to `COMMANDS`.
+`mangaeasy.runtime.cli_command(...)` builds an argv list for one CLI command
+so pipeline code can shell out to another subcommand instead of importing it
+directly (see `run_pipeline.py`).
+
+Two command families exist, from two different eras of the project:
+
+1. **`video-*` / `video_pipeline/` — the item-based pipeline.** This is the
+   recommended, actively-developed workflow and where almost all recent work
+   has happened. "Item" = one source unit (usually one manga chapter) that
+   becomes one short video, later joined into a long video.
+2. **Older chapter-specific commands** (`render-video`, `add-bgm`,
+   `join-chapters`, `fade-audio`, `normalize-chapter-audio`, the `narration.*`
+   and `web.*` editors) — predate the item pipeline, still used for
+   single-chapter workflows and the browser-based narration/panel editors.
+   Don't assume these share code paths with `video_pipeline/`; check first.
+
+## Data layout (a "project")
+
+A project is a folder containing chapters/items, conventionally under
+`library/<project-name>/<item>/`:
+
+```
+library/<project-name>/
+  01/
+    panels/                  source panel images (png/jpg/webp)
+    narration.json            [{"image": "chapter1_001.png", "narration": "..."}]
+    narration.backup.json     auto-kept backup, see mangaeasy.narration.backup
+    intro.json                OPTIONAL: same shape, prepended at load time
+    download/                 raw downloaded chapter assets (MangaDex etc.)
+  02/
+    ...
+```
+
+- `mangaeasy.video_pipeline.item_assets.load_narration(item_dir)` is the
+  **single source of truth** for reading an item's narration: it reads
+  `narration.json` and, if `intro.json` exists, prepends those entries.
+  `intro.json` is how one item (usually the first chapter) gets a cold-open
+  trailer/hook reel without splicing it into the real script. **Every
+  caller must go through this function** — there have been bugs in the past
+  from modules that had their own narration-loading copy that didn't know
+  about `intro.json`. If you add a new place that needs narration entries,
+  import `load_narration`, don't re-implement it.
+- Item folder names are sortable strings (`01`, `02`, ...); item selection
+  syntax across the CLI is `--items 01 02 05-08` or `--item-range 01-12`
+  (parsed by `expand_item_tokens` / `merge_item_selection` in
+  `video_pipeline/common.py`).
+
+Generated output lives in separate root folders (override via env vars or
+`--*-root` flags), never inside `library/`:
+
+- `audio/<project>/<item>/<panel-stem>.wav` — one narration WAV per panel.
+- `audio/<project>/_items/item_<NN>_narration.wav` — per-item concatenated
+  narration track (used when joining into the long video).
+- `output/<project>/<item>/` — rendered per-item videos.
+- `output/<project>/<project>_full.mp4` — the joined long video.
+- `work/` — scratch directory, safe to delete (`video-clean-work`).
+
+Default roots: `DEFAULT_PROJECT_ROOT=content`, `DEFAULT_AUDIO_ROOT=audio`,
+`DEFAULT_OUTPUT_ROOT=output`, `DEFAULT_WORK_DIR=work` (see
+`video_pipeline/common.py`), overridable by env vars (`PROJECT_ROOT`, etc.)
+or `--project-root`/`--audio-root`/`--output-root`/`--work-dir` flags. The
+desktop app always passes explicit `library/<project>` etc.
+
+## Archive-before-overwrite (never silently destroy output)
+
+`mangaeasy/utils/__init__.py` has `archive_before_overwrite()` /
+`archive_into_run()` / `LazyArchiveRunDir`. Any pipeline step that's about to
+overwrite previously generated audio or video moves the old file into
+`old/run_NNNN/...` first, instead of deleting it. This pattern is used
+throughout `video_pipeline/` (audio regeneration, long-video rebuilds, BGM
+remixing). `audio-takes-list` / `audio-takes-restore` (backed by
+`video_pipeline/audio_takes.py`) let a user browse and restore an old take
+instead of regenerating. **When writing new code that overwrites generated
+output, use this pattern — don't `Path.write_bytes()` over an existing
+file.**
+
+`video-clean-all` / `video-clean-audio` / `video-clean-video` /
+`video-clean-work` delete *generated* output only; they never touch
+`library/` source chapters.
+
+## The item video pipeline, end to end
+
+`mangaeasy video` (→ `video_pipeline/run_pipeline.py`) is the all-in-one
+entry point. It shells out to the narrower commands in this order:
+
+1. **Audio** — `video-audio` (Kokoro, in-process worker pool) or
+   `video-audio-indextts` (IndexTTS, external tool env). `--tts auto`
+   picks IndexTTS only if: an NVIDIA GPU is present, the `index-tts` tool env
+   is installed, model checkpoints exist, and a speaker reference WAV
+   resolves — otherwise it falls back to Kokoro. See
+   `resolve_tts_engine()` in `run_pipeline.py`.
+2. **(optional) Fade** — `video-fade-audio`, only if `--audio-source faded`;
+   writes fade-in/out copies to a sibling `_faded` audio root, never touches
+   the raw audio.
+3. **Render** — `video-render` (`video_pipeline/make_videos.py` /
+   `item_video_builder.py`): one video per item from panels + per-panel
+   audio, frame-aligned to audio duration (`frame_aligned_duration()` in
+   `item_assets.py` rounds each panel's visible time up to a whole frame
+   count so audio never gets cut off).
+4. **(optional) Join into a long video** — only if `--build-long-video`.
+   **This always runs in three separate steps, never one combined ffmpeg
+   call**, specifically so that re-mixing background music doesn't require
+   re-joining every item clip from scratch:
+   - `video-join` (`long_video_builder.py` / `make_long_video.py`) — joins
+     item videos into one long video, **with no background music**, always.
+   - `video-normalize-audio` (only if `--normalize-audio`) — two-pass
+     loudness normalization to −14 LUFS (YouTube target), replaces in place.
+   - `video-add-bgm` (only if `--background-music` is set) —
+     `video_pipeline/add_long_video_bgm.py` mixes a music track into the
+     *already-joined, already-normalized* long video via ffmpeg
+     `amix`/`alimiter`, archiving the previous file first. This is the step
+     to re-run alone when a user just wants to try a different track or
+     volume — it's far cheaper than re-joining.
+
+   The ordering (join → normalize → add BGM) is deliberate: narration
+   loudness gets normalized to target on its own, *then* music is layered on
+   top at a fixed dB offset below it — normalizing after mixing would pull
+   the music up to the same loudness as narration.
+
+Background music volume is **dB-native** end to end (`--music-volume-db`,
+default `-25.0`, applied via ffmpeg's `volume=XdB` filter) — not a linear
+multiplier. Don't reintroduce a linear volume knob; it was deliberately
+converted away from one because it confused users (the UI used to label a
+linear value "dB").
+
+## GPU / TTS concurrency — known limits
+
+- Kokoro runs as `gpu-workers` parallel processes, each loading its own
+  model copy onto the GPU (`video_pipeline/generate_audio.py` shards the
+  item manifest across workers with `chunk_list()` /
+  `kokoro_batch_worker.py` does the actual generation in each worker).
+- `torch.backends.cudnn.benchmark` **must stay `False`** in
+  `kokoro_batch_worker.py` — `True` causes `CUDNN_STATUS_EXECUTION_FAILED`
+  under concurrent multi-process GPU access (cuDNN re-benchmarking races
+  across processes).
+- Empirically, on an RTX 3060, **`--gpu-workers 4` is stable; `8` crashes**
+  even with `benchmark=False` (confirmed in real production runs, not just
+  synthetic tests) — 8 concurrent CUDA contexts exceeds reliable capacity on
+  that card. Treat 4 as the practical ceiling unless tested otherwise on
+  different hardware.
+- GPU/CPU/RAM usage climbing over a long run is **expected, not a leak** —
+  PyTorch's CUDA caching allocator never returns memory to the OS on its
+  own, and narration text length varies, so allocations don't perfectly
+  recycle. Mitigated with periodic `gc.collect()` +
+  `torch.cuda.empty_cache()` every `CACHE_RELEASE_INTERVAL = 25` items in
+  `kokoro_batch_worker.py`. If usage growth becomes a complaint again, raise
+  that interval's frequency rather than assuming a new leak.
+- Resuming an interrupted run: `--resume-audio` deletes the most-recently
+  written audio file plus the previous 5 (in case the last write was
+  mid-flight) before regenerating. With `--gpu-workers > 1`, the manifest is
+  sharded *before* resume-pruning runs, so pruning must happen **per shard**,
+  not against one global "last N" — that's what
+  `prune_recent_audio_for_resume(..., shards=args.gpu_workers)` /
+  `chunk_list()` in `video_pipeline/common.py` exist for. If you change
+  sharding logic, keep resume-pruning shard-aware or multi-worker resume will
+  prune the wrong files.
+- HF Hub model loading tries `HF_HUB_OFFLINE=1` first and only falls back to
+  online on failure (`build_pipeline()` in `kokoro_batch_worker.py`) — avoids
+  a redundant network freshness check on every single run once the model is
+  cached locally.
+
+## Pre-flight validation tools
+
+- `video-check` — validates item inputs exist (panels + narration.json)
+  before generation.
+- `video-validate` — checks generated audio/video against inputs after the
+  fact.
+- `video-audio-audit` (`video_pipeline/audio_audit.py`) — ffprobes every
+  expected per-panel audio file, separately reporting **missing panels**
+  (a data problem, needs human attention) vs **missing/corrupt audio**
+  (`< MIN_AUDIO_SECONDS = 0.05s` counts as corrupt) — regeneratable. Pass
+  `--fix` to delete bad audio files (never touches panels or narration.json)
+  so the next `video-audio` run regenerates exactly those. Skips items that
+  aren't ready yet (no `narration.json`) by logging instead of crashing.
+  Run this before any long-video build if you don't trust the audio state.
+
+## Desktop app (`desktop/`)
+
+Electron + React + TypeScript, built with `electron-vite`.
+
+- `desktop/src/main/` — Electron main process (Node). Key files:
+  - `ipc-handlers.ts` — every IPC channel the renderer can call; mostly thin
+    wrappers that spawn `mangaeasy <command> ...` as a child process via
+    `jobs.ts` and stream stdout/stderr back to the renderer as progress
+    events.
+  - `jobs.ts` — child-process job runner/registry (start, stream output,
+    cancel, track running jobs).
+  - `config.ts` / `settings.ts` — read/write `config.json` (per-project) and
+    `config.system.json` (machine-wide defaults: BGM file/volume, TTS
+    speaker WAV, video encoder settings, ports, etc.) under the project root.
+  - `paths.ts` — resolves the project root / install root paths the
+    Electron app runs against.
+- `desktop/src/preload/index.ts` (+ `index.d.ts`) — context-bridge surface
+  exposed to the renderer as `window.api.*`; every new IPC capability needs
+  an entry here too, or the renderer can't call it.
+- `desktop/src/renderer/src/` — the UI. Key views:
+  - `views/Workflow.tsx` — single-chapter pipeline tab.
+  - `views/Batch.tsx` — **multi-chapter pipeline tab, the most actively
+    developed view.** Lets the user pick a `video-*` step and exposes only
+    the settings relevant to that step. Pattern used: settings controls are
+    **always rendered**, never conditionally hidden — irrelevant ones get
+    `disabled={!usesX}` plus a dimmed style and a `title` tooltip explaining
+    why/where they apply. See the `usesTts`/`usesAudioSource`/
+    `usesBgmFields`/etc. booleans near the top of the file for the
+    per-step applicability rules; update those booleans (and only those) when
+    adding a new step or changing what a step accepts.
+  - `views/Project.tsx` — per-project config editor (`config.json` +
+    `config.system.json`), including BGM file/volume and TTS speaker WAV.
+    **Gotcha already hit once**: structured-field edits must go through a
+    helper that keeps the raw JSON-text editor state in sync
+    (`updateSystemConfig` in this file) — `save()` writes the raw text state,
+    so updating only the parsed object and not the text silently discards
+    the edit on save. If you add another structured field to this view,
+    route its onChange through `updateSystemConfig`, not `setSystemConfig`
+    directly.
+  - `App.tsx`, `editor-context.tsx`, `job-context.tsx` — app shell and
+    shared state for running jobs / live progress.
+- `desktop/src/shared/types.ts` — types shared between main and renderer
+  (IPC payload shapes, config shapes). Keep this in sync with both ends when
+  changing an IPC contract.
+
+**Critical build gotcha**: `run.bat` / `run.sh` **always rebuild the desktop
+app from source on every launch** (`npm run build` under `desktop/`) before
+starting it — this was a deliberate fix. They used to skip the build if
+`desktop/out/main/index.js` already existed, which meant source edits
+silently kept running stale compiled output until someone noticed and
+rebuilt by hand. Do not reintroduce a skip-the-build-if-output-exists guard.
+`npm install` itself is still skipped if `desktop/node_modules/electron`
+already exists (that part is fine to skip — only the build step must always
+run). `npm run build` runs `npm run typecheck` first (separate tsconfigs for
+main/preload vs. renderer) then the electron-vite build.
+
+## Config files
+
+- `config.json` (project root) — per-project settings: manga download
+  source, current chapter, BGM file path, TTS speaker WAV path. Small,
+  user-facing.
+- `config.system.json` (project root, or `.mangaeasy/` in an installed app)
+  — machine-wide defaults: audio sample rate/fades, BGM file + volume_db,
+  video encoder settings (NVENC/libx264 presets, bitrate), ports for the
+  Flask web editors, watermark, whisper settings. `config.system.example.json`
+  is the template for a fresh install.
+- Both load through `mangaeasy/config.py`.
+
+## External AI tool environments (`mangaeasy/tools/`)
+
+Kokoro, IndexTTS, MAGI (panel detection), GOT-OCR 2.0 each live in their own
+isolated `uv` project under `<install>/.mangaeasy/tools/<tool>/` so their
+CUDA/Torch/Transformers versions can't conflict with the main package or
+each other. `mangaeasy install-tool <name>` installs one;
+`mangaeasy.tools.external.resolve_tool_dir()` finds an installed tool's
+directory; `mangaeasy.tools.vendored` vendors ffmpeg/uv/git-lfs/Node.js into
+the install so end users never need them on PATH —
+`ensure_vendored_path()` runs unconditionally at the top of `cli.py` so every
+bare subprocess call (`"ffmpeg"`, `"npm"`, ...) picks up the vendored copy
+automatically. See `docs/external-tools.md` and `docs/install-tools.md` for
+the install mechanics; this file just covers what calls what.
+
+## Packaging (`packaging/`)
+
+`packaging/mangaeasy.spec` + `launcher.py` build a self-contained
+distributable via PyInstaller; `make_icon.py`/`icon.ico`/`icon.png` are
+packaging assets. See `docs/publishing.md` for the release process. Data for
+an *installed* app lives under `<install root>/.mangaeasy/`, not
+`~/.mangaeasy` — don't assume a home-directory config path when touching
+install-time path resolution.
+
+## Conventions worth preserving
+
+- **Lazy imports in `cli.py`** — never import a heavy optional dependency
+  (torch, opencv, transformers, flask) at module top level if it's only
+  needed by one subcommand; import inside that subcommand's module instead.
+- **CPU fallback everywhere** — every pipeline stage must work without a
+  GPU (`--device auto|cuda|cpu`, encoder auto-detection preferring
+  hardware encoders but always falling back to `libx264`). Don't add a
+  GPU-only code path without a CPU equivalent.
+- **dB units for any new audio-volume control** — match the existing
+  `music_volume_db` / `--music-volume-db` convention, not a linear
+  multiplier.
+- **Archive, don't delete, generated output** before overwriting it (see
+  above).
+- **`load_narration()` is the only narration reader** — never re-parse
+  `narration.json` directly in a new module.
+- Git commits only happen when the user explicitly asks; this has been
+  reiterated multiple times in this project's history — don't commit
+  proactively after a fix, even if tests pass.

@@ -5,6 +5,7 @@
  * Electron's own dialog/shell APIs and `jobs.ts`'s PTY-backed job runner.
  */
 import { dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
+import { existsSync, readdirSync, statSync } from 'fs'
 import path from 'path'
 import {
   chapterStatus,
@@ -48,6 +49,28 @@ async function runCliStreamed(event: IpcMainInvokeEvent, command: string, args: 
       send(event, 'job:progress', update)
     }
   })
+}
+
+// Picks the newest plain join output (<name>_full_<timestamp>.mp4) in a
+// long-video directory, skipping background-music mixes ("_bgm_" in the
+// name) -- mirrors find_latest_long_video() in
+// mangaeasy/video_pipeline/common.py, since joining no longer writes one
+// fixed filename: every join keeps its own timestamped file so re-running
+// it never overwrites a previous one.
+function findLatestLongVideo(longVideoDir: string, mangaName: string): string | null {
+  if (!existsSync(longVideoDir)) return null
+  let best: { path: string; mtimeMs: number } | null = null
+  for (const entry of readdirSync(longVideoDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue
+    const lower = entry.name.toLowerCase()
+    if (!lower.endsWith('.mp4') || !lower.startsWith(`${mangaName.toLowerCase()}_full`) || lower.includes('_bgm_')) {
+      continue
+    }
+    const full = path.join(longVideoDir, entry.name)
+    const mtimeMs = statSync(full).mtimeMs
+    if (!best || mtimeMs > best.mtimeMs) best = { path: full, mtimeMs }
+  }
+  return best?.path ?? null
 }
 
 export function registerIpcHandlers(): void {
@@ -150,7 +173,46 @@ export function registerIpcHandlers(): void {
     const projectOutputDir = path.isAbsolute(outDir) ? path.join(outputRoot, mangaName) : outputRoot
     const audioRoot = path.join(projectOutputDir, 'audio')
     const fadedAudioRoot = `${audioRoot}_faded`
-    return { outputRoot, projectOutputDir, audioRoot, fadedAudioRoot }
+    // Long videos always live at <output-root>/<name>/ regardless of how
+    // outputRoot/projectOutputDir above were computed, because the CLI
+    // itself appends /<name>/ to whatever --output-root it's given
+    // (make_long_video.py / add_long_video_bgm.py). projectOutputDir is
+    // NOT the same directory in the common case (relative outDir).
+    const longVideoDir = path.join(outputRoot, mangaName)
+    const latestLongVideoPath = findLatestLongVideo(longVideoDir, mangaName)
+    return { outputRoot, projectOutputDir, audioRoot, fadedAudioRoot, longVideoDir, latestLongVideoPath }
+  })
+
+  // Lists .mp4 files a "pick which video" control can offer: every join's
+  // own timestamped output, any background-music mixes, plus anything
+  // archived under old/run_NNNN/ (the same archive-before-overwrite
+  // folders audio takes use) -- so re-mixing music onto an older take
+  // doesn't require digging through Explorer first.
+  ipcMain.handle('batch:list-videos', (_event, longVideoDir: string) => {
+    const results: { path: string; label: string; mtimeMs: number }[] = []
+    if (!longVideoDir || !existsSync(longVideoDir)) return results
+
+    for (const entry of readdirSync(longVideoDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.toLowerCase().endsWith('.mp4')) {
+        const full = path.join(longVideoDir, entry.name)
+        results.push({ path: full, label: entry.name, mtimeMs: statSync(full).mtimeMs })
+      }
+    }
+    const oldDir = path.join(longVideoDir, 'old')
+    if (existsSync(oldDir)) {
+      for (const runEntry of readdirSync(oldDir, { withFileTypes: true })) {
+        if (!runEntry.isDirectory()) continue
+        const runDir = path.join(oldDir, runEntry.name)
+        for (const fileEntry of readdirSync(runDir, { withFileTypes: true })) {
+          if (fileEntry.isFile() && fileEntry.name.toLowerCase().endsWith('.mp4')) {
+            const full = path.join(runDir, fileEntry.name)
+            results.push({ path: full, label: `${runEntry.name}/${fileEntry.name}`, mtimeMs: statSync(full).mtimeMs })
+          }
+        }
+      }
+    }
+    results.sort((a, b) => b.mtimeMs - a.mtimeMs)
+    return results
   })
 
   // ---- Editors (Flask sub-apps embedded as <webview>) -----------------------

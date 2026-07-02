@@ -7,7 +7,12 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from mangaeasy.video_pipeline.common import DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, project_name
+from mangaeasy.video_pipeline.common import (
+    DEFAULT_OUTPUT_ROOT,
+    DEFAULT_PROJECT_ROOT,
+    find_latest_long_video,
+    project_name,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,7 +48,13 @@ def run(command: list[str], capture: bool = False) -> subprocess.CompletedProces
 
 def default_input(args: argparse.Namespace) -> Path:
     name = project_name(args.project_root, args.project_name)
-    return args.output_root.resolve() / name / f"{name}_full.mp4"
+    found = find_latest_long_video(args.output_root, name)
+    if found is None:
+        raise FileNotFoundError(
+            f"No joined long video found for '{name}' under {(args.output_root / name).resolve()}. "
+            "Run the join step first."
+        )
+    return found
 
 
 def default_output(input_path: Path) -> Path:

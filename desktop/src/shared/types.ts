@@ -24,6 +24,10 @@ export interface AppConfig {
 export interface BgmConfig {
   file?: string
   volume_db?: number
+  duck?: boolean
+  duck_ratio?: number
+  duck_attack?: number
+  duck_release?: number
 }
 
 export interface SystemConfig {

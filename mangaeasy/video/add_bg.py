@@ -31,16 +31,25 @@ def process_video(
     video_path: Path, out_path: Path, music_file: Path,
     bg_vol_db: float, audio_bitrate: str, sample_rate: int, use_nvenc: bool,
     ffmpeg_path: str, ffprobe_path: str,
+    duck: bool = False, duck_ratio: float = 10.0, duck_attack: float = 5.0, duck_release: float = 500.0,
 ) -> None:
     print(f"  -> Processing {video_path.name} ... ", end="", flush=True)
     encoder   = ["-c:v", "h264_nvenc"] if use_nvenc else ["-c:v", "libx264", "-preset", "fast"]
     audio_enc = ["-c:a", "aac", "-b:a", audio_bitrate, "-ar", str(sample_rate)]
 
     if has_audio_stream(video_path, ffprobe_path):
-        filter_complex = (
-            f"[1:a]volume={bg_vol_db}dB[a1];"
-            f"[0:a][a1]amix=inputs=2:duration=first:dropout_transition=3[aout]"
-        )
+        if duck:
+            filter_complex = (
+                f"[1:a]volume={bg_vol_db}dB[music];"
+                "[0:a]asplit=2[narr_main][narr_sc];"
+                f"[music][narr_sc]sidechaincompress=threshold=0.01:ratio={duck_ratio}:attack={duck_attack}:release={duck_release}[music_ducked];"
+                "[narr_main][music_ducked]amix=inputs=2:duration=first:dropout_transition=3[aout]"
+            )
+        else:
+            filter_complex = (
+                f"[1:a]volume={bg_vol_db}dB[a1];"
+                f"[0:a][a1]amix=inputs=2:duration=first:dropout_transition=3[aout]"
+            )
         cmd = [ffmpeg_path, "-y", "-i", str(video_path),
                "-stream_loop", "-1", "-i", str(music_file),
                "-filter_complex", filter_complex,
@@ -74,9 +83,13 @@ def main() -> None:
     chapter = int(dl["chapter"])
     name    = str(dl["name"])
 
-    bgm_cfg  = syscfg.get("bgm", {})
-    bg_vol   = float(bgm_cfg.get("volume_db", -25))
-    music    = PROJECT_ROOT / bgm_cfg.get("file", "music/bgm.mp3")
+    bgm_cfg       = syscfg.get("bgm", {})
+    bg_vol        = float(bgm_cfg.get("volume_db", -25))
+    music         = PROJECT_ROOT / bgm_cfg.get("file", "music/bgm.mp3")
+    duck          = bool(bgm_cfg.get("duck", False))
+    duck_ratio    = float(bgm_cfg.get("duck_ratio", 10.0))
+    duck_attack   = float(bgm_cfg.get("duck_attack", 5.0))
+    duck_release  = float(bgm_cfg.get("duck_release", 500.0))
 
     if not music.exists():
         print(f"[ERROR] Background music not found: {music}")
@@ -101,9 +114,10 @@ def main() -> None:
     else:
         print("[INFO] NVENC not available — using libx264.")
 
-    print(f"[INFO] BGM: {music.name}  volume: {bg_vol} dB")
+    print(f"[INFO] BGM: {music.name}  volume: {bg_vol} dB  duck: {duck}")
     process_video(video_in, video_out, music, bg_vol, audio_bitrate, sample_rate,
-                  use_nvenc, FFMPEG, FFPROBE)
+                  use_nvenc, FFMPEG, FFPROBE,
+                  duck=duck, duck_ratio=duck_ratio, duck_attack=duck_attack, duck_release=duck_release)
     print(f"[DONE] {video_out}")
 
 

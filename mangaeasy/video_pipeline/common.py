@@ -133,6 +133,30 @@ def prune_recent_audio_for_resume(
     return removed
 
 
+def find_latest_long_video(output_root: Path, name: str) -> Path | None:
+    """Most recently created plain-join long video for a project, or None.
+
+    Joining no longer overwrites one fixed filename -- every run of
+    video-join writes its own timestamped file (see
+    long_video_builder.output_path), so steps that act on "the" long video
+    after the fact (video-add-bgm, video-normalize-audio, video-validate)
+    need to find the latest one instead of assuming a name. Excludes
+    background-music mixes (named with a "_bgm_" segment) so add-bgm's
+    default input is always a clean narration-only join, never a previous
+    mix, and never looks inside old/ (archived/superseded files).
+    """
+    project_dir = output_root.resolve() / name
+    if not project_dir.is_dir():
+        return None
+    candidates = [
+        path for path in project_dir.glob(f"{name}_full*.mp4")
+        if path.is_file() and "_bgm_" not in path.name
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
 def item_dirs(root: Path, selected: list[str] | None = None) -> list[Path]:
     candidates = [
         path

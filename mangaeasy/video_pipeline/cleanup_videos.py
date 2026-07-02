@@ -58,9 +58,13 @@ def safe_targets(
             if legacy_target.exists():
                 targets.append(legacy_target)
         if include_long:
-            long_video = (project_output / f"{project}_full.mp4").resolve()
-            if long_video.exists():
-                targets.append(long_video)
+            # Each join now writes its own timestamped filename (and
+            # add-bgm mixes get their own "_bgm_..." filename alongside),
+            # so there can be several -- catch all of them, not just one
+            # fixed name.
+            for long_video in project_output.glob(f"{project}_full*.mp4"):
+                if long_video.is_file():
+                    targets.append(long_video.resolve())
     elif project_output.exists():
         targets.append(project_output)
 

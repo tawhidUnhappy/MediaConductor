@@ -98,6 +98,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--music-volume-db", type=float, default=-25.0,
                         help="Background music loudness in dB (negative = quieter), applied via ffmpeg's volume filter.")
     parser.add_argument("--narration-volume", type=float, default=1.0)
+    parser.add_argument("--duck", action="store_true",
+                        help="Enable audio ducking so background music lowers automatically when narration is audible.")
+    parser.add_argument("--duck-ratio", type=float, default=10.0)
+    parser.add_argument("--duck-attack", type=float, default=5.0)
+    parser.add_argument("--duck-release", type=float, default=500.0)
     parser.add_argument("--audio-bitrate", default="128k")
     parser.add_argument("--render-mode", choices=("segments", "concat-images"), default="segments")
     parser.add_argument("--encoder", default="auto")
@@ -254,7 +259,16 @@ def main() -> int:
                 "--background-music", str(args.background_music),
                 "--music-volume-db", str(args.music_volume_db),
                 "--narration-volume", str(args.narration_volume),
+                # The full pipeline's output filename should stay predictable
+                # (always <name>_full.mp4) for anything that watches for it,
+                # so opt into in-place replacement here. Trying out several
+                # mixes without overwriting one another is what the
+                # standalone video-add-bgm step (its own default) is for.
+                "--replace",
             )
+            if args.duck:
+                bgm_cmd += ["--duck", "--duck-ratio", str(args.duck_ratio),
+                            "--duck-attack", str(args.duck_attack), "--duck-release", str(args.duck_release)]
             if args.project_name:
                 bgm_cmd += ["--project-name", args.project_name]
             run(bgm_cmd, cwd)

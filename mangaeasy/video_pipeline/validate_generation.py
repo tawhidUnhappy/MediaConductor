@@ -9,6 +9,7 @@ from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PROJECT_ROOT,
+    find_latest_long_video,
     item_dirs,
     merge_item_selection,
     project_name,
@@ -232,7 +233,8 @@ def main() -> int:
         errors.append("Unexpected extra item videos: " + ", ".join(extra_videos[:20]))
 
     if args.require_long:
-        long_video = (args.long_video or (args.output_root.resolve() / name / f"{name}_full.mp4")).resolve()
+        default_long = find_latest_long_video(args.output_root, name)
+        long_video = (args.long_video or default_long or (args.output_root.resolve() / name / f"{name}_full.mp4")).resolve()
         long_duration = check_video_file(long_video, args, errors)
         if long_video.exists() and long_expected_duration:
             long_tolerance = max(args.duration_tolerance, expected_items * 0.25)

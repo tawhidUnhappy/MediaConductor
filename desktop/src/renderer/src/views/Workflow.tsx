@@ -62,6 +62,7 @@ export function Workflow(): React.JSX.Element {
   const [audioSource, setAudioSource] = useState<'raw' | 'faded'>('raw')
   const [mangaName, setMangaName] = useState('')
   const [bgmFile, setBgmFile] = useState('')
+  const [audioDuck, setAudioDuck] = useState(false)
   const [status, setStatus] = useState<ChapterStatus | null>(null)
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export function Workflow(): React.JSX.Element {
       setLang(String(config.download?.translated_language ?? 'en'))
       setBgmFile(configuredBgmFile(config.audio?.bgm, systemConfig.bgm?.file))
       setAudioSource((systemConfig.video?.audio_source as 'raw' | 'faded') ?? 'raw')
+      setAudioDuck(Boolean(systemConfig.bgm?.duck ?? false))
     })
   }, [])
 
@@ -177,6 +179,12 @@ export function Workflow(): React.JSX.Element {
     await saveWfConfig()
     await runChain(videoSteps(false))
     refreshStatus()
+  }
+
+  const setAudioDuckAndSave = async (value: boolean): Promise<void> => {
+    setAudioDuck(value)
+    const { systemConfig } = await window.api.getConfig()
+    await window.api.setConfig(undefined, { ...systemConfig, bgm: { ...systemConfig.bgm, duck: value } })
   }
 
   const deleteData = async (what: DeleteWhat): Promise<void> => {
@@ -276,6 +284,9 @@ export function Workflow(): React.JSX.Element {
         <div className="row">
           <label>
             <input type="checkbox" checked={normalize} onChange={(e) => setNormalize(e.target.checked)} /> YouTube loudness (-14 LUFS)
+          </label>
+          <label title="Audio ducking: background music automatically lowers when narration is playing, so narration is never drowned out.">
+            <input type="checkbox" checked={audioDuck} onChange={(e) => setAudioDuckAndSave(e.target.checked)} /> Audio ducking
           </label>
           <label>
             Audio source
