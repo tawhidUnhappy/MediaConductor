@@ -31,13 +31,13 @@ execFileSync(
   { cwd: repoRoot, stdio: 'inherit' }
 )
 
-// PyInstaller's spec produces dist/mangaEasy/ everywhere, plus
-// dist/mangaEasy.app/ on macOS — prefer the .app bundle's Contents/MacOS
-// payload when present so the backend folder layout is the same shape
-// (a runnable "mangaeasy" entry point alongside its _internal/ payload).
-const macApp = path.join(distDir, 'mangaEasy.app', 'Contents', 'MacOS')
-const plainDir = path.join(distDir, 'mangaEasy')
-const sourceDir = existsSync(macApp) ? macApp : plainDir
+// PyInstaller's spec produces dist/mangaEasy/ everywhere (plus a
+// dist/mangaEasy.app bundle on macOS). Always take the plain onedir output:
+// the .app's Contents/MacOS is NOT self-contained under PyInstaller 6 — its
+// payload lives in Contents/Frameworks with symlinks pointing there, so
+// copying MacOS/ alone ships dangling symlinks and a backend that dies on
+// launch (caught by the release workflow's frozen-backend smoke test).
+const sourceDir = path.join(distDir, 'mangaEasy')
 
 if (!existsSync(sourceDir)) {
   console.error(`[bundle-backend] expected PyInstaller output at ${sourceDir}, found nothing.`)
