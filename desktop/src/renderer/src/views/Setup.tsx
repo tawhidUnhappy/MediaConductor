@@ -21,6 +21,9 @@ export function Setup(): React.JSX.Element {
   const [checkingAppUpdate, setCheckingAppUpdate] = useState(false)
   const [youtube, setYoutube] = useState<YoutubeStatus | null>(null)
   const [youtubeBusy, setYoutubeBusy] = useState(false)
+  const [ytClientId, setYtClientId] = useState('')
+  const [ytClientSecret, setYtClientSecret] = useState('')
+  const [ytVerify, setYtVerify] = useState<YoutubeStatus | null>(null)
 
   const refreshYoutube = useCallback(async () => {
     try {
@@ -47,13 +50,35 @@ export function Setup(): React.JSX.Element {
     window.api.getAppInfo().then(setInfo).catch(console.error)
   }, [refresh, refreshYoutube])
 
+  // Attach the user's Google project by pasted client ID + secret (the
+  // simple path — both values are shown in the Google console's Credentials
+  // dialog), then open the browser for consent.
+  const attachAndConnect = async (): Promise<void> => {
+    setYoutubeBusy(true)
+    setYtVerify(null)
+    try {
+      await run('youtube-auth', [
+        '--client-id',
+        ytClientId.trim(),
+        '--client-secret',
+        ytClientSecret.trim()
+      ])
+      setYtClientId('')
+      setYtClientSecret('')
+    } finally {
+      setYoutubeBusy(false)
+      refreshYoutube()
+    }
+  }
+
   const connectYoutube = async (): Promise<void> => {
     setYoutubeBusy(true)
+    setYtVerify(null)
     try {
       const args: string[] = []
       if (!youtube?.client_secrets_present) {
-        // First connect: the user picks the client_secret.json they created
-        // following docs/youtube.md; it gets imported into the data folder.
+        // Alternative path: pick the downloaded client_secret.json file;
+        // it gets imported into the data folder.
         const picked = await window.api.pickFile(['json'])
         if (!picked) return
         args.push('--client-secrets', picked)
@@ -64,6 +89,19 @@ export function Setup(): React.JSX.Element {
     } finally {
       setYoutubeBusy(false)
       refreshYoutube()
+    }
+  }
+
+  const verifyYoutube = async (): Promise<void> => {
+    setYoutubeBusy(true)
+    try {
+      const result = await window.api.verifyYoutube()
+      setYtVerify(result)
+      setYoutube(result)
+    } catch (err) {
+      console.error('youtube verify failed', err)
+    } finally {
+      setYoutubeBusy(false)
     }
   }
 
@@ -233,35 +271,90 @@ export function Setup(): React.JSX.Element {
         {!youtube ? (
           <p className="hint">Checking…</p>
         ) : youtube.connected ? (
-          <div className="row" style={{ gap: 10 }}>
-            <span className="badge positive">connected</span>
-            <span>
-              {youtube.channel_title ? (
-                <>
-                  Uploading as <strong>{youtube.channel_title}</strong>
-                </>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="row" style={{ gap: 10 }}>
+              <span className="badge positive">connected</span>
+              <span>
+                {youtube.channel_title ? (
+                  <>
+                    Uploading as <strong>{youtube.channel_title}</strong>
+                  </>
+                ) : (
+                  'Connected (channel name unknown)'
+                )}
+              </span>
+              <button onClick={verifyYoutube} disabled={youtubeBusy || running}>
+                {youtubeBusy ? 'Verifying…' : 'Verify'}
+              </button>
+              <button onClick={disconnectYoutube} disabled={youtubeBusy || running}>
+                Disconnect
+              </button>
+            </div>
+            {ytVerify &&
+              (ytVerify.verified ? (
+                <p className="hint" style={{ color: 'var(--positive)', margin: 0 }}>
+                  ✓ Verified — token refreshed and channel reachable
+                  {ytVerify.channel_title ? ` (${ytVerify.channel_title})` : ''}.
+                </p>
               ) : (
-                'Connected (channel name unknown)'
-              )}
-            </span>
-            <button onClick={disconnectYoutube} disabled={youtubeBusy || running}>
-              Disconnect
-            </button>
+                <p className="hint" style={{ color: 'var(--negative)', margin: 0 }}>
+                  ✗ Verification failed: {ytVerify.verify_error ?? 'unknown error'}
+                </p>
+              ))}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div className="row" style={{ gap: 10 }}>
               <span className="badge grey">not connected</span>
-              <button onClick={connectYoutube} disabled={youtubeBusy || running}>
-                {youtube.client_secrets_present
-                  ? 'Connect account…'
-                  : 'Connect account (pick client_secret.json)…'}
+              <span className="hint">
+                Attach your Google project (≈10-minute one-time setup — see the guide), then approve
+                access in the browser window that opens.
+              </span>
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              <label className="flex-1">
+                Client ID
+                <input
+                  style={{ width: '100%' }}
+                  placeholder="…apps.googleusercontent.com"
+                  value={ytClientId}
+                  onChange={(e) => setYtClientId(e.target.value)}
+                />
+              </label>
+              <label className="flex-1">
+                Client secret
+                <input
+                  style={{ width: '100%' }}
+                  type="password"
+                  placeholder="GOCSPX-…"
+                  value={ytClientSecret}
+                  onChange={(e) => setYtClientSecret(e.target.value)}
+                />
+              </label>
+              <button
+                className="primary"
+                onClick={attachAndConnect}
+                disabled={youtubeBusy || running || !ytClientId.trim() || !ytClientSecret.trim()}
+                title="Saves these into the app's data folder and opens the browser for Google's consent page."
+              >
+                Attach &amp; connect
               </button>
             </div>
-            <p className="hint">
-              One-time setup: create a free Google OAuth client (≈10 minutes, see the guide), pick
-              the downloaded client_secret.json here, then approve access in the browser window that
-              opens. Everything is stored inside this app&apos;s own data folder.
+            <p className="hint" style={{ margin: 0 }}>
+              Paste both values from Google Cloud console → APIs &amp; Services → Credentials (shown
+              when you create the &quot;Desktop app&quot; OAuth client) — or{' '}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  connectYoutube()
+                }}
+              >
+                {youtube.client_secrets_present
+                  ? 'connect with the already-attached project'
+                  : 'pick the downloaded client_secret.json instead'}
+              </a>
+              . Everything is stored inside this app&apos;s own data folder.
             </p>
           </div>
         )}

@@ -227,11 +227,13 @@ mangaeasy audio-takes-restore --project-root "$PROJ" --audio-root "$AUDIO" --run
 
 Preconditions (once, by the **human** — a browser consent is required, an
 agent cannot do it): the user creates their own Google OAuth client and
-connects it (`mangaeasy youtube-auth --client-secrets <file>`, or Setup tab
-→ YouTube account; full walkthrough in [youtube.md](youtube.md)).
+connects it — pasted values (`mangaeasy youtube-auth --client-id <id>
+--client-secret <secret>`), a file (`--client-secrets <file>`), or Setup
+tab → YouTube account; full walkthrough in [youtube.md](youtube.md).
 
 ```bash
 mangaeasy youtube-status --json     # {"connected": true, "channel_title": ...}
+mangaeasy youtube-status --verify --json  # + live check: {"verified": true, ...}
 mangaeasy youtube-upload --video /abs/path/video.mp4 \
     --title "My Recap" --tags "manga,recap" --privacy private --json
 # → MANGAEASY_RESULT {"video_id": "...", "url": "https://youtu.be/...", "privacy": "private"}

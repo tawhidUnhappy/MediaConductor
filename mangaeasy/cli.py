@@ -82,8 +82,8 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "audio-takes-restore":  ("mangaeasy.video_pipeline.audio_takes",           "restore_main","Video pipeline",   "Restore an archived audio take as the active audio instead of regenerating it."),
 
     # ── YouTube ───────────────────────────────────────────────────────────────
-    "youtube-auth":         ("mangaeasy.youtube.auth",                         "auth_main",   "YouTube",          "Connect a YouTube account (browser consent; --client-secrets imports your OAuth client, see docs/youtube.md)."),
-    "youtube-status":       ("mangaeasy.youtube.auth",                         "status_main", "YouTube",          "Show YouTube connection status (--json)."),
+    "youtube-auth":         ("mangaeasy.youtube.auth",                         "auth_main",   "YouTube",          "Connect a YouTube account (browser consent). Attach your Google project via --client-id/--client-secret (pasted) or --client-secrets <file>."),
+    "youtube-status":       ("mangaeasy.youtube.auth",                         "status_main", "YouTube",          "Show YouTube connection status (--json); --verify checks the token live."),
     "youtube-logout":       ("mangaeasy.youtube.auth",                         "logout_main", "YouTube",          "Disconnect the YouTube account (delete the stored token)."),
     "youtube-upload":       ("mangaeasy.youtube.upload",                       "main",        "YouTube",          "Upload a video to the connected channel (resumable; default privacy: private)."),
 

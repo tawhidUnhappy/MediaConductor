@@ -156,9 +156,12 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "youtube_status": (
         "youtube-status",
-        "YouTube connection status: connected or not, channel name. Connecting itself needs a human "
+        "YouTube connection status: connected or not, channel name. Set verify=true for a live "
+        "check (token refresh + channel query; needs network). Connecting itself needs a human "
         "in a browser — tell the user to run `mangaeasy youtube-auth` (see docs/youtube.md).",
-        {}, [], {},
+        {"verify": {**_BOOL, "description": "Also verify the token works right now (network call)."}},
+        [],
+        {"verify": ("--verify", "flag")},
     ),
     "youtube_upload": (
         "youtube-upload",

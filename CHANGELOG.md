@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.3.0 — 2026-07-03
+
+Simpler YouTube project attach + live verification.
+
+### Added
+- **Paste-to-attach**: connect your Google project by pasting the Client ID
+  and Client secret straight from the Google console — no JSON file needed.
+  CLI: `mangaeasy youtube-auth --client-id <id> --client-secret <secret>`;
+  GUI: Setup tab → YouTube account now has the two fields + "Attach &
+  connect" (the client_secret.json file path still works as before).
+- **Live verification**: `mangaeasy youtube-status --verify` (and a
+  "Verify" button in the GUI) refreshes the token and queries the channel
+  to prove the connection works right now, with a clear error when it
+  doesn't. MCP `youtube_status` gained the matching `verify` option.
+- Input validation with actionable errors (client-ID format check, both
+  values required together).
+
 ## v1.2.0 — 2026-07-03
 
 Direct YouTube upload — connect your channel once, then publish finished

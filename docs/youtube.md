@@ -36,20 +36,29 @@ explained at the bottom. Follow the steps in order.
      your own permission).
 5. **Create the client credentials**: *APIs & Services* → *Credentials* →
    **+ Create credentials** → *OAuth client ID* → Application type:
-   **Desktop app** → Create → **Download JSON**. You now have a file like
-   `client_secret_1234….json`.
+   **Desktop app** → Create. Google now shows the **Client ID** (ends with
+   `.apps.googleusercontent.com`) and **Client secret** (starts with
+   `GOCSPX-`) — copy both. (You can also *Download JSON* if you prefer a
+   file; both work.)
 
-## Part 2 — Connect mangaEasy
+## Part 2 — Attach the project & connect mangaEasy
 
-**Desktop app:** Setup tab → **YouTube account** → *Connect account* → pick
-the downloaded `client_secret.json` → your browser opens Google's consent
-page → approve. The section now shows *Connected as \<your channel\>*.
+**Desktop app (simplest):** Setup tab → **YouTube account** → paste the
+**Client ID** and **Client secret** → **Attach & connect** → your browser
+opens Google's consent page → approve. The section now shows *Connected as
+\<your channel\>*; the **Verify** button re-checks the connection live any
+time. (Prefer the file? The link under the form accepts the downloaded
+`client_secret.json` instead.)
 
 **CLI:**
 
 ```bash
+# paste the two values...
+mangaeasy youtube-auth --client-id 1234-abc.apps.googleusercontent.com --client-secret GOCSPX-xyz
+# ...or use the downloaded file
 mangaeasy youtube-auth --client-secrets /path/to/client_secret_1234.json
-mangaeasy youtube-status        # → Connected as <channel>
+
+mangaeasy youtube-status --verify   # → Connected as <channel> / verified: yes
 ```
 
 The client file and token are stored in `<data folder>/.mangaeasy/youtube/`

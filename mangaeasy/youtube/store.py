@@ -62,6 +62,25 @@ def write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+def write_client_config(client_id: str, client_secret: str) -> None:
+    """Persist a pasted client id/secret pair as a standard installed-app
+    client config — the simple alternative to downloading client_secret.json
+    (Google shows both values right in the console's Credentials dialog)."""
+    write_json(client_secret_path(), {
+        "installed": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": ["http://localhost"],
+        }
+    })
+
+
+def looks_like_client_id(client_id: str) -> bool:
+    return client_id.endswith(".apps.googleusercontent.com") and len(client_id) > 40
+
+
 def status_snapshot() -> dict:
     """Offline status: what exists on disk (no network, no google imports)."""
     channel = read_json(channel_cache_path())

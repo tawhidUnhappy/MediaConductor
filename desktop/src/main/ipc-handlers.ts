@@ -169,6 +169,15 @@ export function registerIpcHandlers(): void {
     return parseJsonOutput(stdout)
   })
 
+  // Live check: refreshes the token and queries the channel — proves the
+  // connection actually works, not just that the files exist. runCapture
+  // rejects on non-zero exit, but --json mode always exits 0 with the
+  // verified/verify_error fields carrying the outcome.
+  ipcMain.handle('youtube:verify', async () => {
+    const stdout = await runCapture(buildCli('youtube-status', ['--json', '--verify']), appRoot())
+    return parseJsonOutput(stdout)
+  })
+
   // ---- App info + update check ---------------------------------------------
 
   ipcMain.handle('app:get-info', () => ({

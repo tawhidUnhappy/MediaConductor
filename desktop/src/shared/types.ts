@@ -125,6 +125,9 @@ export interface YoutubeStatus {
   channel_id: string | null
   scopes: string[]
   token_file: string
+  /** Present only when the status was requested with --verify. */
+  verified?: boolean
+  verify_error?: string | null
 }
 
 /** Shape of the `app:check-updates` IPC reply. */

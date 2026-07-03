@@ -48,6 +48,7 @@ const api = {
 
   // YouTube
   getYoutubeStatus: (): Promise<YoutubeStatus> => ipcRenderer.invoke('youtube:status'),
+  verifyYoutube: (): Promise<YoutubeStatus> => ipcRenderer.invoke('youtube:verify'),
 
   listAudioTakes: (projectRoot: string, audioRoot: string): Promise<AudioTakesStatus> =>
     ipcRenderer.invoke('list-audio-takes', projectRoot, audioRoot),

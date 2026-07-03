@@ -68,12 +68,49 @@ def auth_main() -> int:
              "Imported into the app's data folder on first use; see docs/youtube.md.",
     )
     parser.add_argument(
+        "--client-id",
+        default=None,
+        help="Alternative to --client-secrets: paste the OAuth client ID shown in the "
+             "Google console (ends with .apps.googleusercontent.com). Use with --client-secret.",
+    )
+    parser.add_argument(
+        "--client-secret",
+        default=None,
+        help="The OAuth client secret shown next to the client ID (not confidential for "
+             "Desktop-app clients). Use with --client-id.",
+    )
+    parser.add_argument(
         "--no-browser",
         action="store_true",
         help="Don't open a browser automatically — print the consent URL instead "
              "(the loopback redirect still requires the browser to run on this machine).",
     )
     args = parser.parse_args()
+
+    if (args.client_id is None) != (args.client_secret is None):
+        print("ERROR: --client-id and --client-secret must be provided together.", file=sys.stderr)
+        return 1
+    if args.client_id is not None and args.client_secrets is not None:
+        print("ERROR: use either --client-secrets (file) or --client-id/--client-secret (pasted), not both.",
+              file=sys.stderr)
+        return 1
+
+    if args.client_id is not None:
+        client_id = args.client_id.strip()
+        client_secret = args.client_secret.strip()
+        if not store.looks_like_client_id(client_id):
+            print(
+                "ERROR: that doesn't look like a Google OAuth client ID "
+                "(expected something ending in .apps.googleusercontent.com).\n"
+                "Copy it from Google Cloud console -> APIs & Services -> Credentials.",
+                file=sys.stderr,
+            )
+            return 1
+        if not client_secret:
+            print("ERROR: the client secret is empty.", file=sys.stderr)
+            return 1
+        store.write_client_config(client_id, client_secret)
+        print(f"Saved OAuth client into {store.client_secret_path()}")
 
     if args.client_secrets is not None:
         source = args.client_secrets.expanduser().resolve()
@@ -119,13 +156,38 @@ def auth_main() -> int:
     return 0
 
 
+def _verify_live(snapshot: dict) -> dict:
+    """Refresh the token and call the API — proves the connection actually
+    works right now (not just that files exist). Updates the channel cache."""
+    if not snapshot["connected"]:
+        return {**snapshot, "verified": False, "verify_error": "not connected"}
+    try:
+        creds = load_credentials()
+        if creds is None:
+            return {**snapshot, "verified": False,
+                    "verify_error": "stored token is invalid or was revoked — run: mangaeasy youtube-auth"}
+        channel = _fetch_channel(creds)
+        if channel:
+            store.write_json(store.channel_cache_path(), channel)
+            snapshot = {**snapshot, "channel_title": channel["title"], "channel_id": channel["id"]}
+        return {**snapshot, "verified": True, "verify_error": None}
+    except Exception as exc:  # noqa: BLE001 — network/auth failures become a reason string
+        return {**snapshot, "verified": False, "verify_error": str(exc)}
+
+
 def status_main() -> int:
     parser = argparse.ArgumentParser(description="Show YouTube connection status.")
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="Emit one JSON object on stdout.")
+    parser.add_argument("--verify", action="store_true",
+                        help="Also verify the connection live: refresh the token and query the "
+                             "channel (needs network). Adds verified/verify_error to the output.")
     args = parser.parse_args()
 
     snapshot = store.status_snapshot()
+    if args.verify:
+        snapshot = _verify_live(snapshot)
+
     if args.as_json:
         print(json.dumps(snapshot, ensure_ascii=False))
         return 0
@@ -133,7 +195,8 @@ def status_main() -> int:
     if not snapshot["connected"]:
         print("Not connected.")
         if not snapshot["client_secrets_present"]:
-            print("No OAuth client imported yet either — see docs/youtube.md, then run:")
+            print("No Google project attached yet either — see docs/youtube.md, then run one of:")
+            print("  mangaeasy youtube-auth --client-id <id> --client-secret <secret>")
             print("  mangaeasy youtube-auth --client-secrets /path/to/client_secret.json")
         else:
             print("Run: mangaeasy youtube-auth")
@@ -141,6 +204,12 @@ def status_main() -> int:
     who = snapshot["channel_title"] or "(channel name unknown)"
     print(f"Connected as {who}")
     print(f"  token: {snapshot['token_file']}")
+    if args.verify:
+        if snapshot.get("verified"):
+            print("  verified: yes — token refreshed and channel reachable.")
+        else:
+            print(f"  verified: NO — {snapshot.get('verify_error')}")
+            return 1
     return 0
 
 

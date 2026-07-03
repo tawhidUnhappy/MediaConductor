@@ -111,3 +111,54 @@ def test_mcp_upload_args():
 
 def test_mcp_status_args():
     assert _build_args("youtube_status", {}) == ["--json"]
+    assert _build_args("youtube_status", {"verify": True}) == ["--verify", "--json"]
+
+
+def test_write_client_config_shape(tmp_path, monkeypatch):
+    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    store.write_client_config("abc.apps.googleusercontent.com", "GOCSPX-xyz")
+    data = store.read_json(store.client_secret_path())
+    installed = data["installed"]
+    assert installed["client_id"] == "abc.apps.googleusercontent.com"
+    assert installed["client_secret"] == "GOCSPX-xyz"
+    assert installed["token_uri"] == "https://oauth2.googleapis.com/token"
+
+
+def test_looks_like_client_id():
+    assert store.looks_like_client_id(
+        "123456789012-abcdefghijklmnop.apps.googleusercontent.com"
+    )
+    assert not store.looks_like_client_id("not-a-client-id")
+    assert not store.looks_like_client_id("x.apps.googleusercontent.com")  # too short
+
+
+def test_auth_paste_requires_both_values(tmp_path):
+    proc = run_cli(tmp_path, "youtube-auth", "--client-id", "only-half")
+    assert proc.returncode == 1
+    assert "together" in proc.stderr
+
+
+def test_auth_paste_rejects_bad_client_id(tmp_path):
+    proc = run_cli(tmp_path, "youtube-auth", "--client-id", "garbage", "--client-secret", "s")
+    assert proc.returncode == 1
+    assert "apps.googleusercontent.com" in proc.stderr
+
+
+def test_auth_rejects_file_and_paste_together(tmp_path):
+    secrets = tmp_path / "cs.json"
+    secrets.write_text("{}", encoding="utf-8")
+    proc = run_cli(
+        tmp_path, "youtube-auth", "--client-secrets", str(secrets),
+        "--client-id", "123456789012-abcdefghijklmnop.apps.googleusercontent.com",
+        "--client-secret", "s",
+    )
+    assert proc.returncode == 1
+    assert "not both" in proc.stderr
+
+
+def test_status_verify_when_disconnected(tmp_path):
+    proc = run_cli(tmp_path, "youtube-status", "--verify", "--json")
+    assert proc.returncode == 0
+    data = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert data["verified"] is False
+    assert data["verify_error"] == "not connected"
