@@ -117,6 +117,16 @@ export interface AppInfo {
   cli: string[]
 }
 
+/** Shape of `mangaeasy youtube-status --json` (`mangaeasy/youtube/store.py`). */
+export interface YoutubeStatus {
+  connected: boolean
+  client_secrets_present: boolean
+  channel_title: string | null
+  channel_id: string | null
+  scopes: string[]
+  token_file: string
+}
+
 /** Shape of the `app:check-updates` IPC reply. */
 export interface UpdateCheck {
   current: string

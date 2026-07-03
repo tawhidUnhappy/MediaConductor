@@ -81,6 +81,12 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "audio-takes-list":     ("mangaeasy.video_pipeline.audio_takes",           "list_main",   "Video pipeline",   "List previously archived audio takes (old/run_NNNN/) for a project."),
     "audio-takes-restore":  ("mangaeasy.video_pipeline.audio_takes",           "restore_main","Video pipeline",   "Restore an archived audio take as the active audio instead of regenerating it."),
 
+    # ── YouTube ───────────────────────────────────────────────────────────────
+    "youtube-auth":         ("mangaeasy.youtube.auth",                         "auth_main",   "YouTube",          "Connect a YouTube account (browser consent; --client-secrets imports your OAuth client, see docs/youtube.md)."),
+    "youtube-status":       ("mangaeasy.youtube.auth",                         "status_main", "YouTube",          "Show YouTube connection status (--json)."),
+    "youtube-logout":       ("mangaeasy.youtube.auth",                         "logout_main", "YouTube",          "Disconnect the YouTube account (delete the stored token)."),
+    "youtube-upload":       ("mangaeasy.youtube.upload",                       "main",        "YouTube",          "Upload a video to the connected channel (resumable; default privacy: private)."),
+
     # ── External AI tool environments ─────────────────────────────────────────
     "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI) resolve."),
     "index-tts":            ("mangaeasy.tools.index_tts",                      "main",        "External tools",   "Run IndexTTS inside its external uv env."),

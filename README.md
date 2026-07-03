@@ -62,6 +62,11 @@ Usage:
 - **Hardware-aware everything** — `--encoder auto` picks NVENC, AMF, Quick Sync,
   VideoToolbox, or falls back to `libx264`; `--tts auto` uses IndexTTS (voice
   cloning) on NVIDIA GPU machines and Kokoro on CPU machines.
+- **Direct YouTube upload** — connect your channel once (your own free
+  Google OAuth client, see [docs/youtube.md](docs/youtube.md)) and upload
+  finished videos from the app, the CLI (`mangaeasy youtube-upload`), or an
+  AI assistant. Resumable uploads with progress; tokens stay in the app's
+  own data folder.
 - **Legacy manga workflow included** — MangaDex download, page-cutting and
   narration web editors, watermarking, PDF export, and more.
 - **Cross-platform** — Windows, macOS, and Linux.

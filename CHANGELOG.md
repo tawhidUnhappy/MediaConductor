@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.2.0 — 2026-07-03
+
+Direct YouTube upload — connect your channel once, then publish finished
+videos from the app, the CLI, or an AI assistant.
+
+### Added
+- **YouTube account connect** (`mangaeasy youtube-auth` /
+  `youtube-status [--json]` / `youtube-logout`, and Setup tab → "YouTube
+  account"): browser-based Google consent using your own free OAuth client
+  (one-time ~10-minute setup — full walkthrough in `docs/youtube.md`).
+  Tokens live in the app's own data folder (`.mangaeasy/youtube/`),
+  removable with one click; nothing system-wide.
+- **`mangaeasy youtube-upload`**: resumable chunked upload with retry and
+  progress, title/description(-file)/tags/privacy/category/thumbnail
+  flags, friendly quota/auth error messages, and the standard
+  `MANGAEASY_PROGRESS` + `MANGAEASY_RESULT {"video_id","url"}` machine
+  contract. Default privacy is **private** (YouTube locks uploads from
+  personal, unaudited API projects to private — publish in YouTube Studio).
+- **Batch tab → "Upload to YouTube" step**: defaults to your latest joined
+  long video, with title (pre-filled), description, tags, and privacy.
+- **MCP tools** `youtube_status` and `youtube_upload`; new "Uploading to
+  YouTube" section in the AI guide with agent rules (never attempt the
+  browser auth; respect quota; don't fight the private lock).
+- Dependencies: `google-auth` + `google-auth-oauthlib` (OAuth flow/refresh
+  only — the upload itself is plain `requests` against YouTube's resumable
+  protocol).
+
 ## v1.1.0 — 2026-07-03
 
 AI-assistant / scripting release: the whole pipeline is now drivable by any

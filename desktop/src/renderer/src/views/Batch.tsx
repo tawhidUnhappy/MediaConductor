@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useJob } from '../job-context'
-import type { AudioTakesStatus, LibraryEntry } from '../../../shared/types'
+import type { AudioTakesStatus, LibraryEntry, YoutubeStatus } from '../../../shared/types'
 
 const STEPS: Record<string, string> = {
   video: 'Everything (IndexTTS + blur + long video)',
@@ -16,7 +16,8 @@ const STEPS: Record<string, string> = {
   'video-clean-audio': 'Clear generated audio (kept, restorable later)',
   'video-clean-video': 'Delete rendered videos',
   'video-validate': 'Validate generated output',
-  'video-clean-all': 'DELETE ALL generated output (start fresh)'
+  'video-clean-all': 'DELETE ALL generated output (start fresh)',
+  'youtube-upload': 'Upload to YouTube'
 }
 
 // Grouped purely for the step picker, so the dropdown reads as "stages of
@@ -29,6 +30,7 @@ const STEP_GROUPS: { label: string; steps: string[] }[] = [
   { label: 'Audio', steps: ['video-audio', 'video-audio-indextts', 'video-fade-audio'] },
   { label: 'Video', steps: ['video-render'] },
   { label: 'Long video assembly', steps: ['video-join', 'video-add-bgm', 'video-normalize-audio'] },
+  { label: 'Publish', steps: ['youtube-upload'] },
   {
     label: 'Check & maintain',
     steps: [
@@ -72,7 +74,9 @@ const STEP_DESCRIPTIONS: Record<string, string> = {
   'video-validate':
     'Checks generated audio/video against the expected inputs and reports any mismatches.',
   'video-clean-all':
-    'Deletes ALL generated output for this manga (audio, videos, long video). Chapters/panels/narration are untouched.'
+    'Deletes ALL generated output for this manga (audio, videos, long video). Chapters/panels/narration are untouched.',
+  'youtube-upload':
+    'Uploads the input video to your connected YouTube channel. Arrives as PRIVATE (YouTube policy for personal API projects) — publish it in YouTube Studio afterward.'
 }
 
 const DISABLED_STYLE: React.CSSProperties = { opacity: 0.45 }
@@ -158,6 +162,12 @@ export function Batch(): React.JSX.Element {
   // archived take, or a video outside the usual output folder, doesn't
   // require renaming files on disk first.
   const [inputVideo, setInputVideo] = useState('')
+  // YouTube upload step state — title defaults to the manga's folder name.
+  const [ytStatus, setYtStatus] = useState<YoutubeStatus | null>(null)
+  const [ytTitle, setYtTitle] = useState('')
+  const [ytDescription, setYtDescription] = useState('')
+  const [ytTags, setYtTags] = useState('')
+  const [ytPrivacy, setYtPrivacy] = useState<'private' | 'unlisted' | 'public'>('private')
   const [availableVideos, setAvailableVideos] = useState<
     { path: string; label: string; mtimeMs: number }[]
   >([])
@@ -327,7 +337,45 @@ export function Batch(): React.JSX.Element {
     })
   }
 
+  useEffect(() => {
+    window.api.getYoutubeStatus().then(setYtStatus).catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    // Pre-fill the upload title from the manga folder once one is chosen.
+    if (mangaPath && !ytTitle) {
+      const base =
+        mangaPath
+          .replace(/[\\/]+$/, '')
+          .split(/[\\/]/)
+          .pop() ?? ''
+      setYtTitle(base.replace(/[_-]+/g, ' ').trim())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only seed from mangaPath
+  }, [mangaPath])
+
   const start = async (): Promise<void> => {
+    if (step === 'youtube-upload') {
+      const video = inputVideo || paths.latestLongVideoPath
+      if (!video) {
+        window.alert('No video to upload yet — join a long video first, or pick a file above.')
+        return
+      }
+      if (!ytStatus?.connected) {
+        window.alert('Connect your YouTube account first (Setup tab → YouTube account).')
+        return
+      }
+      if (!ytTitle.trim()) {
+        window.alert('Set a video title first.')
+        return
+      }
+      const args = ['--video', video, '--title', ytTitle.trim(), '--privacy', ytPrivacy]
+      if (ytDescription.trim()) args.push('--description', ytDescription)
+      if (ytTags.trim()) args.push('--tags', ytTags)
+      await run('youtube-upload', args)
+      return
+    }
+
     if (step === 'got-ocr2') {
       const args = baseArgs()
       if (!args) return
@@ -522,23 +570,31 @@ export function Batch(): React.JSX.Element {
   // video-join still operates on a chapter range (which item clips to
   // concatenate) -- only video-add-bgm/video-normalize-audio work on the
   // whole already-joined file and have no use for a range.
-  const usesItemRange = !['video-add-bgm', 'video-normalize-audio', 'video-clean-all'].includes(
-    step
-  )
+  const usesItemRange = ![
+    'video-add-bgm',
+    'video-normalize-audio',
+    'video-clean-all',
+    'youtube-upload'
+  ].includes(step)
   const usesResume = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
   const usesSkipAudio = step === 'video'
   const usesOcrForce = step === 'got-ocr2'
   const usesRenderWorkers = ['video', 'video-render'].includes(step)
   const usesGpuWorkers = ['video', 'video-audio', 'video-audio-indextts'].includes(step)
   const usesBgmFields = step === 'video-add-bgm' || (step === 'video' && bgm)
-  const usesInputVideoPicker = step === 'video-add-bgm' || step === 'video-normalize-audio'
+  const usesInputVideoPicker =
+    step === 'video-add-bgm' || step === 'video-normalize-audio' || step === 'youtube-upload'
+  const usesYoutubeFields = step === 'youtube-upload'
   const isLongVideoStep = LONG_VIDEO_STEPS.has(step)
   // A custom inputVideo (picked from availableVideos or browsed to) is
   // known to exist already -- only fall back to checking the default
   // <name>_full.mp4 path when the user hasn't picked one.
   const missingLongVideo =
     usesInputVideoPicker && !!mangaPath && !inputVideo && !paths.latestLongVideoPath
-  const startBlocked = missingLongVideo || (step === 'video-add-bgm' && !bgmFile)
+  const startBlocked =
+    missingLongVideo ||
+    (step === 'video-add-bgm' && !bgmFile) ||
+    (step === 'youtube-upload' && (!ytStatus?.connected || !ytTitle.trim()))
 
   return (
     <div className="tab-panel">
@@ -748,6 +804,63 @@ export function Batch(): React.JSX.Element {
             mixes are left untouched, so trying another track or volume never overwrites a previous
             one.
           </p>
+        )}
+
+        {usesYoutubeFields && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+            {!ytStatus?.connected && (
+              <p className="hint" style={{ color: '#e0a64a', margin: 0 }}>
+                ⚠ No YouTube account connected — go to Setup → YouTube account first.
+              </p>
+            )}
+            {ytStatus?.connected && ytStatus.channel_title && (
+              <p className="hint" style={{ margin: 0 }}>
+                Uploading as <strong>{ytStatus.channel_title}</strong>
+              </p>
+            )}
+            <div className="row">
+              <label className="flex-1">
+                Title
+                <input
+                  style={{ width: '100%' }}
+                  value={ytTitle}
+                  maxLength={100}
+                  onChange={(e) => setYtTitle(e.target.value)}
+                />
+              </label>
+              <label title="Videos from personal (unaudited) API projects always arrive private regardless of this setting — publish in YouTube Studio.">
+                Privacy
+                <select
+                  value={ytPrivacy}
+                  onChange={(e) =>
+                    setYtPrivacy(e.target.value as 'private' | 'unlisted' | 'public')
+                  }
+                >
+                  <option value="private">private (recommended)</option>
+                  <option value="unlisted">unlisted</option>
+                  <option value="public">public</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Description
+              <textarea
+                rows={3}
+                style={{ width: '100%', resize: 'vertical' }}
+                value={ytDescription}
+                onChange={(e) => setYtDescription(e.target.value)}
+              />
+            </label>
+            <label>
+              Tags (comma-separated)
+              <input
+                style={{ width: '100%' }}
+                value={ytTags}
+                placeholder="manga, recap"
+                onChange={(e) => setYtTags(e.target.value)}
+              />
+            </label>
+          </div>
         )}
 
         {step === 'video' && (

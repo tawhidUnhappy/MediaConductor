@@ -8,6 +8,7 @@ from mangaeasy.cli import COMMANDS
 
 DOCS = [
     Path(__file__).resolve().parents[1] / "docs" / "ai-guide.md",
+    Path(__file__).resolve().parents[1] / "docs" / "youtube.md",
     Path(__file__).resolve().parents[1] / "AGENTS.md",
 ]
 

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useJob } from '../job-context'
-import type { AppInfo, DoctorStatus, UpdateCheck } from '../../../shared/types'
+import type { AppInfo, DoctorStatus, UpdateCheck, YoutubeStatus } from '../../../shared/types'
+
+const YOUTUBE_GUIDE_URL = 'https://github.com/tawhidUnhappy/mangaEasy/blob/main/docs/youtube.md'
 
 const CORE_EXES = ['ffmpeg', 'ffprobe', 'uv', 'git']
 
@@ -17,6 +19,16 @@ export function Setup(): React.JSX.Element {
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [appUpdate, setAppUpdate] = useState<UpdateCheck | null>(null)
   const [checkingAppUpdate, setCheckingAppUpdate] = useState(false)
+  const [youtube, setYoutube] = useState<YoutubeStatus | null>(null)
+  const [youtubeBusy, setYoutubeBusy] = useState(false)
+
+  const refreshYoutube = useCallback(async () => {
+    try {
+      setYoutube(await window.api.getYoutubeStatus())
+    } catch (err) {
+      console.error('youtube status failed', err)
+    }
+  }, [])
 
   const refresh = useCallback(async (checkUpdates = false) => {
     setLoading(true)
@@ -31,8 +43,39 @@ export function Setup(): React.JSX.Element {
 
   useEffect(() => {
     refresh()
+    refreshYoutube()
     window.api.getAppInfo().then(setInfo).catch(console.error)
-  }, [refresh])
+  }, [refresh, refreshYoutube])
+
+  const connectYoutube = async (): Promise<void> => {
+    setYoutubeBusy(true)
+    try {
+      const args: string[] = []
+      if (!youtube?.client_secrets_present) {
+        // First connect: the user picks the client_secret.json they created
+        // following docs/youtube.md; it gets imported into the data folder.
+        const picked = await window.api.pickFile(['json'])
+        if (!picked) return
+        args.push('--client-secrets', picked)
+      }
+      // Opens the default browser for Google's consent page; the job ends
+      // once consent is granted (or the window is abandoned).
+      await run('youtube-auth', args)
+    } finally {
+      setYoutubeBusy(false)
+      refreshYoutube()
+    }
+  }
+
+  const disconnectYoutube = async (): Promise<void> => {
+    setYoutubeBusy(true)
+    try {
+      await run('youtube-logout')
+    } finally {
+      setYoutubeBusy(false)
+      refreshYoutube()
+    }
+  }
 
   const checkForUpdates = async (): Promise<void> => {
     setCheckingUpdates(true)
@@ -179,6 +222,50 @@ export function Setup(): React.JSX.Element {
           </div>
         </div>
       )}
+
+      <div className="section">
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h3>YouTube account</h3>
+          <a href={YOUTUBE_GUIDE_URL} target="_blank" rel="noreferrer">
+            Setup guide
+          </a>
+        </div>
+        {!youtube ? (
+          <p className="hint">Checking…</p>
+        ) : youtube.connected ? (
+          <div className="row" style={{ gap: 10 }}>
+            <span className="badge positive">connected</span>
+            <span>
+              {youtube.channel_title ? (
+                <>
+                  Uploading as <strong>{youtube.channel_title}</strong>
+                </>
+              ) : (
+                'Connected (channel name unknown)'
+              )}
+            </span>
+            <button onClick={disconnectYoutube} disabled={youtubeBusy || running}>
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="row" style={{ gap: 10 }}>
+              <span className="badge grey">not connected</span>
+              <button onClick={connectYoutube} disabled={youtubeBusy || running}>
+                {youtube.client_secrets_present
+                  ? 'Connect account…'
+                  : 'Connect account (pick client_secret.json)…'}
+              </button>
+            </div>
+            <p className="hint">
+              One-time setup: create a free Google OAuth client (≈10 minutes, see the guide), pick
+              the downloaded client_secret.json here, then approve access in the browser window that
+              opens. Everything is stored inside this app&apos;s own data folder.
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="section">
         <h3>About</h3>

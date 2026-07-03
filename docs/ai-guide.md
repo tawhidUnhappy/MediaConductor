@@ -223,7 +223,35 @@ mangaeasy audio-takes-list    --project-root "$PROJ" --audio-root "$AUDIO" --jso
 mangaeasy audio-takes-restore --project-root "$PROJ" --audio-root "$AUDIO" --run run_0003
 ```
 
-## 7. Environment variables
+## 7. Uploading to YouTube
+
+Preconditions (once, by the **human** — a browser consent is required, an
+agent cannot do it): the user creates their own Google OAuth client and
+connects it (`mangaeasy youtube-auth --client-secrets <file>`, or Setup tab
+→ YouTube account; full walkthrough in [youtube.md](youtube.md)).
+
+```bash
+mangaeasy youtube-status --json     # {"connected": true, "channel_title": ...}
+mangaeasy youtube-upload --video /abs/path/video.mp4 \
+    --title "My Recap" --tags "manga,recap" --privacy private --json
+# → MANGAEASY_RESULT {"video_id": "...", "url": "https://youtu.be/...", "privacy": "private"}
+```
+
+Agent rules for uploads:
+
+- If `youtube-status --json` says `"connected": false`, do **not** attempt
+  auth yourself — tell the user to connect (Setup tab or `youtube-auth`).
+- Default and recommended `--privacy` is `private`: YouTube force-locks
+  uploads from personal (unaudited) API projects to private; the user
+  publishes in YouTube Studio. Don't fight this.
+- Quota: one upload = 1,600 of 10,000 daily units (~6 uploads/day,
+  resets midnight Pacific). A `quotaExceeded` error means wait, not retry.
+- Uploads are resumable and LONG-RUNNING; progress comes as
+  `MANGAEASY_PROGRESS <bytes>/<total>` lines.
+- `youtube-logout` disconnects; never read or print the token files under
+  `<data>/.mangaeasy/youtube/`.
+
+## 8. Environment variables
 
 | Variable | Meaning |
 |---|---|
@@ -236,7 +264,7 @@ mangaeasy audio-takes-restore --project-root "$PROJ" --audio-root "$AUDIO" --run
 HF/torch/uv caches are automatically redirected under the data folder —
 model downloads never touch `~/.cache`.
 
-## 8. MCP server
+## 9. MCP server
 
 ```bash
 mangaeasy mcp        # newline-delimited JSON-RPC 2.0 over stdio
@@ -247,12 +275,13 @@ Register: `claude mcp add mangaeasy -- mangaeasy mcp` (or client config
 "..."}` to share a GUI install's data). Tools: `doctor`, `where`,
 `library_list`, `video_check`, `video_validate`, `audio_audit`,
 `generate_audio`, `render_videos`, `build_long_video`, `add_bgm`,
-`run_full_pipeline`, `bootstrap_tools`, `install_tool`. Tool results are a
+`run_full_pipeline`, `bootstrap_tools`, `install_tool`, `youtube_status`,
+`youtube_upload`. Tool results are a
 JSON text block: `exit_code`, parsed `report` (for `--json` commands),
 parsed `result` (the `MANGAEASY_RESULT` payload), and tail `output`.
 Generation/install tools block until done — that can be many minutes.
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom | Likely cause | Do |
 |---|---|---|

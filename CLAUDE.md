@@ -338,6 +338,21 @@ points there). When changing CLI behaviour, keep these stable:
   dependency-free. `tests/test_docs_crossref.py` fails if docs mention
   commands that don't exist.
 
+## YouTube integration (`mangaeasy/youtube/`)
+
+`youtube-auth`/`youtube-status`/`youtube-logout`/`youtube-upload` (v1.2.0).
+`store.py` owns the on-disk layout (`<home>/youtube/{client_secret,token,
+channel}.json`) with **plain-JSON helpers only** — the google-auth imports
+stay inside `auth.py` (lazy-import convention). Upload is hand-rolled
+`requests` against the resumable protocol (`upload.py`), not the Google
+discovery client; keep it that way — it's what keeps the PyInstaller
+bundle small and the deps shallow. Rules: tokens are secrets (print
+paths/booleans, never contents); default privacy stays `private` (YouTube
+force-locks unaudited API projects to private — documented in
+docs/youtube.md, don't "fix" it); `youtube-upload --json` prints its JSON
+object as the *last* stdout line (after `MANGAEASY_RESULT`) because the
+MCP server parses the final line.
+
 ## Tests, lint, CI
 
 - `tests/` is a pytest suite for the pipeline's pure logic (item selection,

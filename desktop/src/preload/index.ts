@@ -13,7 +13,8 @@ import type {
   LibraryEntry,
   PurgeKind,
   SystemConfig,
-  UpdateCheck
+  UpdateCheck,
+  YoutubeStatus
 } from '../shared/types'
 
 const api = {
@@ -44,6 +45,9 @@ const api = {
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:get-info'),
   checkAppUpdate: (force = false): Promise<UpdateCheck> =>
     ipcRenderer.invoke('app:check-updates', force),
+
+  // YouTube
+  getYoutubeStatus: (): Promise<YoutubeStatus> => ipcRenderer.invoke('youtube:status'),
 
   listAudioTakes: (projectRoot: string, audioRoot: string): Promise<AudioTakesStatus> =>
     ipcRenderer.invoke('list-audio-takes', projectRoot, audioRoot),

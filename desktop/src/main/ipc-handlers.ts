@@ -162,6 +162,13 @@ export function registerIpcHandlers(): void {
     return parseJsonOutput(stdout)
   })
 
+  // ---- YouTube --------------------------------------------------------------
+
+  ipcMain.handle('youtube:status', async () => {
+    const stdout = await runCapture(buildCli('youtube-status', ['--json']), appRoot())
+    return parseJsonOutput(stdout)
+  })
+
   // ---- App info + update check ---------------------------------------------
 
   ipcMain.handle('app:get-info', () => ({

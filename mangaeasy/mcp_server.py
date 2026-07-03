@@ -154,6 +154,27 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "background_music": ("--background-music", "value"),
          "music_volume_db": ("--music-volume-db", "value")},
     ),
+    "youtube_status": (
+        "youtube-status",
+        "YouTube connection status: connected or not, channel name. Connecting itself needs a human "
+        "in a browser — tell the user to run `mangaeasy youtube-auth` (see docs/youtube.md).",
+        {}, [], {},
+    ),
+    "youtube_upload": (
+        "youtube-upload",
+        "Upload a video to the connected YouTube channel (resumable, LONG-RUNNING). Requires a prior "
+        "`mangaeasy youtube-auth` by the user. Default privacy is private (YouTube forces private for "
+        "unaudited API projects); one upload costs 1,600 of the default 10,000/day quota units.",
+        {"video": {**_STR, "description": "Absolute path to the video file."},
+         "title": {**_STR, "description": "Video title (max 100 chars)."},
+         "description": _STR,
+         "tags": {**_STR, "description": "Comma-separated tags, e.g. 'manga,recap'."},
+         "privacy": {"type": "string", "enum": ["private", "unlisted", "public"]}},
+        ["video", "title"],
+        {"video": ("--video", "value"), "title": ("--title", "value"),
+         "description": ("--description", "value"), "tags": ("--tags", "value"),
+         "privacy": ("--privacy", "value")},
+    ),
     "bootstrap_tools": (
         "bootstrap-tools",
         "Download ffmpeg/uv/git-lfs (~100 MB, one-time) into this install's own tools dir. LONG-RUNNING.",
@@ -170,7 +191,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 }
 
 # Commands whose --json flag should be appended automatically.
-_JSON_COMMANDS = {"doctor", "where", "library-list", "video-check", "video-validate", "video-audio-audit"}
+_JSON_COMMANDS = {"doctor", "where", "library-list", "video-check", "video-validate",
+                  "video-audio-audit", "youtube-status", "youtube-upload"}
 
 
 def _build_args(tool: str, arguments: dict) -> list[str]:
