@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.1 — 2026-07-03
+
+- Setup tab → YouTube account: the downloaded `client_secret.json` file now
+  has its own **Browse client_secret.json…** button (it was a small text
+  link before), plus a one-click "Connect with already-attached project"
+  button when a project is attached but the account is disconnected.
+
 ## v1.3.0 — 2026-07-03
 
 Simpler YouTube project attach + live verification.

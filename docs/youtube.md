@@ -47,8 +47,8 @@ explained at the bottom. Follow the steps in order.
 **Client ID** and **Client secret** → **Attach & connect** → your browser
 opens Google's consent page → approve. The section now shows *Connected as
 \<your channel\>*; the **Verify** button re-checks the connection live any
-time. (Prefer the file? The link under the form accepts the downloaded
-`client_secret.json` instead.)
+time. (Prefer the file? Click **Browse client_secret.json…** under the form
+and pick the downloaded file instead.)
 
 **CLI:**
 

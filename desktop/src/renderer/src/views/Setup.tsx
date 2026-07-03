@@ -71,21 +71,29 @@ export function Setup(): React.JSX.Element {
     }
   }
 
-  const connectYoutube = async (): Promise<void> => {
+  // Alternative to pasting: browse for the downloaded client_secret.json —
+  // always opens the picker (also usable to replace an attached project),
+  // imports it into the data folder, then opens the browser for consent.
+  const connectWithFile = async (): Promise<void> => {
     setYoutubeBusy(true)
     setYtVerify(null)
     try {
-      const args: string[] = []
-      if (!youtube?.client_secrets_present) {
-        // Alternative path: pick the downloaded client_secret.json file;
-        // it gets imported into the data folder.
-        const picked = await window.api.pickFile(['json'])
-        if (!picked) return
-        args.push('--client-secrets', picked)
-      }
-      // Opens the default browser for Google's consent page; the job ends
-      // once consent is granted (or the window is abandoned).
-      await run('youtube-auth', args)
+      const picked = await window.api.pickFile(['json'])
+      if (!picked) return
+      await run('youtube-auth', ['--client-secrets', picked])
+    } finally {
+      setYoutubeBusy(false)
+      refreshYoutube()
+    }
+  }
+
+  // Re-run the consent flow with the project that's already attached
+  // (e.g. after a logout, or when the token expired).
+  const connectExisting = async (): Promise<void> => {
+    setYoutubeBusy(true)
+    setYtVerify(null)
+    try {
+      await run('youtube-auth', [])
     } finally {
       setYoutubeBusy(false)
       refreshYoutube()
@@ -340,21 +348,21 @@ export function Setup(): React.JSX.Element {
                 Attach &amp; connect
               </button>
             </div>
+            <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+              <span className="hint">— or use the downloaded file:</span>
+              <button onClick={connectWithFile} disabled={youtubeBusy || running}>
+                Browse client_secret.json…
+              </button>
+              {youtube.client_secrets_present && (
+                <button onClick={connectExisting} disabled={youtubeBusy || running}>
+                  Connect with already-attached project
+                </button>
+              )}
+            </div>
             <p className="hint" style={{ margin: 0 }}>
               Paste both values from Google Cloud console → APIs &amp; Services → Credentials (shown
-              when you create the &quot;Desktop app&quot; OAuth client) — or{' '}
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault()
-                  connectYoutube()
-                }}
-              >
-                {youtube.client_secrets_present
-                  ? 'connect with the already-attached project'
-                  : 'pick the downloaded client_secret.json instead'}
-              </a>
-              . Everything is stored inside this app&apos;s own data folder.
+              when you create the &quot;Desktop app&quot; OAuth client), or browse to the JSON file
+              it offers for download. Everything is stored inside this app&apos;s own data folder.
             </p>
           </div>
         )}
