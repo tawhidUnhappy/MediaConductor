@@ -153,6 +153,13 @@ multiplier. Don't reintroduce a linear volume knob; it was deliberately
 converted away from one because it confused users (the UI used to label a
 linear value "dB").
 
+Both `amix` calls in `add_long_video_bgm.py` pass **`normalize=0` — keep
+it**. amix's default rescales every input by 1/inputs (−6 dB for two),
+which silently undid the −14 LUFS normalization and shipped ~−20 LUFS
+videos (found in production: YouTube never boosts quiet uploads, so they
+just played quiet). With plain summation the narration keeps its normalized
+loudness and the `alimiter` after the mix handles summed peaks.
+
 ## GPU / TTS concurrency — known limits
 
 - Kokoro runs as `gpu-workers` parallel processes, each loading its own
@@ -352,6 +359,14 @@ force-locks unaudited API projects to private — documented in
 docs/youtube.md, don't "fix" it); `youtube-upload --json` prints its JSON
 object as the *last* stdout line (after `MANGAEASY_RESULT`) because the
 MCP server parses the final line.
+
+`store.SCOPES` requests **full video management** (`youtube.force-ssl`, on
+top of upload + readonly) so a bad take can be deleted/replaced through the
+API instead of a manual YouTube Studio trip. It was upload-only originally;
+tokens granted back then still upload fine but get 403
+`insufficientPermissions` on delete/update — the fix is re-running
+`youtube-auth` (re-consent), not code. Scope still excludes comments,
+playlists, and account settings; don't broaden it further without need.
 
 ## Tests, lint, CI
 

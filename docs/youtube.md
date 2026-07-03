@@ -66,6 +66,15 @@ The client file and token are stored in `<data folder>/.mangaeasy/youtube/`
 Disconnect, or `mangaeasy youtube-logout`); you can also revoke access at
 https://myaccount.google.com/permissions.
 
+**What you're granting:** full management of your channel's *videos* —
+upload, edit metadata, and delete. Delete matters in practice: when you
+re-upload a fixed take, the bad one can be removed through the API instead
+of a manual YouTube Studio trip. mangaEasy never touches comments,
+playlists, live chat, or account settings. If you connected with an older
+mangaEasy version, your token is upload-only — video management will fail
+with a 403 "insufficient authentication scopes" until you reconnect once
+(`mangaeasy youtube-auth`, or Setup → Connect).
+
 ## Part 3 — Upload
 
 **Desktop app:** Batch tab → step **Upload to YouTube** → it defaults to
@@ -113,3 +122,4 @@ stopped, and large files upload in chunks with progress.
 | `quotaExceeded` | Rule 2 — wait for the daily reset (midnight Pacific) |
 | Disconnected after a week | Consent screen left in "Testing" — set it to "In production" and reconnect |
 | Thumbnail warning after upload | Custom thumbnails need a phone-verified YouTube account (youtube.com/verify) |
+| 403 "insufficient authentication scopes" on delete/update | Token predates full video management — reconnect once: `mangaeasy youtube-auth` |

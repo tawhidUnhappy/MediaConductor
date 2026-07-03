@@ -112,7 +112,11 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
-  `--music-volume-db -25`.
+  `--music-volume-db -25`. The value is how far the music sits *below the
+  narration*: mixing never attenuates the narration track, so a long video
+  normalized to −14 LUFS stays at −14 LUFS after `video-add-bgm`. For
+  narration-driven recap videos, −15 to −20 keeps music audible but clearly
+  under the voice.
 - `--gpu-workers` above 4 is known to crash consumer NVIDIA cards; default
   is safe.
 - Everything works CPU-only; GPU is an optimization, not a requirement.

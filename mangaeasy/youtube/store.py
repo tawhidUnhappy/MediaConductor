@@ -24,9 +24,13 @@ from pathlib import Path
 
 from mangaeasy.tools.external import mangaeasy_home
 
-# Upload permission + read-only (the latter only to show "connected as
-# <channel>"; no channel-management scope is ever requested).
+# Full video management (youtube.force-ssl): upload, edit metadata, and
+# delete the channel's videos — needed so re-uploads can replace a bad take
+# without a trip to YouTube Studio. Tokens granted before this scope was
+# added keep working for upload but can't delete; re-run `youtube-auth`
+# once to re-consent with the broader permission.
 SCOPES = [
+    "https://www.googleapis.com/auth/youtube.force-ssl",
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",
 ]

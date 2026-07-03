@@ -89,14 +89,19 @@ def add_background_music(
             f"[1:a]volume={music_volume_db}dB,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[music];"
             "[narr]asplit=2[narr_main][narr_sc];"
             f"[music][narr_sc]sidechaincompress=threshold=0.01:ratio={duck_ratio}:attack={duck_attack}:release={duck_release}[music_ducked];"
-            "[narr_main][music_ducked]amix=inputs=2:duration=first:dropout_transition=3,"
+            # normalize=0: amix's default rescales every input by 1/inputs (-6 dB
+            # for two), silently undoing the -14 LUFS normalization of the
+            # narration track. Plain summation keeps narration at its normalized
+            # loudness; the limiter below handles any summed peaks.
+            "[narr_main][music_ducked]amix=inputs=2:duration=first:dropout_transition=3:normalize=0,"
             "alimiter=limit=0.95,aresample=async=1:first_pts=0[a]"
         )
     else:
         filter_complex = (
             f"[0:a]volume={narration_volume},aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[narr];"
             f"[1:a]volume={music_volume_db}dB,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[music];"
-            "[narr][music]amix=inputs=2:duration=first:dropout_transition=3,"
+            # normalize=0: see comment in the ducking branch above.
+            "[narr][music]amix=inputs=2:duration=first:dropout_transition=3:normalize=0,"
             "alimiter=limit=0.95,aresample=async=1:first_pts=0[a]"
         )
     cmd = [
