@@ -19,6 +19,11 @@ mangaeasy commands --json   # the full command catalog
 Prefer MCP? `mangaeasy mcp` runs an MCP stdio server with typed tools —
 see [MCP server](#mcp-server) below. The CLI and MCP expose the same engine.
 
+Making a full recap video end to end (panel detection, narration writing,
+thumbnail, YouTube upload)? Follow `docs/recap-video-playbook.md` — a
+step-by-step production recipe verified on a real published video. This
+file is the command reference underneath it.
+
 ---
 
 ## 1. Getting a working `mangaeasy` command

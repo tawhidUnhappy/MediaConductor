@@ -5,7 +5,10 @@ work on `D:\mangaEasy`. It describes what the app does, how the pieces fit
 together, the conventions that matter, and the gotchas that have bitten past
 sessions. Read this before making changes. `docs/architecture.md`,
 `docs/app.md`, `docs/install.md`, `docs/external-tools.md`, and
-`docs/publishing.md` are supplementary — this file is the map.
+`docs/publishing.md` are supplementary — this file is the map. If the task
+is *producing a recap video* rather than changing code, follow
+`docs/recap-video-playbook.md` — the verified end-to-end production recipe
+(download → panels → narration → build → thumbnail → upload).
 
 ## What this app does
 
