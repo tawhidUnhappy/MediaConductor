@@ -235,9 +235,12 @@ Structure that worked (96 entries ≈ 9–11 min depending on TTS):
 
 Rules learned in production:
 
-- **Audio is keyed by image stem.** If the hook reuses a story panel, the
-  two entries would share one WAV. Make renamed copies for the hook
-  (`01_00_01.png`, `01_00_02.png`, …) and reference those.
+- **Audio is keyed by image stem.** If the hook (or the CTA) reuses a story
+  panel, the two entries would share one WAV. Make renamed *physical copies*
+  and reference those: hook panels into a page-`00` namespace
+  (`01_00_01.png`, `01_00_02.png`, …); the CTA panel into a page number
+  *past the last real page* (e.g. `01_74_01.png` when the chapter ends at
+  page 72) so it can't collide with a story panel's stem either.
 - Skip the unsafe panels from Phase 4 entirely; keep plot-critical
   borderline panels brief and frame them as comedy/panic, never salacious.
 - Style: present tense, short punchy sentences, escalation words,
@@ -249,6 +252,16 @@ Validate inputs before burning GPU time:
 ```bash
 mangaeasy video-check --project-root library/<Project> --items 01 --json
 ```
+
+When you deliberately narrate a subset of panels (the normal case — hook/CTA
+copies plus only the story-carrying panels), `video-check` returns
+`"ok": false` with "Narration count does not match panel count" / "Panels
+not listed in narration" warnings. **That is expected** — unlisted panels
+are simply unused, and the pipeline renders only the panels named in
+`narration.json`. The pre-build checks that actually matter: the JSON
+parses, no two entries share an image stem, and every referenced image
+exists on disk. (After building, the warnings that do matter are
+audio-related — missing audio for a *referenced* entry; see Phase 7.)
 
 ## Phase 6 — Build the video
 
