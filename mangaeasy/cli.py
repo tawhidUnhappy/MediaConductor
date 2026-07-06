@@ -97,6 +97,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "cut-page":             ("mangaeasy.web.cut_page",                         "main",        "Manga: acquire",   "Web editor: cut full pages into panels."),
     "panel-editor":         ("mangaeasy.web.panel_editor",                     "main",        "Manga: acquire",   "Web editor: arrange panels (vertical manhwa)."),
     "gutter-split":         ("mangaeasy.panels.gutter",                        "main",        "Manga: acquire",   "Split pages along gutters into panels."),
+    "webtoon-split":        ("mangaeasy.panels.webtoon",                       "main",        "Manga: acquire",   "Split webtoon items into panels with auto-split, gap rescue and verify sheets."),
     "process-panels":       ("mangaeasy.panels.process",                       "main",        "Manga: acquire",   "Post-process panels (upscale / mirror / clean bubbles)."),
 
     # ── Manga chapter workflow: narration ─────────────────────────────────────

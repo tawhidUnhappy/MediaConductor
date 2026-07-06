@@ -53,10 +53,63 @@ e.g. for the description's credits / "support the official release" section
 (`mangaeasy library-list --json` includes it as each project's `manga`
 field).
 
-## Phase 2 — Panel detection (MAGI v3)
+## Phase 2–3 for webtoons — `webtoon-split`, then clear every flag
+
+**This applies to vertical-strip webtoons** (one endless scroll with
+gutter-separated panels). Paged manga: skip to the MAGI phases below.
+
+One command replaces detection + cropping + verification-sheet generation:
+
+```bash
+mangaeasy webtoon-split --project-root library/<Project> --item-range 01-19
+```
+
+Per item it stitches `download/` into one tall strip, splits it at gutters
+(same detection code path as `gutter-split`), then applies two fixups the
+raw gutter pass reliably needs on real webtoons:
+
+- **Auto-split** — any "panel" taller than 2.2× width is re-cut at the
+  quietest row near even split points. A single missed gutter otherwise
+  produces a 10,000-px panel that renders unreadably small in a video.
+- **Gap rescue** — dropped gaps whose interior still contains content
+  (scene-break captions like "ONE HOUR LATER…" sitting on gutter-colored
+  background) are attached to the following panel so no story text is lost.
+
+Crops land in `library/<Project>/<item>/panels/ch<item>_###.jpg` (an
+existing panels folder is archived to `<item>/old/run_NNNN/` first), and
+verification images in `work/webtoon_verify/<Project>/`:
+
+- `NN_sheet_K.png` — numbered contact sheets; suspects get a red `!!` label.
+- `NN_strip_K.png` — the downscaled strip with green panel boxes, blue
+  auto-cut lines, and red dropped rows.
+
+**Clear every flag visually before writing narration.** Each item's report
+line prints `suspects` (unusually tall/short panels), `rescued` gaps, and
+`content_drops` (dropped rows that still look like content). Production-
+verified benign patterns: a thin `#3`-ish sliver near the top = scanlator /
+Tencent credit banner; a trailing drop of h≈765–1054 at the very end of a
+strip = "NOTICE: we're recruiting" promo block; thin bright slivers mid-
+chapter = SFX calligraphy (fine to skip in narration). Dialogue-bubble
+slices flagged as suspects are real content — keep them. When the automatic
+result is actually wrong, correct it per item with `--overrides`:
+
+```json
+{"07": {"split_at": [23140]}, "12": {"merge": [[4, 5]]}}
+```
+
+(`replace` swaps an item's whole range list; `merge` indices are 0-based
+inclusive; `split_at` values are stitched-strip y coordinates readable off
+the strip overlay.)
+
+Webtoon panel naming is `ch{item}_{i:03d}.jpg` — narration.json keys on
+these filenames. Chapters from different scanlators differ in boilerplate:
+check the first sheet of each group for leading credit/cover pages (skip
+them in narration) and the last sheet for trailing promo panels.
+
+## Phase 2 — Panel detection (MAGI v3, paged manga)
 
 **This applies to paged manga.** Vertical webtoons don't need MAGI — use
-`mangaeasy gutter-split` or the `mangaeasy cut-page` editor instead.
+`mangaeasy webtoon-split` (previous section) instead.
 
 The repo ships a single-image adapter
 (`mangaeasy/assets/tools/detect_magi.py`, copied into the tool env by
