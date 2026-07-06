@@ -86,6 +86,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "youtube-status":       ("mangaeasy.youtube.auth",                         "status_main", "YouTube",          "Show YouTube connection status (--json); --verify checks the token live."),
     "youtube-logout":       ("mangaeasy.youtube.auth",                         "logout_main", "YouTube",          "Disconnect the YouTube account (delete the stored token)."),
     "youtube-upload":       ("mangaeasy.youtube.upload",                       "main",        "YouTube",          "Upload a video to the connected channel (resumable; default privacy: private)."),
+    "youtube-delete":       ("mangaeasy.youtube.delete",                       "main",        "YouTube",          "Delete a video from the connected channel (two-step: requires --confirm)."),
 
     # ── External AI tool environments ─────────────────────────────────────────
     "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI) resolve."),
