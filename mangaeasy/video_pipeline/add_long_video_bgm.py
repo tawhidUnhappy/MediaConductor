@@ -39,8 +39,15 @@ def parse_args() -> argparse.Namespace:
                              "-stream_loop seams and in-track defects can't repeat through the whole video.")
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR,
                         help="Scratch dir for the cached music bed (default: the pipeline work dir).")
-    parser.add_argument("--music-volume-db", type=float, default=-25.0,
-                        help="Background music loudness in dB (negative = quieter), applied via ffmpeg's volume filter.")
+    parser.add_argument("--music-volume-db", type=float, default=-19.0,
+                        help="How far the music sits below the narration, in dB (negative = quieter). The music "
+                             "stem is loudness-normalized to the narration's -14 LUFS reference first (see "
+                             "--no-music-loudnorm), so this value is a true LU separation regardless of how hot "
+                             "the source track was mastered. -18 to -20 is the recap-video sweet spot.")
+    parser.add_argument("--no-music-loudnorm", action="store_true",
+                        help="Skip measuring the music's integrated loudness and aligning it to the -14 LUFS "
+                             "reference before applying --music-volume-db. With this flag the offset is applied "
+                             "to the raw file, so the effective separation depends on the track's mastering.")
     parser.add_argument("--narration-volume", type=float, default=1.0)
     parser.add_argument("--duck", action="store_true",
                         help="Enable audio ducking: background music is automatically lowered "
@@ -156,8 +163,30 @@ def main() -> int:
         music, bed_report = prepare_music_bed(args.background_music, video_duration, args.work_dir)
         print(describe_report(bed_report), flush=True)
 
+    # Align the music stem to the -14 LUFS narration reference before the
+    # user's offset, so --music-volume-db is a true LU separation (a hot
+    # master and a quiet ambient track end up equally far under the voice).
+    effective_volume_db = args.music_volume_db
+    if not args.no_music_loudnorm:
+        from mangaeasy.video_pipeline.music_bed import (
+            MUSIC_LOUDNESS_REF,
+            measure_integrated_lufs,
+            music_loudnorm_pregain,
+        )
+
+        measured = measure_integrated_lufs(music)
+        pregain = music_loudnorm_pregain(measured)
+        if measured is None:
+            print("[music-loudnorm] could not measure music loudness; applying the offset to the raw file", flush=True)
+        else:
+            effective_volume_db = args.music_volume_db + pregain
+            print(f"[music-loudnorm] music measured {measured:.1f} LUFS; pre-gain {pregain:+.1f} dB "
+                  f"to the {MUSIC_LOUDNESS_REF:g} LUFS reference -> effective volume "
+                  f"{effective_volume_db:.1f} dB (a true {abs(args.music_volume_db):g} LU below narration)",
+                  flush=True)
+
     add_background_music(
-        video_in, video_out, music, args.music_volume_db, args.narration_volume, args.audio_bitrate,
+        video_in, video_out, music, effective_volume_db, args.narration_volume, args.audio_bitrate,
         duck=args.duck, duck_ratio=args.duck_ratio, duck_attack=args.duck_attack, duck_release=args.duck_release,
     )
     print(f"\nAdded background music: {video_out}", flush=True)

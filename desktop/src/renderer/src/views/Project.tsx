@@ -140,7 +140,7 @@ export function Project(): React.JSX.Element {
             <input
               type="number"
               style={{ width: 70 }}
-              value={systemConfig.bgm?.volume_db ?? -25}
+              value={systemConfig.bgm?.volume_db ?? -19}
               onChange={(e) =>
                 updateSystemConfig((sc) => ({
                   ...sc,

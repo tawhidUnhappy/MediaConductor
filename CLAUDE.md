@@ -174,10 +174,21 @@ entry point. It shells out to the narrower commands in this order:
    the music up to the same loudness as narration.
 
 Background music volume is **dB-native** end to end (`--music-volume-db`,
-default `-25.0`, applied via ffmpeg's `volume=XdB` filter) — not a linear
+default `-19.0`, applied via ffmpeg's `volume=XdB` filter) — not a linear
 multiplier. Don't reintroduce a linear volume knob; it was deliberately
 converted away from one because it confused users (the UI used to label a
 linear value "dB").
+
+Before the offset is applied, `video-add-bgm` measures the music's
+integrated loudness (ffmpeg `ebur128`) and pre-gains it to the same
+−14 LUFS reference the narration is normalized to
+(`music_loudnorm_pregain()` in `video_pipeline/music_bed.py`, clamped to
+±12 dB, `--no-music-loudnorm` to disable). Without this, the *effective*
+separation depended on the source track's mastering (a −9 LUFS hot master
+sat 5 dB closer to the voice than a −19 LUFS ambient track at the same
+setting). The −19 default is the audio-engineering consensus for
+continuous narration (−18…−20; −15 masks the voice on phone speakers,
+−25 is inaudible) — keep new volume-related defaults inside that window.
 
 Both `amix` calls in `add_long_video_bgm.py` pass **`normalize=0` — keep
 it**. amix's default rescales every input by 1/inputs (−6 dB for two),
@@ -307,10 +318,13 @@ main/preload vs. renderer) then the electron-vite build.
 
 ## External AI tool environments (`mangaeasy/tools/`)
 
-Kokoro, IndexTTS, MAGI (panel detection), GOT-OCR 2.0 each live in their own
+Kokoro, IndexTTS, MAGI (panel detection), GOT-OCR 2.0, and Z-Image Turbo
+(image generation, `mangaeasy zimage`) each live in their own
 isolated `uv` project under `<install>/.mangaeasy/tools/<tool>/` so their
 CUDA/Torch/Transformers versions can't conflict with the main package or
-each other. `mangaeasy install-tool <name>` installs one;
+each other. Z-Image facts that must not be "optimized" away: guidance_scale
+stays 0.0 (Turbo has no CFG), bf16/fp32 only (fp16 renders black frames),
+NF4 quantization is what lets it run on 8–12 GB GPUs. `mangaeasy install-tool <name>` installs one;
 `mangaeasy.tools.external.resolve_tool_dir()` finds an installed tool's
 directory; `mangaeasy.tools.vendored` vendors ffmpeg/uv/git-lfs/Node.js into
 the install so end users never need them on PATH —

@@ -228,7 +228,7 @@ export function Batch(): React.JSX.Element {
     refreshMangas()
     window.api.getConfig().then(({ systemConfig }) => {
       setBgmFile(systemConfig.bgm?.file ?? '')
-      setBgmVolumeDb(systemConfig.bgm?.volume_db ?? -25)
+      setBgmVolumeDb(systemConfig.bgm?.volume_db ?? -19)
     })
   }, [refreshMangas])
 
@@ -772,7 +772,7 @@ export function Batch(): React.JSX.Element {
               <input
                 type="number"
                 style={{ width: 70 }}
-                value={bgmVolumeDb ?? -25}
+                value={bgmVolumeDb ?? -19}
                 onChange={(e) => setBgmVolume(Number(e.target.value))}
               />
             </label>

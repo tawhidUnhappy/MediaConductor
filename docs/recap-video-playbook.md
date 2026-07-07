@@ -325,22 +325,29 @@ One command runs audio → render → join → normalize → BGM:
 mangaeasy video --project-root library/<Project> --items 01 \
   --tts kokoro --gpu-workers 4 \
   --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -17
+  --background-music "<path to music>" --music-volume-db -19
 
 # IndexTTS voice clone (much slower, best quality; leave gpu-workers at default):
 mangaeasy video --project-root library/<Project> --items 01 \
   --tts indextts --speaker-wav "<path to reference voice wav>" \
   --overwrite-audio --overwrite-video \
   --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -17
+  --background-music "<path to music>" --music-volume-db -19
 ```
 
 - Use the **default audio/output roots** (don't pass `--audio-root
   audio/<Project>` — the project name is appended automatically and you
   get a doubled path).
-- `--music-volume-db -17` is the recap-channel sweet spot (music audible,
-  voice clearly on top; the value is dB below the narration, which is
-  never attenuated). −15 to −20 is the sane range.
+- `--music-volume-db -19` (the default) is the researched recap-channel
+  sweet spot: audio-engineering and faceless-channel guidance converges on
+  music **18–20 dB below continuous narration** (−15 is the masking
+  boundary on phone speakers, −25 the inaudibility boundary). The music
+  stem is loudness-aligned to the narration's −14 LUFS reference before
+  the offset (`[music-loudnorm]` log line), so the value is a true LU
+  separation whatever the track's mastering; `--no-music-loudnorm`
+  restores the old raw-offset behavior. An earlier production used −17
+  before the loudnorm existed — with a hot-mastered YouTube-rip bed that
+  was effectively ~−16 LU, slightly hot.
 - **Music QC is automatic** — `video-add-bgm` scans the track's 20 ms RMS
   envelope before mixing (`mangaeasy/video_pipeline/music_bed.py`): splice
   holes (brief 25+ dB collapses mid-phrase — `silencedetect` can't see
@@ -409,33 +416,66 @@ first at `0:00`, each ≥10 s. **Recompute after every audio regeneration**
 
 ## Phase 9 — Thumbnail (1280×720)
 
-Composition that worked (PIL): dramatic panel as background, scaled to
-width, blurred (GaussianBlur ~2.5), darkened (brightness ~0.42), warm/red
-tint blended through an elliptical mask; subject panel cropped tight and
-pasted right at ~700 px tall with a 6 px white sticker border; 3–5 words
-of text on the left in Impact, 90–120 pt, white/yellow/red fills, black
-stroke (`stroke_width ≈ size//9`) plus a small drop shadow.
+Two proven approaches — pick by what tools are installed:
 
-Two mandatory checks, both from real failures:
+**A. Generated scene (big-recap-channel style, e.g. MamoruManhwa).** Top
+manhwa-recap channels don't collage panels; the thumbnail is one coherent
+glossy anime illustration. With `mangaeasy install-tool z-image-turbo`
+installed, generate it: `mangaeasy zimage --prompt-file prompt.txt --output
+thumb_base.png --width 1280 --height 720 --count 4` (pick the best of 4),
+prompting a two-character face-off (foreground face ~30% of frame height,
+bright saturated blues, depth-of-field background matching the story's
+setting, exaggerated expressions — one side shocked/flustered, the other
+calm/powered-up). Then with PIL add the signature text/furniture:
+1–3 blocks of 1–4 words each — ALL-CAPS role labels + lowercase dialogue
+quips — in extra-bold rounded comic type (Luckiest Guy family), **yellow
+#FFE600 or white fills, black stroke ≈ 12% of font size**, in the top-left
+and top-right zones; a solid triangle speech-tail from each block toward
+its speaker; optionally one chunky yellow black-outlined arrow to the
+reveal character and a white radial glow behind them; finish with a ~5 px
+white rounded-rect border inset ~3 px from the edge.
+
+**B. Panel collage (works with no image model).** Dramatic panel as
+background, scaled to width, blurred (GaussianBlur ~2.5), darkened
+(brightness ~0.42), warm/red tint blended through an elliptical mask;
+subject panel cropped tight and pasted right at ~700 px tall with a 6 px
+white sticker border; 3–5 words of text on the left in Impact, 90–120 pt,
+white/yellow/red fills, black stroke (`stroke_width ≈ size//9`) plus a
+small drop shadow.
+
+Mandatory checks, all from real failures:
 
 1. **Render it and look at it.** Never ship a thumbnail you haven't seen.
 2. **Check every visible speech bubble in the crop** — a cut-off bubble
    can leave exactly the wrong words readable (the reference production's
    first thumbnail showed a truncated explicit line). Adjust the crop to
    exclude unsafe bubbles; a safe intriguing bubble is a bonus, not a risk.
+3. Generated scenes: check hands/faces for AI artifacts before shipping;
+   regenerate with a different seed rather than shipping a warped face.
 
 ## Phase 10 — Title, description, tags
 
-- **Title** ≤ 100 chars: curiosity gap + contradiction, then
-  `| <Series> Ch. N Recap`. Pattern: "He Tried To Propose To A Nun... And
-  Freed A Demon King Instead | Irozuku Monochrome Ch. 1 Recap".
+- **Title** ≤ 100 chars. Two archetypes (big recap channels run both):
+  - *Curiosity-gap premise* (browse/suggested traffic — the viral engine):
+    `[He/She] + [unfair disadvantage] + BUT/AND + [OP payoff]! - Manhwa
+    Recap`. 1–3 ALL-CAPS power words (SECRET, WORST, OP), concrete numbers
+    ("9,999 times", "#1"), and — counterintuitively — **don't name the
+    series**: "what's this called?" becomes the top comment and drives
+    engagement. Put the series name in the description instead (and pin a
+    comment naming it after upload).
+  - *Search-intent* (evergreen): `<Series> Chapter X–Y Full Recap` /
+    "...Full Story Recap in 30 Minutes". Use for catch-up mega-recaps.
 - **Description** (write to a UTF-8 file): first ~150 chars are the search
-  snippet — make them the hook; then a short story tease, `CHAPTERS`
-  block from Phase 8, a binary comment-bait question + subscribe line,
-  official-release credit (author + publisher, "support the official
-  release"), a fair-use/transformative disclaimer, and 5–7 hashtags.
+  snippet — lead with the hook AND the main keyword ("<series> manhwa
+  recap"); then a short story tease, `CHAPTERS` block from Phase 8, a
+  binary comment-bait question (power-scaling debates are the
+  highest-engagement format) + subscribe line, official-release credit
+  (author + publisher, "support the official release"), a
+  fair-use/transformative disclaimer, and **3–5 hashtags** (more dilutes;
+  15+ and YouTube ignores all of them).
 - **Tags**: comma-separated, ≤ 500 chars total — series name, genre
-  phrases, "manga recap", "new manga <year>".
+  phrases, "manhwa recap"/"manga recap", character names, "new manga
+  <year>".
 
 ## Phase 11 — Upload (and replacing a bad take)
 

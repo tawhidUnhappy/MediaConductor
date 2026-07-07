@@ -7,7 +7,7 @@
   },
   "bgm": {
     "file": "music/background.mp3",
-    "volume_db": -34
+    "volume_db": -19
   },
   "video": {
     "width": 1920,

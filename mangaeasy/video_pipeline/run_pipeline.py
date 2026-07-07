@@ -97,8 +97,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--background-brightness", type=float, default=-0.06)
     parser.add_argument("--background-saturation", type=float, default=1.08)
     parser.add_argument("--background-music", type=Path, default=None)
-    parser.add_argument("--music-volume-db", type=float, default=-25.0,
-                        help="Background music loudness in dB (negative = quieter), applied via ffmpeg's volume filter.")
+    parser.add_argument("--music-volume-db", type=float, default=-19.0,
+                        help="How far the music sits below the narration, in dB (negative = quieter). The music "
+                             "stem is loudness-aligned to the narration's -14 LUFS reference first, so this is "
+                             "a true LU separation; -18 to -20 is the recap-video sweet spot.")
+    parser.add_argument("--no-music-loudnorm", action="store_true",
+                        help="Apply --music-volume-db to the raw music file without aligning its loudness "
+                             "to the -14 LUFS reference first.")
     parser.add_argument("--narration-volume", type=float, default=1.0)
     parser.add_argument("--duck", action="store_true",
                         help="Enable audio ducking so background music lowers automatically when narration is audible.")
@@ -268,6 +273,8 @@ def main() -> int:
                 # standalone video-add-bgm step (its own default) is for.
                 "--replace",
             )
+            if args.no_music_loudnorm:
+                bgm_cmd += ["--no-music-loudnorm"]
             if args.duck:
                 bgm_cmd += ["--duck", "--duck-ratio", str(args.duck_ratio),
                             "--duck-attack", str(args.duck_attack), "--duck-release", str(args.duck_release)]

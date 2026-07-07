@@ -9,9 +9,12 @@ must not be mistaken for defects.
 import numpy as np
 
 from mangaeasy.video_pipeline.music_bed import (
+    MAX_LOUDNORM_GAIN_DB,
     WIN_S,
     find_holes,
     find_trims,
+    music_loudnorm_pregain,
+    parse_ebur128_integrated,
     plan_keep_segments,
     plan_repeats,
     rms_envelope_db,
@@ -111,3 +114,47 @@ def test_plan_repeats_covers_target():
 
 def test_plan_repeats_degenerate_core():
     assert plan_repeats(2.0, 100.0, xfade_s=3.0) == 1  # core shorter than xfade: no loop
+
+
+# ---------------------------------------------------------------------------
+# music loudness pre-normalization
+# ---------------------------------------------------------------------------
+
+EBUR128_TAIL = """\
+[Parsed_ebur128_0 @ 000001] Summary:
+
+  Integrated loudness:
+    I:         -13.2 LUFS
+    Threshold: -23.6 LUFS
+
+  Loudness range:
+    LRA:         7.9 LU
+    Threshold: -33.5 LUFS
+    LRA low:   -20.5 LUFS
+    LRA high:  -12.6 LUFS
+"""
+
+
+def test_parse_ebur128_integrated_reads_summary():
+    assert parse_ebur128_integrated(EBUR128_TAIL) == -13.2
+
+
+def test_parse_ebur128_integrated_ignores_other_lufs_lines():
+    # Threshold / LRA lines also end in LUFS but must not match.
+    text = EBUR128_TAIL.replace("    I:         -13.2 LUFS\n", "")
+    assert parse_ebur128_integrated(text) is None
+
+
+def test_parse_ebur128_integrated_takes_last_match():
+    assert parse_ebur128_integrated(EBUR128_TAIL + "\n  I: -10.0 LUFS\n") == -10.0
+
+
+def test_pregain_aligns_to_reference():
+    assert music_loudnorm_pregain(-13.2) == -0.8000000000000007  # −14 − (−13.2)
+    assert music_loudnorm_pregain(-20.0) == 6.0
+
+
+def test_pregain_clamps_and_handles_missing():
+    assert music_loudnorm_pregain(None) == 0.0
+    assert music_loudnorm_pregain(-60.0) == MAX_LOUDNORM_GAIN_DB
+    assert music_loudnorm_pregain(30.0) == -MAX_LOUDNORM_GAIN_DB

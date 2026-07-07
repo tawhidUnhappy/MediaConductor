@@ -35,6 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import subprocess
 from pathlib import Path
 from typing import List, Tuple
@@ -44,6 +45,16 @@ import numpy as np
 from mangaeasy.video_pipeline.audio_audit import ffprobe_duration
 
 Segment = Tuple[float, float]
+
+# Reference loudness the music stem is aligned to before the user's dB offset
+# is applied — the same target `video-normalize-audio` uses for narration
+# (−14 LUFS, YouTube's normalization point). With both stems on the same
+# footing, `--music-volume-db -19` is a true 19 LU separation no matter how
+# hot or quiet the source track was mastered.
+MUSIC_LOUDNESS_REF = -14.0
+# A pre-gain larger than this means the measurement or the file is suspect
+# (near-silent or clipping-hot source) — clamp instead of applying blindly.
+MAX_LOUDNORM_GAIN_DB = 12.0
 
 ANALYSIS_SR = 8000
 WIN_S = 0.02                 # envelope window (s) — short enough to see 80 ms holes
@@ -270,6 +281,44 @@ def prepare_music_bed(music: Path, video_duration_s: float, work_dir: Path) -> T
     except Exception as exc:  # never break the mix over bed preparation
         report["note"] = f"music bed preparation failed ({exc}); using file as-is"
         return music, report
+
+
+# ---------------------------------------------------------------------------
+# Loudness measurement (for pre-offset music normalization)
+# ---------------------------------------------------------------------------
+
+_EBUR128_I_RE = re.compile(r"^\s*I:\s*(-?\d+(?:\.\d+)?)\s*LUFS\s*$", re.MULTILINE)
+
+
+def parse_ebur128_integrated(text: str) -> float | None:
+    """Integrated loudness (LUFS) from ffmpeg `ebur128` output, or None."""
+    matches = _EBUR128_I_RE.findall(text)
+    return float(matches[-1]) if matches else None
+
+
+def measure_integrated_lufs(path: Path) -> float | None:
+    """Integrated LUFS of an audio file via ffmpeg ebur128 — None on failure."""
+    try:
+        proc = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-nostats", "-i", str(path),
+             "-map", "a:0", "-af", "ebur128", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=600,
+        )
+        return parse_ebur128_integrated(proc.stderr or "")
+    except Exception:
+        return None
+
+
+def music_loudnorm_pregain(measured_lufs: float | None) -> float:
+    """Static gain (dB) that brings the music stem to MUSIC_LOUDNESS_REF.
+
+    Clamped to ±MAX_LOUDNORM_GAIN_DB; 0.0 when measurement failed so the
+    user's offset is applied to the raw file exactly as before.
+    """
+    if measured_lufs is None:
+        return 0.0
+    gain = MUSIC_LOUDNESS_REF - measured_lufs
+    return max(-MAX_LOUDNORM_GAIN_DB, min(MAX_LOUDNORM_GAIN_DB, gain))
 
 
 def describe_report(report: dict) -> str:
