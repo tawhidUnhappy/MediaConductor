@@ -325,20 +325,20 @@ One command runs audio → render → join → normalize → BGM:
 mangaeasy video --project-root library/<Project> --items 01 \
   --tts kokoro --gpu-workers 4 \
   --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -19
+  --background-music "<path to music>" --music-volume-db -22
 
 # IndexTTS voice clone (much slower, best quality; leave gpu-workers at default):
 mangaeasy video --project-root library/<Project> --items 01 \
   --tts indextts --speaker-wav "<path to reference voice wav>" \
   --overwrite-audio --overwrite-video \
   --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -19
+  --background-music "<path to music>" --music-volume-db -22
 ```
 
 - Use the **default audio/output roots** (don't pass `--audio-root
   audio/<Project>` — the project name is appended automatically and you
   get a doubled path).
-- `--music-volume-db -19` (the default) is the researched recap-channel
+- `--music-volume-db -22` (the default) is the researched recap-channel
   sweet spot: audio-engineering and faceless-channel guidance converges on
   music **18–20 dB below continuous narration** (−15 is the masking
   boundary on phone speakers, −25 the inaudibility boundary). The music

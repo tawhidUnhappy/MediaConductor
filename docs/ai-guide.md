@@ -128,13 +128,14 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
-  `--music-volume-db -19`. The value is how far the music sits *below the
+  `--music-volume-db -22`. The value is how far the music sits *below the
   narration*: mixing never attenuates the narration track, so a long video
   normalized to −14 LUFS stays at −14 LUFS after `video-add-bgm`. The music
   stem is loudness-aligned to the same −14 LUFS reference before the offset
   (disable with `--no-music-loudnorm`), so the number is a true LU
   separation regardless of the track's mastering. For narration-driven
-  recap videos the researched sweet spot is **−18 to −20 (default −19)**;
+  recap videos (dense, wall-to-wall narration) the researched value is
+  **−22 (the default)**; sparser voiceover sits at −18 to −20;
   below −25 the bed is inaudible on phone speakers, above −15 it masks the
   voice. `video-add-bgm` also, by default, compresses the bed's own dynamic
   range so it sits at a consistent level (not swelling on its own), carves

@@ -174,7 +174,7 @@ entry point. It shells out to the narrower commands in this order:
    the music up to the same loudness as narration.
 
 Background music volume is **dB-native** end to end (`--music-volume-db`,
-default `-19.0`, applied via ffmpeg's `volume=XdB` filter) — not a linear
+default `-22.0`, applied via ffmpeg's `volume=XdB` filter) — not a linear
 multiplier. Don't reintroduce a linear volume knob; it was deliberately
 converted away from one because it confused users (the UI used to label a
 linear value "dB").
@@ -206,9 +206,13 @@ true, consistent separation:
    makes the music quiet everywhere (measured 9 dB at ratio 4 on a
    continuous-narration segment) instead of dipping. `--no-duck`.
 
-The −19 default offset is the audio-engineering consensus for continuous
-narration (−18…−20; −15 masks the voice on phone speakers, −25 is
-inaudible) — keep new volume-related defaults inside that window.
+The **−22 default offset** is the audio-engineering recommendation for
+*dense, wall-to-wall* narration (recaps): the general voiceover range is
+−18…−20, but continuous speech masks more, so the guidance is to push toward
+−22 (Pure Audio Insight's "e-learning/dense-information" figure). −15 masks
+the voice on phone speakers, −25 is the inaudibility floor — keep new
+volume-related defaults inside −18…−24. (Was −19; a real listen on a recap
+found it a touch loud, matching the dense-narration guidance.)
 
 Two ffmpeg-filter invariants in `build_mix_filter()` are load-bearing and
 each silently undid the −14 LUFS target once — both are guarded by tests in

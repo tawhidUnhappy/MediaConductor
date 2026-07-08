@@ -40,8 +40,8 @@
   the narration's −14 LUFS reference before `--music-volume-db` is applied,
   so the offset is a true LU separation regardless of how hot the track was
   mastered. Disable with `--no-music-loudnorm`. The default offset changed
-  −25 → **−19 dB**, the audio-engineering consensus for continuous
-  narration (music clearly audible but never masking the voice).
+  −25 → **−22 dB** — the audio-engineering recommendation for dense,
+  wall-to-wall narration (recaps); sparser voiceover sits at −18…−20.
 
 ### Fixed
 - `mangaeasy doctor` reported `gpu_backend: "cpu"` (and the app's Setup tab

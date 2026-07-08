@@ -97,10 +97,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--background-brightness", type=float, default=-0.06)
     parser.add_argument("--background-saturation", type=float, default=1.08)
     parser.add_argument("--background-music", type=Path, default=None)
-    parser.add_argument("--music-volume-db", type=float, default=-19.0,
+    parser.add_argument("--music-volume-db", type=float, default=-22.0,
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
                              "stem is loudness-aligned to the narration's -14 LUFS reference first, so this is "
-                             "a true LU separation; -18 to -20 is the recap-video sweet spot.")
+                             "a true LU separation; default -22 suits dense recap narration, -18 to -20 sparser "
+                             "voiceover.")
     parser.add_argument("--no-music-loudnorm", action="store_true",
                         help="Apply --music-volume-db to the raw music file without aligning its loudness "
                              "to the -14 LUFS reference first.")

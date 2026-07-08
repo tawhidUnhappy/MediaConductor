@@ -39,11 +39,13 @@ def parse_args() -> argparse.Namespace:
                              "-stream_loop seams and in-track defects can't repeat through the whole video.")
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR,
                         help="Scratch dir for the cached music bed (default: the pipeline work dir).")
-    parser.add_argument("--music-volume-db", type=float, default=-19.0,
+    parser.add_argument("--music-volume-db", type=float, default=-22.0,
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
                              "stem is loudness-normalized to the narration's -14 LUFS reference first (see "
                              "--no-music-loudnorm), so this value is a true LU separation regardless of how hot "
-                             "the source track was mastered. -18 to -20 is the recap-video sweet spot.")
+                             "the source track was mastered. Default -22 is the recommendation for dense, "
+                             "wall-to-wall narration (recaps); -18 to -20 suits sparser voiceover, -25 is the "
+                             "'inaudible on phone speakers' floor.")
     parser.add_argument("--no-music-loudnorm", action="store_true",
                         help="Skip measuring the music's integrated loudness and aligning it to the -14 LUFS "
                              "reference before applying --music-volume-db. With this flag the offset is applied "
