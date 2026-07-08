@@ -344,10 +344,11 @@ which puts them in the managed folder:
 
 ```text
 <data folder>/.mangaeasy/tools/
-  index-tts/      # IndexTTS-2  (cloned uv project + model checkpoints)
-  magi-v3/        # MAGI v3 panel detection (generated env + detect_magi.py)
-  got-ocr2/       # GOT-OCR 2.0 panel OCR (generated env + HF model)
-  kokoro-82m/     # Kokoro TTS  (generated env, default voice af_heart)
+  index-tts/       # IndexTTS-2  (cloned uv project + model checkpoints)
+  magi-v3/         # MAGI v3 panel detection (generated env + detect_magi.py)
+  got-ocr2/        # GOT-OCR 2.0 panel OCR (generated env + HF model)
+  kokoro-82m/      # Kokoro TTS  (generated env, default voice af_heart)
+  z-image-turbo/   # Z-Image Turbo text-to-image (generated env + HF model)
 ```
 
 Sibling folders next to your project (`./index-tts`, `./magi-v3`, `./got-ocr2`, ...) also work —
