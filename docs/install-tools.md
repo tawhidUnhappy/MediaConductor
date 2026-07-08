@@ -38,7 +38,7 @@ What the installer does:
 1. `git clone https://github.com/index-tts/index-tts` (+ `git lfs pull`)
 2. `uv sync --all-extras` — builds its own env with its own torch/CUDA stack
 3. Downloads the `IndexTeam/IndexTTS-2` weights into `checkpoints/` via the
-   Hugging Face CLI (`uvx --from "huggingface-hub[cli,hf_xet]" hf download …`)
+   Hugging Face CLI (`uvx --from huggingface-hub hf download …`)
 4. Verifies `indextts.infer_v2` imports inside that env
 
 Requirements: git, git-lfs, uv. An NVIDIA GPU (CUDA 12.8+) makes synthesis much

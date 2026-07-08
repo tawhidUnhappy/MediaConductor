@@ -25,7 +25,7 @@ Install what's missing:
 
 ```bash
 mangaeasy install-tool magi-v3     # panel detection (needed for paged manga)
-mangaeasy install-tool index-tts   # optional: voice-clone TTS (GPU, slow, best quality)
+mangaeasy install-tool index-tts   # default recap TTS: voice clone, slow, best quality
 # Kokoro installs the same way if absent: mangaeasy install-tool kokoro-82m
 ```
 
@@ -321,16 +321,16 @@ audio-related — missing audio for a *referenced* entry; see Phase 7.)
 One command runs audio → render → join → normalize → BGM:
 
 ```bash
-# Kokoro (fast, ~4x parallel on an RTX 3060 — do not exceed 4 gpu-workers):
-mangaeasy video --project-root library/<Project> --items 01 \
-  --tts kokoro --gpu-workers 4 \
-  --build-long-video --normalize-audio \
-  --background-music "<path to music>" --music-volume-db -22
-
-# IndexTTS voice clone (much slower, best quality; leave gpu-workers at default):
+# IndexTTS voice clone (default, best quality; leave gpu-workers at default):
 mangaeasy video --project-root library/<Project> --items 01 \
   --tts indextts --speaker-wav "<path to reference voice wav>" \
   --overwrite-audio --overwrite-video \
+  --build-long-video --normalize-audio \
+  --background-music "<path to music>" --music-volume-db -22
+
+# Kokoro fallback (fast, ~4x parallel on an RTX 3060 — do not exceed 4 gpu-workers):
+mangaeasy video --project-root library/<Project> --items 01 \
+  --tts kokoro --gpu-workers 4 \
   --build-long-video --normalize-audio \
   --background-music "<path to music>" --music-volume-db -22
 ```
@@ -432,13 +432,41 @@ Two proven approaches — pick by what tools are installed:
 
 **A. Generated scene (big-recap-channel style, e.g. MamoruManhwa).** Top
 manhwa-recap channels don't collage panels; the thumbnail is one coherent
-glossy anime illustration. With `mangaeasy install-tool z-image-turbo`
-installed, generate it: `mangaeasy zimage --prompt-file prompt.txt --output
-thumb_base.png --width 1280 --height 720 --count 4` (pick the best of 4),
-prompting a two-character face-off (foreground face ~30% of frame height,
-bright saturated blues, depth-of-field background matching the story's
-setting, exaggerated expressions — one side shocked/flustered, the other
-calm/powered-up). Then with PIL add the signature text/furniture:
+glossy anime/manhwa illustration with a fanservice-leaning "gooner" edge —
+that's the established house style for this niche (see the MamoruManhwa
+style guide referenced above: flustered/blushing faces, exaggerated curvy
+proportions, foregrounded characters) and it measurably drives CTR. Write
+the prompt yourself for each video (the chapter's actual characters/scene,
+not a generic template) and generate it with **Z-Image Turbo**:
+
+```bash
+mangaeasy zimage --prompt-file thumb_prompt.txt --output thumb_base.png \
+    --width 1280 --height 720 --count 4   # generate 4 variants, pick the best
+```
+
+Prompt-writing rules (non-negotiable — this is what keeps the channel
+monetizable, not optional flavor):
+
+- **Every character drawn as a visibly adult, fully-clothed** — form-fitting
+  or revealing-but-not-explicit outfits (the MamoruManhwa reference range:
+  swimsuits, battle armor, low necklines) are the ceiling; no nudity, no
+  transparent/see-through clothing, no explicit sexual content or pose, no
+  characters that read as minors regardless of the source material's art.
+- Composition: two- or three-character face-off, foreground face ~30% of
+  frame height, depth-of-field background matching the story's actual
+  setting, one side shocked/flustered/blushing, the other calm/smug/
+  powered-up — the emotional contrast between the two *is* the hook.
+- Glossy anime/manhwa rendering, saturated blues and gold, dramatic
+  low-angle or dutch-tilt camera. No in-image text/logo/watermark — that
+  gets added after, with PIL (below), where it can be positioned precisely.
+- Example prompt shape: `"glossy anime key art, [character A] blushing
+  deeply with sparkling wide eyes and a flustered expression, form-fitting
+  [outfit from the story], next to [character B] standing calm and
+  confident with a faint smirk, [story setting] background softly blurred,
+  saturated cyan-blue sky, dramatic low-angle shot, highly detailed,
+  cinematic anime lighting, no text"`.
+
+Then with PIL add the signature text/furniture:
 1–3 blocks of 1–4 words each — ALL-CAPS role labels + lowercase dialogue
 quips — in extra-bold rounded comic type (Luckiest Guy family), **yellow
 #FFE600 or white fills, black stroke ≈ 12% of font size**, in the top-left
@@ -464,6 +492,11 @@ Mandatory checks, all from real failures:
    exclude unsafe bubbles; a safe intriguing bubble is a bonus, not a risk.
 3. Generated scenes: check hands/faces for AI artifacts before shipping;
    regenerate with a different seed rather than shipping a warped face.
+4. Generated scenes: **look at all 4 variants against the prompt-writing
+   rules above before picking one** — nothing nude, transparent, explicit,
+   or minor-coded. Reject and regenerate with a tweaked prompt/seed rather
+   than cropping around a borderline result; a thumbnail strike risks the
+   whole channel.
 
 ## Phase 10 — Title, description, tags
 
@@ -526,6 +559,7 @@ mangaeasy youtube-upload \
 - [ ] `mangaeasy video-check --json` ok before building
 - [ ] Final MP4: duration sane, frames spot-checked, integrated ≈ −14 LUFS
 - [ ] Timestamps recomputed from the *current* WAVs; total matches duration
-- [ ] Thumbnail rendered, viewed, no unsafe bubble text
+- [ ] Thumbnail rendered, viewed, no unsafe bubble text; if generated with
+      Z-Image, all variants checked against the prompt-writing safety rules
 - [ ] Title ≤ 100 chars, tags ≤ 500 chars, description leads with the hook
 - [ ] Uploaded with `--privacy public` + thumbnail set; `--json` result's privacy verified (and human told what to delete, if replacing)

@@ -29,7 +29,7 @@ If a tool has `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Unix),
 
 ## TTS engine selection
 
-`mangaeasy video` picks the engine automatically (`--tts auto`):
+`mangaeasy video` picks the engine automatically (`--tts auto`, the default):
 
 - **IndexTTS** when an NVIDIA GPU is present, the `index-tts` env is installed
   with checkpoints, and the speaker reference WAV exists — best quality.

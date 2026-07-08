@@ -60,8 +60,10 @@ Usage:
 - **Isolated AI tools** — Kokoro / IndexTTS / MAGI / GOT-OCR run in their own `uv`
   environments so their Torch/CUDA stacks never clash with the core install.
 - **Hardware-aware everything** — `--encoder auto` picks NVENC, AMF, Quick Sync,
-  VideoToolbox, or falls back to `libx264`; `--tts auto` uses IndexTTS (voice
-  cloning) on NVIDIA GPU machines and Kokoro on CPU machines.
+  VideoToolbox, or falls back to `libx264`; `--tts auto` (the default) uses
+  IndexTTS (voice cloning) whenever your machine is ready for it — NVIDIA GPU,
+  the `index-tts` tool installed, and a speaker reference WAV — falling back
+  to Kokoro otherwise, so `mangaeasy video` always works out of the box.
 - **Direct YouTube upload** — connect your channel once (your own free
   Google OAuth client, see [docs/youtube.md](docs/youtube.md)) and upload
   finished videos from the app, the CLI (`mangaeasy youtube-upload`), or an

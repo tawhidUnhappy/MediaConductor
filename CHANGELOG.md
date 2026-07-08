@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Added
+- **Thumbnail-generation guidance in the recap playbook** — Phase 9 now spells
+  out how to write the prompt for a generated (Z-Image Turbo) recap thumbnail
+  in the established big-channel "gooner" fanservice house style (see the
+  MamoruManhwa style guide), with a non-negotiable safety bound baked into
+  the prompt-writing rules themselves: every character drawn as a visibly
+  adult, fully clothed (revealing-but-not-explicit is the ceiling), no
+  nudity/transparent clothing/explicit content/minor-coded characters, and a
+  mandatory-checks item to review every generated variant against those
+  rules before picking one — a thumbnail strike risks the whole channel.
 - **Z-Image Turbo image generation** — `mangaeasy install-tool z-image-turbo`
   provisions Alibaba's Apache-2.0 text-to-image model (~33 GB) in an
   isolated env, and `mangaeasy zimage --prompt "..." --output out.png`

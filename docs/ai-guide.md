@@ -76,17 +76,18 @@ Default data folders: Windows portable = next to the exe; macOS =
 mangaeasy doctor --json          # ffmpeg/git/GPU/tool status
 mangaeasy bootstrap-tools        # one-time ~100 MB: ffmpeg/ffprobe/uv/git-lfs
                                  #   downloaded into the data folder, not system-wide
-mangaeasy install-tool kokoro-82m  # the CPU-friendly TTS voice (~1-2 GB, one-time)
+mangaeasy install-tool index-tts   # default full-pipeline TTS voice clone (large, one-time)
+mangaeasy install-tool kokoro-82m  # optional CPU-friendly fallback voice (~1-2 GB, one-time)
 ```
 
 `doctor --json` fields that matter: `executables.ffmpeg`/`ffprobe`
 (null = missing → run `bootstrap-tools`), `gpu_backend` (`cuda`/`mps`/`cpu`
 — the *machine's* capability, which is what installs and engine selection key
 on; the main env deliberately has no torch), `tools` (installed AI tools).
-Optional bigger tools: `index-tts` (voice cloning, needs NVIDIA GPU),
-`magi-v3` (panel detection), `got-ocr2` (OCR), `z-image-turbo`
-(text-to-image generation, ~33 GB). All installs are **long-running
-downloads** — expect minutes, stream the output.
+Optional bigger tools: `magi-v3` (panel detection), `got-ocr2` (OCR),
+`z-image-turbo` (text-to-image generation, ~33 GB). `index-tts` is the
+default full-pipeline TTS engine and is also a long-running download. All
+model/tool installs can take minutes, so stream the output.
 
 ## 3. Project anatomy
 
@@ -225,7 +226,7 @@ mangaeasy video-render --project-root "$PROJ" --audio-root "$AUDIO" \
 
 ```bash
 mangaeasy video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" \
-    --work-dir "$WORK" --item-range 01-12 --tts auto \
+    --work-dir "$WORK" --item-range 01-12 --tts indextts \
     --build-long-video --normalize-audio \
     --background-music /abs/path/music.mp3 --music-volume-db -25
 ```

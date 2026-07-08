@@ -20,7 +20,7 @@ from mangaeasy.video_pipeline.common import (
 
 
 def resolve_tts_engine(choice: str, speaker_wav: Path | None) -> str:
-    """Pick the TTS engine. auto = IndexTTS on GPU machines, Kokoro otherwise.
+    """Pick the TTS engine. explicit choices are honored; auto can fall back.
 
     IndexTTS gives the best quality but needs an NVIDIA GPU, an installed
     index-tts tool env with checkpoints, and a speaker reference WAV. If any
@@ -55,10 +55,15 @@ def resolve_tts_engine(choice: str, speaker_wav: Path | None) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate narration audio (IndexTTS on GPU machines, Kokoro otherwise), then build videos."
+        description="Generate narration audio (IndexTTS when your machine is ready for it, Kokoro otherwise), "
+                     "then build videos."
     )
     parser.add_argument("--tts", choices=("auto", "kokoro", "indextts"), default="auto",
-                        help="TTS engine. auto picks IndexTTS when a GPU and the tool are available, else Kokoro.")
+                        help="TTS engine. auto (the default) picks IndexTTS when an NVIDIA GPU, the index-tts "
+                             "tool + checkpoints, and a speaker WAV are all present, else Kokoro -- this is what "
+                             "keeps 'mangaeasy video' working on any machine out of the box. Force one "
+                             "explicitly with --tts indextts / --tts kokoro; forcing indextts on a machine "
+                             "without it installed fails outright instead of falling back to Kokoro.")
     parser.add_argument("--speaker-wav", type=Path, default=None,
                         help="IndexTTS speaker reference WAV (defaults to config.system.json -> tts.speaker_wav).")
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
