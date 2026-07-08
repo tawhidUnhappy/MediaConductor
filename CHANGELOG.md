@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Removed
+- **Dead pre-Electron web control center** — `mangaeasy/assets/templates/app.html`,
+  its 13-file JS bundle (`static/js/app/*.js`), `static/css/app.css`, and the
+  vendored `static/vendor/xterm/` (xterm.js terminal) were leftovers from the
+  NiceGUI/pywebview control center that `mangaeasy app` replaced with the
+  Electron desktop app (`desktop/`) — the replacement module's own docstring
+  already said "The NiceGUI/pywebview GUI this replaced has been removed,"
+  but these static assets were never actually deleted. Confirmed unreachable
+  (no Flask route in the package renders `app.html`; every other web tool's
+  `render_template()` call targets its own distinct template) before removal.
+
 ### Added
 - **Thumbnail-generation guidance in the recap playbook** — Phase 9 now spells
   out how to write the prompt for a generated (Z-Image Turbo) recap thumbnail
