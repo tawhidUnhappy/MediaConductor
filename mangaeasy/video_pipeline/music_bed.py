@@ -321,6 +321,85 @@ def music_loudnorm_pregain(measured_lufs: float | None) -> float:
     return max(-MAX_LOUDNORM_GAIN_DB, min(MAX_LOUDNORM_GAIN_DB, gain))
 
 
+# ---------------------------------------------------------------------------
+# Bed conditioning — tame the music's own dynamics + carve the vocal band
+# ---------------------------------------------------------------------------
+# A raw music track carries its own 6-10 LU loudness range (the Thapin bed
+# used in production measured LRA 7.9 LU / a 37 LU momentary swing). A single
+# static gain preserves all of that, so the bed audibly swells and recedes
+# *independently of the narration* — sometimes poking through the voice,
+# sometimes vanishing. Every professional VO workflow (radio, podcast,
+# DaVinci/Premiere auto-duck) first compresses the bed to a tight, consistent
+# level, then places it under the voice. `condition_bed()` bakes that
+# compression (plus a gentle dip in the 2-5 kHz speech-intelligibility band
+# so the music masks the voice less) into a cached copy; the caller then
+# measures *this* file and aligns it to the -14 LUFS reference, so the
+# `--music-volume-db` offset stays a true, consistent LU separation.
+
+COND_COMPRESS_THRESHOLD_DB = -18.0
+COND_COMPRESS_RATIO = 3.0
+COND_COMPRESS_ATTACK_MS = 25.0
+COND_COMPRESS_RELEASE_MS = 250.0
+COND_COMPRESS_MAKEUP = 1.4          # linear multiplier (~+3 dB), ~loudness-neutral
+COND_EQ_FREQ_HZ = 2800.0            # centre of the vocal-presence band to carve
+COND_EQ_WIDTH_Q = 1.2
+COND_EQ_GAIN_DB = -3.5
+COND_PARAMS_VERSION = 1             # bump to invalidate cached conditioned beds
+
+
+def build_condition_filter(*, compress: bool = True, eq_carve: bool = True) -> str:
+    """ffmpeg filter chain that tames the bed's dynamics and carves its
+    vocal band. Returns ``anull`` when both stages are disabled."""
+    parts: List[str] = []
+    if compress:
+        parts.append(
+            f"acompressor=threshold={COND_COMPRESS_THRESHOLD_DB}dB"
+            f":ratio={COND_COMPRESS_RATIO}"
+            f":attack={COND_COMPRESS_ATTACK_MS}"
+            f":release={COND_COMPRESS_RELEASE_MS}"
+            f":makeup={COND_COMPRESS_MAKEUP}"
+        )
+    if eq_carve:
+        parts.append(
+            f"equalizer=f={COND_EQ_FREQ_HZ}:width_type=q"
+            f":width={COND_EQ_WIDTH_Q}:g={COND_EQ_GAIN_DB}"
+        )
+    return ",".join(parts) if parts else "anull"
+
+
+def _condition_cache_key(bed: Path, filt: str) -> str:
+    stat = bed.stat()
+    ident = f"{bed.resolve()}|{stat.st_size}|{stat.st_mtime_ns}|{filt}|v{COND_PARAMS_VERSION}"
+    return hashlib.sha1(ident.encode("utf-8")).hexdigest()[:16]
+
+
+def condition_bed(
+    bed: Path, work_dir: Path, *, compress: bool = True, eq_carve: bool = True,
+) -> Tuple[Path, dict]:
+    """Return (conditioned bed path, report). Cached; falls back to input on failure.
+
+    The conditioned copy has its dynamic range compressed and (optionally) the
+    vocal band carved, so it sits at a consistent level under the narration.
+    """
+    filt = build_condition_filter(compress=compress, eq_carve=eq_carve)
+    if filt == "anull":
+        return bed, {"conditioned": False, "note": "conditioning disabled"}
+    try:
+        bed_dir = work_dir / "music_bed"
+        bed_dir.mkdir(parents=True, exist_ok=True)
+        key = _condition_cache_key(bed, filt)
+        out = bed_dir / f"cond_{key}.flac"
+        if not out.is_file() or (ffprobe_duration(out) or 0) <= 0:
+            subprocess.run(
+                ["ffmpeg", "-v", "error", "-y", "-i", str(bed),
+                 "-af", filt, "-ar", "48000", "-ac", "2", "-c:a", "flac", str(out)],
+                check=True, capture_output=True,
+            )
+        return out, {"conditioned": True, "filter": filt, "path": str(out)}
+    except Exception as exc:  # never break the mix over conditioning
+        return bed, {"conditioned": False, "note": f"conditioning failed ({exc}); using bed as-is"}
+
+
 def describe_report(report: dict) -> str:
     """One human line for the add-bgm log."""
     if not report.get("used_bed"):

@@ -134,7 +134,7 @@ export function Batch(): React.JSX.Element {
   const [longVideo, setLongVideo] = useState(initialPrefs.longVideo ?? true)
   const [normalize, setNormalize] = useState(initialPrefs.normalize ?? true)
   const [bgm, setBgm] = useState(initialPrefs.bgm ?? true)
-  const [audioDuck, setAudioDuck] = useState(initialPrefs.audioDuck ?? false)
+  const [audioDuck, setAudioDuck] = useState(initialPrefs.audioDuck ?? true)
   const [resume, setResume] = useState(initialPrefs.resume ?? false)
   const [overwriteAudio, setOverwriteAudio] = useState(initialPrefs.overwriteAudio ?? false)
   const [skipAudio, setSkipAudio] = useState(initialPrefs.skipAudio ?? false)
@@ -308,7 +308,7 @@ export function Batch(): React.JSX.Element {
     args.push('--background-music', bgmFile)
     if (bgmVolumeDb !== null) args.push('--music-volume-db', String(bgmVolumeDb))
     if (narrationVolume !== 1) args.push('--narration-volume', String(narrationVolume))
-    if (audioDuck) args.push('--duck')
+    args.push(audioDuck ? '--duck' : '--no-duck')
   }
 
   // setConfig overwrites config.system.json wholesale, so any save here must
@@ -477,7 +477,7 @@ export function Batch(): React.JSX.Element {
       args.push('--background-music', bgmFile)
       if (bgmVolumeDb !== null) args.push('--music-volume-db', String(bgmVolumeDb))
       if (narrationVolume !== 1) args.push('--narration-volume', String(narrationVolume))
-      if (audioDuck) args.push('--duck')
+      args.push(audioDuck ? '--duck' : '--no-duck')
       await run(step, args)
       await refreshPaths()
       await refreshVideos()
@@ -786,7 +786,7 @@ export function Batch(): React.JSX.Element {
                 onChange={(e) => setNarrationVolume(Number(e.target.value))}
               />
             </label>
-            <label title="Audio ducking: background music automatically lowers when narration is playing, so narration is never drowned out. Uses sidechain compression internally.">
+            <label title="Audio ducking (on by default): the background music dips a few dB while narration plays and breathes back up in the gaps — the standard radio/podcast approach. On top of this, the music bed is always compressed to a consistent level and loudness-aligned so it never swells or masks the voice. Uncheck to hold the music at a flat level.">
               <input
                 type="checkbox"
                 checked={audioDuck}

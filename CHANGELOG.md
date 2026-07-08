@@ -17,10 +17,28 @@
   the requested language (with a warning and a final summary instead of
   aborting), and when several scanlations upload the same chapter number,
   the fullest version (most pages) is picked instead of feed order.
-- **Music loudness alignment in `video-add-bgm`** — the music stem's
-  integrated loudness is measured (ffmpeg ebur128) and pre-gained to the
-  narration's −14 LUFS reference before `--music-volume-db` is applied, so
-  the offset is a true LU separation regardless of how hot the track was
+- **Music bed conditioning + ducking in `video-add-bgm` (all default-on).**
+  The background-music mix now matches professional voiceover practice
+  instead of a flat gain:
+  - **Dynamics compression** — the bed's own loudness range is compressed
+    (the production track went from LRA 7.9 → 3.4 LU) so it sits at a
+    *constant* level under the voice instead of swelling and receding on its
+    own, which was the main reason the bed still sounded "unmixed."
+    `--no-condition-bed`.
+  - **Vocal-band EQ carve** — a gentle dip in the 2–5 kHz
+    speech-intelligibility band so the music masks the voice less.
+    `--no-eq-carve`.
+  - **Sidechain ducking** — the music dips a few dB under the narration and
+    breathes back up in the pauses (default ratio 2, tuned so wall-to-wall
+    narration doesn't just make the music uniformly quiet). Was opt-in
+    `--duck`; now on by default with `--no-duck` to disable.
+  - **Limiter fix** — the post-mix `alimiter` no longer runs with its
+    default `level=true`, which auto-normalized the output back toward
+    0 dBFS and fought the gain staging.
+- **Music loudness alignment in `video-add-bgm`** — the (conditioned) music
+  stem's integrated loudness is measured (ffmpeg ebur128) and pre-gained to
+  the narration's −14 LUFS reference before `--music-volume-db` is applied,
+  so the offset is a true LU separation regardless of how hot the track was
   mastered. Disable with `--no-music-loudnorm`. The default offset changed
   −25 → **−19 dB**, the audio-engineering consensus for continuous
   narration (music clearly audible but never masking the voice).

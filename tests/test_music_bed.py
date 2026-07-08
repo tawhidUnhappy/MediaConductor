@@ -158,3 +158,49 @@ def test_pregain_clamps_and_handles_missing():
     assert music_loudnorm_pregain(None) == 0.0
     assert music_loudnorm_pregain(-60.0) == MAX_LOUDNORM_GAIN_DB
     assert music_loudnorm_pregain(30.0) == -MAX_LOUDNORM_GAIN_DB
+
+
+# ---------------------------------------------------------------------------
+# bed conditioning filter
+# ---------------------------------------------------------------------------
+
+from mangaeasy.video_pipeline.music_bed import build_condition_filter  # noqa: E402
+
+
+def test_condition_filter_compress_and_eq():
+    f = build_condition_filter(compress=True, eq_carve=True)
+    assert "acompressor=" in f and "equalizer=" in f
+    assert "width_type=q" in f
+
+
+def test_condition_filter_stages_toggle_independently():
+    assert "equalizer=" not in build_condition_filter(compress=True, eq_carve=False)
+    assert "acompressor=" not in build_condition_filter(compress=False, eq_carve=True)
+    # both off => a no-op filter (caller returns the bed untouched)
+    assert build_condition_filter(compress=False, eq_carve=False) == "anull"
+
+
+# ---------------------------------------------------------------------------
+# mix filter (regression guards for the two load-bearing amix/limiter bugs)
+# ---------------------------------------------------------------------------
+
+from mangaeasy.video_pipeline.add_long_video_bgm import build_mix_filter  # noqa: E402
+
+
+def test_mix_filter_keeps_amix_and_limiter_invariants():
+    # Both branches must never reintroduce amix's 1/inputs rescale or the
+    # limiter's auto-level, which each silently undid the -14 LUFS target.
+    for duck in (True, False):
+        f = build_mix_filter(narration_volume=1.0, music_volume_db=-19.0, duck=duck)
+        assert "normalize=0" in f
+        assert "alimiter=level=disabled" in f
+        assert "volume=-19.0dB" in f
+        assert f.endswith("[a]")
+
+
+def test_mix_filter_duck_toggles_sidechain():
+    ducked = build_mix_filter(narration_volume=1.0, music_volume_db=-19.0, duck=True,
+                              duck_ratio=2.0, duck_threshold=0.08)
+    flat = build_mix_filter(narration_volume=1.0, music_volume_db=-19.0, duck=False)
+    assert "sidechaincompress=" in ducked and "ratio=2.0" in ducked and "threshold=0.08" in ducked
+    assert "sidechaincompress=" not in flat

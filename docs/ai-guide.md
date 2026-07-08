@@ -136,7 +136,11 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   separation regardless of the track's mastering. For narration-driven
   recap videos the researched sweet spot is **−18 to −20 (default −19)**;
   below −25 the bed is inaudible on phone speakers, above −15 it masks the
-  voice.
+  voice. `video-add-bgm` also, by default, compresses the bed's own dynamic
+  range so it sits at a consistent level (not swelling on its own), carves
+  the 2–5 kHz vocal band, and sidechain-ducks the music under the voice —
+  the pro voiceover chain. Opt out per-stage with `--no-condition-bed`,
+  `--no-eq-carve`, `--no-duck`.
 - `--gpu-workers` above 4 is known to crash consumer NVIDIA cards; default
   is safe.
 - Everything works CPU-only; GPU is an optimization, not a requirement.

@@ -48,17 +48,34 @@ def parse_args() -> argparse.Namespace:
                         help="Skip measuring the music's integrated loudness and aligning it to the -14 LUFS "
                              "reference before applying --music-volume-db. With this flag the offset is applied "
                              "to the raw file, so the effective separation depends on the track's mastering.")
+    parser.add_argument("--condition-bed", action=argparse.BooleanOptionalAction, default=True,
+                        help="Compress the music's dynamic range so it sits at a consistent level under the "
+                             "narration instead of swelling and receding on its own (a raw track's 6-10 LU "
+                             "loudness range is the top reason a bed sounds 'unmixed'). On by default; "
+                             "--no-condition-bed applies only the flat dB offset.")
+    parser.add_argument("--eq-carve", action=argparse.BooleanOptionalAction, default=True,
+                        help="Gently dip the music in the 2-5 kHz speech-intelligibility band so it masks the "
+                             "voice less (part of bed conditioning). On by default; --no-eq-carve keeps the "
+                             "music's full spectrum.")
     parser.add_argument("--narration-volume", type=float, default=1.0)
-    parser.add_argument("--duck", action="store_true",
-                        help="Enable audio ducking: background music is automatically lowered "
-                             "whenever the narration is audible, so the narration is never "
-                             "drowned out. Uses ffmpeg sidechaincompress internally.")
-    parser.add_argument("--duck-ratio", type=float, default=10.0,
-                        help="Compression ratio for ducking (1–20). Higher = music ducks more aggressively.")
-    parser.add_argument("--duck-attack", type=float, default=5.0,
+    parser.add_argument("--duck", action=argparse.BooleanOptionalAction, default=True,
+                        help="Sidechain-duck the music under the narration: the bed automatically dips a few dB "
+                             "whenever the voice is present and breathes back up in the pauses — the standard "
+                             "radio/podcast/DaVinci workflow. On by default; --no-duck holds the music at a "
+                             "flat level.")
+    parser.add_argument("--duck-ratio", type=float, default=2.0,
+                        help="Compression ratio for ducking (1–20). Higher = music ducks more aggressively. "
+                             "Default 2 gives a gentle ~3-4 dB dip during speech that breathes up in the gaps. "
+                             "For wall-to-wall narration a low ratio matters: a high ratio just makes the music "
+                             "uniformly quiet (ducking degenerates to a constant reduction) instead of dipping.")
+    parser.add_argument("--duck-attack", type=float, default=20.0,
                         help="How fast (ms) the music ducks when narration starts.")
-    parser.add_argument("--duck-release", type=float, default=500.0,
-                        help="How fast (ms) the music fades back up when narration stops.")
+    parser.add_argument("--duck-release", type=float, default=350.0,
+                        help="How fast (ms) the music fades back up when narration stops. Too short pumps on "
+                             "the micro-gaps between words; 300-400 ms rides sentence pauses smoothly.")
+    parser.add_argument("--duck-threshold", type=float, default=0.08,
+                        help="Sidechain level (linear, 0-1) above which the narration triggers ducking. "
+                             "Default 0.08 (~-22 dBFS) catches speech while keeping the dip gentle.")
     parser.add_argument("--audio-bitrate", default="192k")
     return parser.parse_args()
 
@@ -78,9 +95,50 @@ def default_bgm_output(video_in: Path, music_volume_db: float) -> Path:
     return video_in.with_name(f"{video_in.stem}_bgm_{volume_tag}_{timestamp}{video_in.suffix}")
 
 
+_AFMT = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo"
+
+
+def build_mix_filter(
+    *, narration_volume: float, music_volume_db: float,
+    duck: bool = True, duck_ratio: float = 2.0, duck_attack: float = 20.0,
+    duck_release: float = 350.0, duck_threshold: float = 0.08,
+) -> str:
+    """Build the ffmpeg -filter_complex string mixing narration (input 0) and
+    music (input 1) into label [a]. Pure — unit-tested in test_music_bed.py.
+
+    Two invariants baked in and load-bearing (see CLAUDE.md):
+    - ``amix=...:normalize=0`` — amix's default rescales every input by
+      1/inputs (-6 dB for two), which would silently undo the narration's
+      -14 LUFS normalization. Plain summation keeps the voice at target.
+    - ``alimiter=level=disabled`` — alimiter's default ``level=true``
+      auto-normalizes the output back toward 0 dBFS, fighting the careful
+      gain staging and pushing the whole mix hotter than intended. Disabled,
+      the limiter is a pure peak-safety catch for summed transients.
+    """
+    narr = f"[0:a]volume={narration_volume},{_AFMT}"
+    music = f"[1:a]volume={music_volume_db}dB,{_AFMT}[music]"
+    tail = ("amix=inputs=2:duration=first:dropout_transition=3:normalize=0,"
+            "alimiter=level=disabled:limit=0.95,aresample=async=1:first_pts=0[a]")
+    if duck:
+        # Narration is the sidechain signal that ducks the music: when the
+        # voice is present the bed dips a few dB and breathes back up in the
+        # pauses — the standard radio/podcast/DaVinci auto-duck behaviour.
+        return (
+            f"{narr}[narr];"
+            f"{music};"
+            "[narr]asplit=2[narr_main][narr_sc];"
+            f"[music][narr_sc]sidechaincompress=threshold={duck_threshold}"
+            f":ratio={duck_ratio}:attack={duck_attack}:release={duck_release}"
+            ":makeup=1[music_ducked];"
+            f"[narr_main][music_ducked]{tail}"
+        )
+    return f"{narr}[narr];{music};[narr][music]{tail}"
+
+
 def add_background_music(
     video_in: Path, video_out: Path, music_file: Path, music_volume_db: float, narration_volume: float, audio_bitrate: str,
-    duck: bool = False, duck_ratio: float = 10.0, duck_attack: float = 5.0, duck_release: float = 500.0,
+    duck: bool = True, duck_ratio: float = 2.0, duck_attack: float = 20.0, duck_release: float = 350.0,
+    duck_threshold: float = 0.08,
 ) -> Path:
     if not video_in.is_file():
         raise FileNotFoundError(f"Long video not found: {video_in}. Run the join step first.")
@@ -95,30 +153,11 @@ def add_background_music(
         source = video_in
         video_out.parent.mkdir(parents=True, exist_ok=True)
 
-    if duck:
-        # Sidechain compress: narration is the sidechain signal that triggers
-        # the music to duck. When narration is audible the music volume drops
-        # automatically, preventing it from overpowering the narration.
-        filter_complex = (
-            f"[0:a]volume={narration_volume},aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[narr];"
-            f"[1:a]volume={music_volume_db}dB,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[music];"
-            "[narr]asplit=2[narr_main][narr_sc];"
-            f"[music][narr_sc]sidechaincompress=threshold=0.01:ratio={duck_ratio}:attack={duck_attack}:release={duck_release}[music_ducked];"
-            # normalize=0: amix's default rescales every input by 1/inputs (-6 dB
-            # for two), silently undoing the -14 LUFS normalization of the
-            # narration track. Plain summation keeps narration at its normalized
-            # loudness; the limiter below handles any summed peaks.
-            "[narr_main][music_ducked]amix=inputs=2:duration=first:dropout_transition=3:normalize=0,"
-            "alimiter=limit=0.95,aresample=async=1:first_pts=0[a]"
-        )
-    else:
-        filter_complex = (
-            f"[0:a]volume={narration_volume},aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[narr];"
-            f"[1:a]volume={music_volume_db}dB,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[music];"
-            # normalize=0: see comment in the ducking branch above.
-            "[narr][music]amix=inputs=2:duration=first:dropout_transition=3:normalize=0,"
-            "alimiter=limit=0.95,aresample=async=1:first_pts=0[a]"
-        )
+    filter_complex = build_mix_filter(
+        narration_volume=narration_volume, music_volume_db=music_volume_db,
+        duck=duck, duck_ratio=duck_ratio, duck_attack=duck_attack,
+        duck_release=duck_release, duck_threshold=duck_threshold,
+    )
     cmd = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(source),
@@ -157,11 +196,30 @@ def main() -> int:
     music = args.background_music
     if not args.raw_music:
         from mangaeasy.video_pipeline.audio_audit import ffprobe_duration
-        from mangaeasy.video_pipeline.music_bed import describe_report, prepare_music_bed
+        from mangaeasy.video_pipeline.music_bed import (
+            condition_bed,
+            describe_report,
+            prepare_music_bed,
+        )
 
         video_duration = ffprobe_duration(video_in) or 0.0
         music, bed_report = prepare_music_bed(args.background_music, video_duration, args.work_dir)
         print(describe_report(bed_report), flush=True)
+
+        # Tame the bed's own dynamics (and carve the vocal band) so it sits at
+        # a consistent level under the voice instead of swelling and receding
+        # on its own. Measured *after* this, so the loudnorm offset below stays
+        # a true LU separation of the conditioned bed.
+        if args.condition_bed or args.eq_carve:
+            music, cond_report = condition_bed(
+                music, args.work_dir, compress=args.condition_bed, eq_carve=args.eq_carve,
+            )
+            if cond_report.get("conditioned"):
+                print(f"[music-condition] compressed dynamics"
+                      f"{' + carved 2-5 kHz vocal band' if args.eq_carve else ''} -> {music}",
+                      flush=True)
+            elif cond_report.get("note"):
+                print(f"[music-condition] {cond_report['note']}", flush=True)
 
     # Align the music stem to the -14 LUFS narration reference before the
     # user's offset, so --music-volume-db is a true LU separation (a hot
@@ -187,7 +245,8 @@ def main() -> int:
 
     add_background_music(
         video_in, video_out, music, effective_volume_db, args.narration_volume, args.audio_bitrate,
-        duck=args.duck, duck_ratio=args.duck_ratio, duck_attack=args.duck_attack, duck_release=args.duck_release,
+        duck=args.duck, duck_ratio=args.duck_ratio, duck_attack=args.duck_attack,
+        duck_release=args.duck_release, duck_threshold=args.duck_threshold,
     )
     print(f"\nAdded background music: {video_out}", flush=True)
     emit_result(outputs=[video_out])

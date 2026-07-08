@@ -179,23 +179,49 @@ multiplier. Don't reintroduce a linear volume knob; it was deliberately
 converted away from one because it confused users (the UI used to label a
 linear value "dB").
 
-Before the offset is applied, `video-add-bgm` measures the music's
-integrated loudness (ffmpeg `ebur128`) and pre-gains it to the same
-−14 LUFS reference the narration is normalized to
-(`music_loudnorm_pregain()` in `video_pipeline/music_bed.py`, clamped to
-±12 dB, `--no-music-loudnorm` to disable). Without this, the *effective*
-separation depended on the source track's mastering (a −9 LUFS hot master
-sat 5 dB closer to the voice than a −19 LUFS ambient track at the same
-setting). The −19 default is the audio-engineering consensus for
-continuous narration (−18…−20; −15 masks the voice on phone speakers,
-−25 is inaudible) — keep new volume-related defaults inside that window.
+**The music bed is conditioned in three stages before it is placed under
+the voice** (all on by default; each independently disable-able). The order
+matters — dynamics first, then measure, then offset — so the offset stays a
+true, consistent separation:
 
-Both `amix` calls in `add_long_video_bgm.py` pass **`normalize=0` — keep
-it**. amix's default rescales every input by 1/inputs (−6 dB for two),
-which silently undid the −14 LUFS normalization and shipped ~−20 LUFS
-videos (found in production: YouTube never boosts quiet uploads, so they
-just played quiet). With plain summation the narration keeps its normalized
-loudness and the `alimiter` after the mix handles summed peaks.
+1. **Dynamics + spectrum (`condition_bed()` in `music_bed.py`).** A raw
+   track carries its own 6–10 LU loudness range (the Thapin production bed
+   measured **LRA 7.9 LU**, a 37 LU momentary swing). A flat gain preserves
+   all of it, so the bed audibly swells and recedes *independently of the
+   narration* — the single biggest reason a bed sounds "unmixed," and the
+   defect that prompted this work. `condition_bed()` bakes an `acompressor`
+   (LRA 7.9 → ~3.4, verified) plus a gentle `equalizer` dip in the 2–5 kHz
+   vocal band into a cached copy. `--no-condition-bed` / `--no-eq-carve`.
+2. **Loudness alignment (`music_loudnorm_pregain()`).** The *conditioned*
+   bed's integrated loudness (ffmpeg `ebur128`) is pre-gained to the same
+   −14 LUFS reference the narration is normalized to (clamped ±12 dB,
+   `--no-music-loudnorm`). Measuring the conditioned bed — not the raw file
+   — is why `--music-volume-db` stays a true LU separation regardless of the
+   source's mastering.
+3. **Sidechain duck (`build_mix_filter()`).** The narration side-chains a
+   gentle `sidechaincompress` on the music so it dips a few dB under speech
+   and breathes back up in the pauses (the radio/podcast/DaVinci workflow).
+   For **wall-to-wall recap narration the ratio must stay low** (default 2):
+   a high ratio makes ducking degenerate into a uniform reduction that just
+   makes the music quiet everywhere (measured 9 dB at ratio 4 on a
+   continuous-narration segment) instead of dipping. `--no-duck`.
+
+The −19 default offset is the audio-engineering consensus for continuous
+narration (−18…−20; −15 masks the voice on phone speakers, −25 is
+inaudible) — keep new volume-related defaults inside that window.
+
+Two ffmpeg-filter invariants in `build_mix_filter()` are load-bearing and
+each silently undid the −14 LUFS target once — both are guarded by tests in
+`test_music_bed.py`, **keep them**:
+
+- **`amix=…:normalize=0`.** amix's default rescales every input by 1/inputs
+  (−6 dB for two), which shipped ~−20 LUFS videos (YouTube never boosts
+  quiet uploads, so they just played quiet). Plain summation keeps the
+  narration at its normalized loudness; the `alimiter` handles summed peaks.
+- **`alimiter=level=disabled`.** alimiter's default `level=true`
+  auto-normalizes the output back toward 0 dBFS, fighting the whole gain
+  chain and pushing the mix hotter than intended. Disabled, the limiter is a
+  pure peak-safety catch.
 
 ## GPU / TTS concurrency — known limits
 

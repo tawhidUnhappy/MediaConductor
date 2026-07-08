@@ -348,6 +348,18 @@ mangaeasy video --project-root library/<Project> --items 01 \
   restores the old raw-offset behavior. An earlier production used −17
   before the loudnorm existed — with a hot-mastered YouTube-rip bed that
   was effectively ~−16 LU, slightly hot.
+- **The bed is conditioned + ducked automatically (all default-on).** Beyond
+  the loudness offset, `video-add-bgm` now (a) compresses the music's own
+  dynamic range so it sits at a *constant* level instead of swelling and
+  receding on its own — a raw track's 6–10 LU loudness range is the top
+  reason a bed sounds "unmixed" (the Thapin bed went from LRA 7.9 → 3.4);
+  (b) dips the music gently in the 2–5 kHz vocal band so it masks the voice
+  less; and (c) sidechain-ducks it a few dB under the narration so it
+  breathes up in the gaps. Log lines to check: `[music-condition]` and
+  `[music-loudnorm]`. Escape hatches if a track needs the raw treatment:
+  `--no-condition-bed`, `--no-eq-carve`, `--no-duck`. Keep the duck ratio
+  low for recaps (default 2) — wall-to-wall narration + a high ratio just
+  makes the music uniformly quiet instead of dipping.
 - **Music QC is automatic** — `video-add-bgm` scans the track's 20 ms RMS
   envelope before mixing (`mangaeasy/video_pipeline/music_bed.py`): splice
   holes (brief 25+ dB collapses mid-phrase — `silencedetect` can't see

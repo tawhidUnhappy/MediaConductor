@@ -104,12 +104,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-music-loudnorm", action="store_true",
                         help="Apply --music-volume-db to the raw music file without aligning its loudness "
                              "to the -14 LUFS reference first.")
+    parser.add_argument("--condition-bed", action=argparse.BooleanOptionalAction, default=True,
+                        help="Compress the music's dynamic range so it sits at a consistent level under the "
+                             "narration (on by default; --no-condition-bed applies only the flat dB offset).")
+    parser.add_argument("--eq-carve", action=argparse.BooleanOptionalAction, default=True,
+                        help="Dip the music in the 2-5 kHz vocal band so it masks the voice less (on by default).")
     parser.add_argument("--narration-volume", type=float, default=1.0)
-    parser.add_argument("--duck", action="store_true",
-                        help="Enable audio ducking so background music lowers automatically when narration is audible.")
-    parser.add_argument("--duck-ratio", type=float, default=10.0)
-    parser.add_argument("--duck-attack", type=float, default=5.0)
-    parser.add_argument("--duck-release", type=float, default=500.0)
+    parser.add_argument("--duck", action=argparse.BooleanOptionalAction, default=True,
+                        help="Sidechain-duck the music under the narration so it dips when the voice is present "
+                             "and breathes back up in the pauses (on by default; --no-duck holds it flat).")
+    parser.add_argument("--duck-ratio", type=float, default=2.0)
+    parser.add_argument("--duck-attack", type=float, default=20.0)
+    parser.add_argument("--duck-release", type=float, default=350.0)
+    parser.add_argument("--duck-threshold", type=float, default=0.08)
     parser.add_argument("--audio-bitrate", default="128k")
     parser.add_argument("--render-mode", choices=("segments", "concat-images"), default="segments")
     parser.add_argument("--encoder", default="auto")
@@ -275,9 +282,14 @@ def main() -> int:
             )
             if args.no_music_loudnorm:
                 bgm_cmd += ["--no-music-loudnorm"]
+            bgm_cmd += ["--condition-bed" if args.condition_bed else "--no-condition-bed"]
+            bgm_cmd += ["--eq-carve" if args.eq_carve else "--no-eq-carve"]
             if args.duck:
                 bgm_cmd += ["--duck", "--duck-ratio", str(args.duck_ratio),
-                            "--duck-attack", str(args.duck_attack), "--duck-release", str(args.duck_release)]
+                            "--duck-attack", str(args.duck_attack), "--duck-release", str(args.duck_release),
+                            "--duck-threshold", str(args.duck_threshold)]
+            else:
+                bgm_cmd += ["--no-duck"]
             if args.project_name:
                 bgm_cmd += ["--project-name", args.project_name]
             run(bgm_cmd, cwd)
