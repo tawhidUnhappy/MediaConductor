@@ -8,12 +8,10 @@ each vendored tool's own ``bin/`` folder to ``PATH`` once at process start
 existing and future bare-name subprocess call picks the vendored copy up
 for free, falling back to the system PATH automatically if it isn't vendored.
 
-CI pre-fetches all three at build time and bundles them into the installer
-(see desktop/electron-builder.yml's extraResources), so a normal install
-never downloads anything here. :func:`ensure_core_tools` is the on-demand
-fallback for everyone else (dev checkouts, future platforms CI hasn't
-pre-built yet, or the bare `pip install mangaeasy` path) — it fetches
-whatever's missing straight into the same self-contained tools dir.
+:func:`ensure_core_tools` (run by ``mangaeasy bootstrap-tools``) is the
+on-demand fetcher: it downloads whatever of ffmpeg/uv/git-lfs is missing
+straight into the install's own self-contained tools dir, so a user never
+needs them on the system PATH.
 """
 
 from __future__ import annotations
@@ -41,11 +39,6 @@ def _vendored_root(tool: str) -> Path:
 
 
 def _bin_dir(tool: str) -> Path:
-    if tool == "node" and platform.system().lower() == "windows":
-        # Windows Node.js distributions put node.exe/npm.cmd/npx.cmd (and
-        # the node_modules/npm they depend on) at the archive's top level,
-        # not in a bin/ subfolder like Unix tarballs do.
-        return _vendored_root(tool)
     return _vendored_root(tool) / "bin"
 
 
@@ -278,58 +271,11 @@ def fetch_git_lfs(log: LogFn) -> bool:
     return ok
 
 
-def fetch_node(log: LogFn) -> bool:
-    """Vendor a portable Node.js + npm build from nodejs.org, for building
-    the Electron desktop app from a source checkout without requiring a
-    system-wide Node install. Only called on demand by run.sh/run.bat (and
-    `mangaeasy ensure-node`) -- the core video pipeline never needs Node, so
-    this is intentionally separate from :func:`ensure_core_tools`/CI."""
-    if _is_vendored("node"):
-        return True
-    system, arch = _platform_arch()
-    # nodejs.org has no "latest LTS" alias URL, so this pins a known-good
-    # LTS release rather than guessing a moving target.
-    version = "22.23.1"
-    exts = {"windows": "zip", "linux": "tar.xz", "darwin": "tar.gz"}
-    ext = exts.get(system)
-    if ext is None:
-        log(f"[warn] no vendored Node.js build for {system}/{arch}")
-        return False
-    asset = f"node-v{version}-{system if system != 'windows' else 'win'}-{arch}.{ext}"
-    url = f"https://nodejs.org/dist/v{version}/{asset}"
-    archive = _download(url, _vendored_root("node") / "_dl" / asset, log)
-    # Extract into a scratch dir, not _vendored_root("node") itself -- the
-    # download above already lives under _dl/ inside that same root, and
-    # _extract_all's one-level flatten only kicks in when the destination
-    # contains exactly the archive's single top-level folder.
-    tmp_extract = _vendored_root("node") / "_extract_tmp"
-    shutil.rmtree(tmp_extract, ignore_errors=True)
-    ok = _extract_all(archive, tmp_extract, log)
-    if ok:
-        for child in tmp_extract.iterdir():
-            dest = _vendored_root("node") / child.name
-            if dest.exists():
-                if dest.is_dir():
-                    shutil.rmtree(dest)
-                else:
-                    dest.unlink()
-            shutil.move(str(child), str(dest))
-    shutil.rmtree(tmp_extract, ignore_errors=True)
-    shutil.rmtree(archive.parent, ignore_errors=True)
-    if ok and system != "windows":
-        bin_dir = _bin_dir("node")
-        for name in ("node", "npm", "npx"):
-            exe = bin_dir / name
-            if exe.exists():
-                _make_executable(exe)
-    return ok and _is_vendored("node")
-
-
 def bootstrap_main() -> int:
     """`mangaeasy bootstrap-tools` — fetch ffmpeg/uv/git-lfs into this
-    install's own tools dir. The desktop app runs this on first launch (the
-    installers deliberately don't bundle these binaries to keep downloads
-    small); anyone can also run it by hand on a dev checkout."""
+    install's own tools dir. The installers deliberately don't bundle these
+    binaries to keep downloads small; the Setup step (or a dev on a checkout)
+    runs this to grab them."""
     results = ensure_core_tools(print)
     ok = all(results.values())
     for name, success in results.items():
@@ -361,27 +307,3 @@ def ensure_core_tools(log: LogFn) -> dict[str, bool]:
         results["git-lfs"] = fetch_git_lfs(log)
     ensure_vendored_path()
     return results
-
-
-def ensure_node(log: LogFn) -> bool:
-    """Fetch a portable Node.js/npm into this install's tools dir if npm
-    isn't already on PATH or already vendored, then add it to this
-    process' PATH. Returns False only on a genuine download/extract
-    failure (no vendored build for this platform, network error, etc)."""
-    if shutil.which("npm") and shutil.which("node"):
-        return True
-    ok = fetch_node(log)
-    ensure_vendored_path()
-    return ok
-
-
-def ensure_node_main() -> int:
-    """`mangaeasy ensure-node` -- vendor Node.js/npm on demand for building
-    the Electron desktop app from source (see run.sh/run.bat). Prints the
-    resolved bin dir on success so callers can confirm it without
-    duplicating mangaeasy's path logic."""
-    if ensure_node(print):
-        print(f"  node       ok ({_bin_dir('node')})")
-        return 0
-    print("  node       FAILED (see warning above)")
-    return 1

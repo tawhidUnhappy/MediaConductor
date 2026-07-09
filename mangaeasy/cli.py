@@ -51,16 +51,14 @@ _force_utf8_stdio()
 
 # command name -> (module path, function, group, one-line help)
 COMMANDS: dict[str, tuple[str, str, str, str]] = {
-    # ── Setup & app ───────────────────────────────────────────────────────────
-    "app":                  ("mangaeasy.web.app",                              "main",        "Setup & app",      "Open the mangaEasy control center (desktop app)."),
-    "commands":             ("mangaeasy.cli",                                  "commands_main","Setup & app",     "List every command, or emit the full machine-readable catalog (--json)."),
-    "where":                ("mangaeasy.tools.external",                       "where_main",  "Setup & app",      "Show this install's resolved data/tool paths (--json). Run this first from scripts/AI agents."),
-    "library-list":         ("mangaeasy.library_scan",                         "main",        "Setup & app",      "List projects and per-item readiness under a project root (--json)."),
-    "mcp":                  ("mangaeasy.mcp_server",                           "main",        "Setup & app",      "Run an MCP stdio server exposing mangaEasy as typed tools for AI assistants."),
-    "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup & app",      "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
-    "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup & app",      "Install an external AI tool (index-tts, magi-v3, deepseek-ocr2, z-image-turbo, ...) from GitHub/Hugging Face."),
-    "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup & app",   "Download ffmpeg/uv/git-lfs into this install's own tools dir (the desktop app runs this on first launch)."),
-    "ensure-node":          ("mangaeasy.tools.vendored",                       "ensure_node_main", "Setup & app", "Vendor a portable Node.js/npm on demand (run.sh/run.bat use this to build the desktop app from source)."),
+    # ── Setup ─────────────────────────────────────────────────────────────────
+    "commands":             ("mangaeasy.cli",                                  "commands_main","Setup",           "List every command, or emit the full machine-readable catalog (--json)."),
+    "where":                ("mangaeasy.tools.external",                       "where_main",  "Setup",            "Show this install's resolved data/tool paths (--json). Run this first from scripts/AI agents."),
+    "library-list":         ("mangaeasy.library_scan",                         "main",        "Setup",            "List projects and per-item readiness under a project root (--json)."),
+    "mcp":                  ("mangaeasy.mcp_server",                           "main",        "Setup",            "Run an MCP stdio server exposing mangaEasy as typed tools for AI assistants."),
+    "doctor":               ("mangaeasy.tools.install",                        "doctor_main", "Setup",            "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
+    "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup",            "Install an external AI tool (index-tts, magi-v3, deepseek-ocr2, z-image-turbo, ...) from GitHub/Hugging Face."),
+    "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup",         "Download ffmpeg/uv/git-lfs into this install's own tools dir (the setup step runs this when they're missing)."),
 
     # ── General item-based video pipeline (the recommended workflow) ──────────
     "video":                ("mangaeasy.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: audio (IndexTTS on GPU, Kokoro otherwise), render, join."),
@@ -94,44 +92,18 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "deepseek-ocr2":        ("mangaeasy.tools.deepseek_ocr2",                  "main",        "External tools",   "Run DeepSeek-OCR 2 and write `ocr` fields into narration JSON files."),
     "zimage":               ("mangaeasy.tools.zimage",                         "main",        "External tools",   "Generate images with Z-Image Turbo (text-to-image; thumbnails, backgrounds)."),
 
-    # ── Manga chapter workflow: acquire & edit ────────────────────────────────
+    # ── Manga chapter workflow: acquire & crop ────────────────────────────────
     "download":             ("mangaeasy.download.mangadex",                    "main",        "Manga: acquire",   "Download a manga chapter from MangaDex."),
-    "cut-page":             ("mangaeasy.web.cut_page",                         "main",        "Manga: acquire",   "Web editor: cut full pages into panels."),
-    "panel-editor":         ("mangaeasy.web.panel_editor",                     "main",        "Manga: acquire",   "Web editor: arrange panels (vertical manhwa)."),
-    "gutter-split":         ("mangaeasy.panels.gutter",                        "main",        "Manga: acquire",   "Split pages along gutters into panels."),
+    "gutter-split":         ("mangaeasy.panels.gutter",                        "main",        "Manga: acquire",   "Split pages along gutters into panels (low-level engine)."),
     "webtoon-split":        ("mangaeasy.panels.webtoon",                       "main",        "Manga: acquire",   "Split webtoon items into panels with auto-split, gap rescue and verify sheets."),
-    "process-panels":       ("mangaeasy.panels.process",                       "main",        "Manga: acquire",   "Post-process panels (upscale / mirror / clean bubbles)."),
+    "page-split":           ("mangaeasy.panels.page",                          "main",        "Manga: acquire",   "Split paged manga into panels with MAGI v3 detection and verify sheets."),
 
-    # ── Manga chapter workflow: narration ─────────────────────────────────────
-    "narration-editor":     ("mangaeasy.web.narration_editor",                 "main",        "Manga: narration", "Web editor: write narration for one chapter."),
-    "narration-editor-all": ("mangaeasy.web.narration_editor_all",             "main",        "Manga: narration", "Web editor: write narration across all chapters."),
-    "narration-review":     ("mangaeasy.web.narration_review",                 "main",        "Manga: narration", "Web editor: review and QA narration."),
-    "join-narration":       ("mangaeasy.narration.join",                       "main",        "Manga: narration", "Join per-chapter narration JSON files."),
-    "normalize-narration":  ("mangaeasy.narration.normalize",                  "main",        "Manga: narration", "Normalize narration JSON text."),
-    "clean-narration":      ("mangaeasy.narration.clean",                      "main",        "Manga: narration", "Clean narration JSON."),
-    "backup-narration":     ("mangaeasy.narration.backup",                     "main",        "Manga: narration", "Back up narration JSON files."),
-    "rename-file":          ("mangaeasy.narration.rename_file",                "main",        "Manga: narration", "Rename narration/media files by convention."),
-
-    # ── Manga chapter workflow: render & export ───────────────────────────────
-    "fade-audio":           ("mangaeasy.audio.fade",                           "main",        "Manga: render",    "Apply fades to chapter narration audio."),
-    "normalize-chapter-audio": ("mangaeasy.audio.normalize_chapter",           "main",        "Manga: render",    "YouTube loudness-normalize the chapter video (−14 LUFS, two-pass, replaces in place)."),
-    "render-video":         ("mangaeasy.video.render",                         "main",        "Manga: render",    "Render a chapter video from panels + audio."),
-    "add-bgm":              ("mangaeasy.video.add_bg",                         "main",        "Manga: render",    "Add background music to a chapter video."),
-    "join-chapters":        ("mangaeasy.video.join",                           "main",        "Manga: render",    "Rebuild chapters from panels + audio and add BGM."),
-    "join-chapters-nobgm":  ("mangaeasy.video.join",                           "main_nobgm",  "Manga: render",    "Concatenate existing chapter videos (no BGM)."),
-    "timestamps":           ("mangaeasy.video.timestamps",                     "main",        "Manga: render",    "Generate per-panel timestamps."),
-    "to-pdf":               ("mangaeasy.images.pdf",                           "main",        "Manga: render",    "Export chapter images to a PDF."),
-    "to-pdf-lossless":      ("mangaeasy.images.pdf_lossless",                  "main",        "Manga: render",    "Export images to a lossless PDF."),
-    "convert-images":       ("mangaeasy.images.convert",                       "main",        "Manga: render",    "Convert / normalize image formats."),
-    "watermark":            ("mangaeasy.images.watermark",                     "main",        "Manga: render",    "Apply a text watermark to images."),
-    "ai-zip":               ("mangaeasy.images.ai_zip_cli",                    "main",        "Manga: render",    "Pack chapter panels into a labelled ZIP for AI context."),
-
-    # ── Chapter bookkeeping ───────────────────────────────────────────────────
-    "init-chapter":         ("mangaeasy.utils.init_chapter",                   "main",        "Manga: chapters",  "Create folders for a new chapter."),
-    "increment-chapter":    ("mangaeasy.utils.increment",                      "main",        "Manga: chapters",  "Bump the chapter number in config.json."),
-    "reset-chapter":        ("mangaeasy.utils.reset",                          "main",        "Manga: chapters",  "Reset chapter working state."),
-    "fix-name":             ("mangaeasy.utils.fix_name",                       "main",        "Manga: chapters",  "Fix file naming for a chapter."),
-    "clean-chapter":        ("mangaeasy.utils.clean_chapter",                  "main",        "Manga: chapters",  "Remove intermediate files for a chapter."),
+    # ── Image export & AI context ─────────────────────────────────────────────
+    "to-pdf":               ("mangaeasy.images.pdf",                           "main",        "Manga: export",    "Export chapter images to a PDF."),
+    "to-pdf-lossless":      ("mangaeasy.images.pdf_lossless",                  "main",        "Manga: export",    "Export images to a lossless PDF."),
+    "convert-images":       ("mangaeasy.images.convert",                       "main",        "Manga: export",    "Convert / normalize image formats."),
+    "watermark":            ("mangaeasy.images.watermark",                     "main",        "Manga: export",    "Apply a text watermark to images."),
+    "ai-zip":               ("mangaeasy.images.ai_zip_cli",                    "main",        "Manga: export",    "Pack chapter panels into a labelled ZIP for AI context."),
 }
 
 

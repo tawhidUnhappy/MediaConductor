@@ -64,7 +64,7 @@ def panels_dir(name=None, chapter=None) -> Path:
 
 
 def processed_panels_dir(name=None, chapter=None) -> Path:
-    """Upscaled / mirrored / cleaned panels produced by mangaeasy process-panels."""
+    """Post-processed (upscaled / mirrored / cleaned) panels directory."""
     subdir = _path_cfg().get("processed_subdir", "panels_processed")
     return chapter_dir(name, chapter) / subdir
 

@@ -188,18 +188,26 @@ def _run_magi(img_array: np.ndarray) -> Dict:
 # ---------------------------------------------------------------------------
 
 
-def _manga_reading_order(boxes: List[Dict[str, int]]) -> List[Dict[str, int]]:
-    """Sort panels using a Topological Sort (DAG) to handle complex manga layouts."""
+def _manga_reading_order(
+    boxes: List[Dict[str, int]], rtl: Optional[bool] = None
+) -> List[Dict[str, int]]:
+    """Sort panels using a Topological Sort (DAG) to handle complex manga layouts.
+
+    `rtl` selects reading direction: True = right-to-left (Japanese), False =
+    left-to-right (Chinese/Korean). When None, it is read from the system
+    config's ``cut_page.reading_direction`` (default rtl).
+    """
     if len(boxes) <= 1:
         return list(boxes)
 
-    try:
-        from mangaeasy.config import load_system_config
+    if rtl is None:
+        try:
+            from mangaeasy.config import load_system_config
 
-        syscfg = load_system_config()
-        rtl = syscfg.get("cut_page", {}).get("reading_direction", "rtl") == "rtl"
-    except Exception:
-        rtl = True
+            syscfg = load_system_config()
+            rtl = syscfg.get("cut_page", {}).get("reading_direction", "rtl") == "rtl"
+        except Exception:
+            rtl = True
 
     def cy(b: Dict) -> float:
         return (b["y1"] + b["y2"]) / 2.0

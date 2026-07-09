@@ -62,6 +62,7 @@ class ToolSpec:
     model_repo: str | None = None
     model_subdir: str | None = None
     adapter: str | None = None          # asset filename to copy into the tool dir
+    extra_adapters: list[str] = field(default_factory=list)  # more asset files to copy in
     env_deps: list[str] = field(default_factory=list)  # for managed_env
     exclude_extras: list[str] = field(default_factory=list)  # extras uv sync must skip
     verify_import: str | None = None    # module to import-check inside the env
@@ -105,6 +106,7 @@ TOOLS: dict[str, ToolSpec] = {
         kind="managed_env",
         git_url="https://github.com/ragavsachdeva/magi",
         adapter="detect_magi.py",
+        extra_adapters=["batch_detect_magi.py"],
         env_deps=[
             "torch>=2.5.0",
             "torchvision>=0.20.0",
@@ -518,12 +520,12 @@ def _install_managed_env(
     log("Writing isolated uv environment definition...")
     _write_managed_pyproject(spec, dest, gpu_mode)
 
-    if spec.adapter:
-        src = ASSETS_TOOLS / spec.adapter
+    for adapter_name in ([spec.adapter] if spec.adapter else []) + spec.extra_adapters:
+        src = ASSETS_TOOLS / adapter_name
         if not src.exists():
             raise InstallError(f"shipped adapter missing: {src}")
-        shutil.copyfile(src, dest / spec.adapter)
-        log(f"Installed adapter: {spec.adapter}")
+        shutil.copyfile(src, dest / adapter_name)
+        log(f"Installed adapter: {adapter_name}")
 
     if clone and spec.git_url:
         upstream = dest / "upstream"

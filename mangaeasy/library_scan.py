@@ -1,12 +1,12 @@
 """`mangaeasy library-list` — discover projects and per-item readiness.
 
-State discovery for scripts and AI agents (and eventually the desktop app):
-answers "what projects exist under this project root, and how far along is
-each chapter/item" without opening the GUI. Read-only — never writes.
+State discovery for scripts and AI agents: answers "what projects exist under
+this project root, and how far along is each chapter/item". Read-only — never
+writes.
 
 Handles both on-disk layouts:
 - item pipeline:  library/<project>/<NN>/{panels/, narration.json[, intro.json]}
-- legacy chapter: library/<name>/<NN>/{panels/, narration_<NN>.json, audio/, *.mp4}
+- older chapter:  library/<name>/<NN>/{panels/, narration_<NN>.json, audio/, *.mp4}
 """
 
 from __future__ import annotations
@@ -29,9 +29,9 @@ def _read_json(path: Path) -> dict:
 
 
 def library_dir(project_root: Path) -> Path:
-    """Mirror of the desktop app's `libraryDir` (config.ts): the configured
-    `paths.library_subdir` from config.system.json, else the first existing
-    legacy folder name, else `mangas`."""
+    """Resolve the library folder: the configured `paths.library_subdir` from
+    config.system.json, else the first existing conventional folder name, else
+    `mangas`."""
     system_config = _read_json(project_root / "config.system.json")
     configured = (system_config.get("paths") or {}).get("library_subdir")
     if configured:

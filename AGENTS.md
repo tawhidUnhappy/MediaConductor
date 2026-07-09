@@ -1,5 +1,10 @@
 # Agent notes for mangaEasy
 
+**New here? Open [START_HERE.md](START_HERE.md) first** — the single entry map
+to the whole repo (what it is, the pipeline, which doc for which job, the code
+map). This file is the quick agent-facing summary; START_HERE points to
+everything.
+
 **Using the tool** (turning images + narration into videos): the entire tool
 surface is the `mangaeasy` CLI — read **[docs/ai-guide.md](docs/ai-guide.md)**
 first; it is the complete operating manual (install modes, data anatomy,
@@ -21,5 +26,4 @@ touch `narration.backup.json`; clear generated output only via the
 
 **Developing this repo** (changing mangaEasy itself): read
 [CLAUDE.md](CLAUDE.md) — architecture, conventions, gotchas, test/lint
-requirements (`uv run pytest`, `uv run ruff check .`, desktop
-`npm run typecheck`).
+requirements (`uv run pytest`, `uv run ruff check .`).

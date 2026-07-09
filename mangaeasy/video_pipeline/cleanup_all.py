@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
                          help="The manga's library folder, used only as a safety check against --dir.")
     parser.add_argument("--dir", type=Path, required=True,
                          help="The manga-specific output directory to delete wholesale "
-                              "(the desktop app's 'projectOutputDir', e.g. library/<manga>/output).")
+                              "(e.g. library/<manga>/output).")
     parser.add_argument("--yes", action="store_true", help="Actually delete. Default is dry run.")
     return parser.parse_args()
 

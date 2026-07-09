@@ -22,7 +22,7 @@ from mangaeasy.video_pipeline.ffmpeg_tools import (
     run,
     validate_video_stream,
 )
-from mangaeasy.video.blur_background import (
+from mangaeasy.video_pipeline.blur_background import (
     BlurBackgroundOptions,
     blur_work_size,
     render_blurred_panel_ffmpeg,

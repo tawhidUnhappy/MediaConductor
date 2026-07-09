@@ -66,7 +66,7 @@ The model code and weights download from Hugging Face automatically on the
 first detection run. Pass `--clone` if you also want the upstream
 `ragavsachdeva/magi` repo checked out for reference.
 
-Used by: panel detection in `mangaeasy cut-page` (and anything calling
+Used by: panel detection in `mangaeasy page-split` (and anything calling
 `mangaeasy.panels.ai`).
 
 ## deepseek-ocr2 (DeepSeek-OCR 2 panel/document OCR)

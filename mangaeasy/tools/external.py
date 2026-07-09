@@ -26,12 +26,11 @@ def package_root() -> Path:
 def _default_frozen_root() -> Path:
     """Writable data root for a frozen build running without MANGAEASY_ROOT.
 
-    The Electron app always sets MANGAEASY_ROOT before spawning the backend,
-    so this only matters when the frozen CLI is run standalone. The exe's own
-    folder is not reliably writable everywhere: inside a macOS .app bundle it
-    is sealed/read-only, and a Linux AppImage mount or /opt install is
-    read-only too — those fall back to the platform's standard data dir
-    (mirrors desktop/src/main/paths.ts's appRoot()).
+    This matters for a standalone frozen CLI when the caller hasn't set
+    MANGAEASY_ROOT. The exe's own folder is not reliably writable everywhere:
+    inside a macOS .app bundle it is sealed/read-only, and a Linux AppImage
+    mount or /opt install is read-only too — those fall back to the platform's
+    standard data dir.
     """
     exe_dir = Path(sys.executable).resolve().parent
     if sys.platform == "win32":
@@ -54,8 +53,7 @@ def app_root() -> Path:
 
     Frozen build: a per-platform writable root (see _default_frozen_root).
     Dev checkout: the repo root (parent of the ``mangaeasy`` package).
-    Electron sets MANGAEASY_ROOT explicitly when it spawns the backend, so
-    that always wins when present.
+    An explicit MANGAEASY_ROOT env var always wins when present.
     """
     configured = os.environ.get("MANGAEASY_ROOT")
     if configured:

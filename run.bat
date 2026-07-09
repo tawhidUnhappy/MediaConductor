@@ -1,11 +1,11 @@
 @echo off
-REM One-command launcher for mangaEasy from a source checkout (Windows).
-REM Syncs Python deps, rebuilds the desktop app, then opens it.
+REM One-command bootstrap for mangaEasy from a source checkout (Windows).
+REM mangaEasy is a CLI + MCP tool for LLM agents -- there is no GUI. This syncs
+REM Python deps and shows the command list; drive it with `uv run mangaeasy ...`.
 REM
-REM Usage: double-click run.bat (or a shortcut to it), or run it from a
-REM terminal in the repo root.
+REM Usage: run it from a terminal in the repo root.
 setlocal
-title mangaEasy launcher
+title mangaEasy
 cd /d "%~dp0"
 
 REM uv's installer adds %USERPROFILE%\.local\bin to your user PATH, but a
@@ -20,7 +20,6 @@ if errorlevel 1 (
   echo [FATAL] uv is not installed or not on PATH.
   echo         Install it from https://docs.astral.sh/uv/ and re-run.
   echo.
-  pause
   exit /b 1
 )
 
@@ -29,70 +28,13 @@ call uv sync
 if errorlevel 1 (
   echo.
   echo [FATAL] uv sync failed -- see the error above.
-  pause
   exit /b 1
 )
 
-where npm >nul 2>nul
-if not errorlevel 1 goto have_npm
-
-REM No system Node -- vendor a portable copy into .mangaeasy\tools (same
-REM self-contained dir ffmpeg/uv/git-lfs use) instead of requiring a real
-REM install. Nothing is committed to the repo; this only runs once.
-echo ==^> No npm found, fetching a portable Node.js for this install...
-call uv run mangaeasy ensure-node
-if errorlevel 1 (
-  echo.
-  echo [FATAL] Could not fetch a portable Node.js automatically.
-  echo         Install Node 22+ yourself from https://nodejs.org/ and re-run.
-  echo.
-  pause
-  exit /b 1
-)
-set "PATH=%~dp0.mangaeasy\tools\_vendor\node;%PATH%"
-
-where npm >nul 2>nul
-if errorlevel 1 (
-  echo [FATAL] Node.js/npm still not found after fetching it -- see the error above.
-  echo.
-  pause
-  exit /b 1
-)
-
-:have_npm
-pushd desktop
-if exist "node_modules\electron" goto skip_npm_install
-call npm install
-if errorlevel 1 (
-  popd
-  echo.
-  echo [FATAL] npm install failed -- see the error above.
-  pause
-  exit /b 1
-)
-
-:skip_npm_install
-REM Always rebuild, every launch -- a stale desktop\out\ from a previous
-REM source change is otherwise silent: the app still runs, it just runs old
-REM code with no error to flag it. electron-vite is fast (a couple seconds)
-REM so paying that cost every launch is cheap insurance against that.
-echo ==^> Building desktop app...
-call npm run build
-if errorlevel 1 (
-  popd
-  echo.
-  echo [FATAL] npm run build failed -- see the error above.
-  pause
-  exit /b 1
-)
-popd
-
-echo ==^> Launching mangaEasy...
-call uv run mangaeasy app
-if errorlevel 1 (
-  echo.
-  echo [FATAL] mangaeasy app exited with an error -- see above.
-  pause
-  exit /b 1
-)
+echo ==^> mangaEasy is ready. Start with:
+echo       uv run mangaeasy where --json      ^(resolved paths + version^)
+echo       uv run mangaeasy commands          ^(the full command list^)
+echo       uv run mangaeasy mcp               ^(run the MCP server for an agent host^)
+echo.
+call uv run mangaeasy --help
 endlocal

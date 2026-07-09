@@ -66,12 +66,6 @@
     "speaker_wav": "vocal/manga_vocal2.wav",
     "use_raw_narration": true
   },
-  "ports": {
-    "cut_page": 5000,
-    "narration_editor": 5003,
-    "narration_editor_all": 5005,
-    "narration_review": 5006
-  },
   "cut_page": {
     "reading_direction": "rtl"
   }

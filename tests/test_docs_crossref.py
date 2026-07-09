@@ -1,17 +1,36 @@
 """Docs can't rot silently: every `mangaeasy <command>` mentioned in the
-AI-facing docs must exist in the CLI's dispatch table."""
+AI-facing docs must exist in the CLI's dispatch table, the repo's own
+navigation docs must not contain broken internal links, and START_HERE must
+name every top-level package so a new package can't appear undocumented."""
 
 import re
 from pathlib import Path
 
 from mangaeasy.cli import COMMANDS
 
+REPO = Path(__file__).resolve().parents[1]
+
 DOCS = [
-    Path(__file__).resolve().parents[1] / "docs" / "ai-guide.md",
-    Path(__file__).resolve().parents[1] / "docs" / "youtube.md",
-    Path(__file__).resolve().parents[1] / "docs" / "recap-video-playbook.md",
-    Path(__file__).resolve().parents[1] / "AGENTS.md",
+    REPO / "docs" / "ai-guide.md",
+    REPO / "docs" / "youtube.md",
+    REPO / "docs" / "recap-video-playbook.md",
+    REPO / "docs" / "operate" / "crop-verify-narrate.md",
+    REPO / "START_HERE.md",
+    REPO / "AGENTS.md",
 ]
+
+# Docs whose internal (relative) links are checked for existence. Scoped to
+# the navigation set this reorg controls; widen as older docs are audited.
+LINK_CHECKED_DOCS = [
+    REPO / "START_HERE.md",
+    REPO / "AGENTS.md",
+    REPO / "docs" / "operate" / "crop-verify-narrate.md",
+    REPO / "docs" / "history" / "reorg-plan.md",
+    REPO / "docs" / "history" / "legacy-inventory.md",
+]
+
+# markdown [text](target) where target is a relative path (not http/anchor)
+LINK_RE = re.compile(r"\]\((?!https?://|#|mailto:)([^)]+)\)")
 
 # `mangaeasy <token>` where token looks like a subcommand (lowercase,
 # digits, hyphens). Placeholders (`<command>`), flags (`--help`), version
@@ -37,3 +56,39 @@ def test_docs_cover_the_agent_essentials():
                    "MANGAEASY_RESULT", "MANGAEASY_PROGRESS", "MANGAEASY_ROOT",
                    "mangaeasy mcp", "exit code", "library-list"):
         assert needle.lower() in guide.lower(), f"ai-guide.md is missing: {needle}"
+
+
+def test_internal_doc_links_resolve():
+    """Relative links in the navigation docs must point at real files/dirs."""
+    broken: dict[str, set[str]] = {}
+    for doc in LINK_CHECKED_DOCS:
+        text = doc.read_text(encoding="utf-8")
+        for target in LINK_RE.findall(text):
+            path_part = target.split("#", 1)[0]  # drop #Lnn / #anchor fragments
+            if not path_part:
+                continue
+            resolved = (doc.parent / path_part).resolve()
+            if not resolved.exists():
+                broken.setdefault(doc.name, set()).add(target)
+    assert not broken, f"docs contain broken internal links: {broken}"
+
+
+def _packages() -> list:
+    pkg_root = REPO / "mangaeasy"
+    return sorted(
+        p for p in pkg_root.iterdir()
+        if p.is_dir() and (p / "__init__.py").exists() and not p.name.startswith("_")
+    )
+
+
+def test_start_here_names_every_top_level_package():
+    """A new mangaeasy/<pkg>/ can't appear without being named in START_HERE."""
+    start_here = (REPO / "START_HERE.md").read_text(encoding="utf-8")
+    missing = [p.name for p in _packages() if p.name not in start_here]
+    assert not missing, f"START_HERE.md does not mention packages: {missing}"
+
+
+def test_every_package_has_a_readme():
+    """Every mangaeasy/<pkg>/ must document itself with a README.md."""
+    missing = [p.name for p in _packages() if not (p / "README.md").exists()]
+    assert not missing, f"packages missing a README.md: {missing}"

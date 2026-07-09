@@ -2,8 +2,8 @@
 
 ## Cutting a release
 
-One script bumps every version in lockstep (pyproject.toml,
-`mangaeasy/__init__.py`, desktop/package.json + lock) and tags:
+One script bumps every version in lockstep (`pyproject.toml`,
+`mangaeasy/__init__.py`) and tags:
 
 ```bash
 uv run python scripts/release.py 1.2.3 --tag
@@ -16,20 +16,17 @@ The pushed `v*` tag triggers `.github/workflows/release.yml`, which on
 Windows / Linux / macOS (Apple Silicon, plus best-effort Intel):
 
 1. **Fails fast if the tag and source versions disagree** (so a forgotten
-   `release.py` run can't ship mislabeled artifacts), then stamps the tag
-   version into `desktop/package.json`.
+   `release.py` run can't ship mislabeled artifacts).
 2. Runs ruff + pytest + a compile check.
-3. Builds the PyInstaller backend (`packaging/mangaeasy.spec`) into
-   `desktop/resources/backend/` and **smoke-tests it** (`--version`,
-   `doctor --json`).
-4. Runs `electron-builder` for that platform (Windows: portable exe only —
-   no NSIS installer by design; macOS: dmg + zip; Linux: AppImage + deb +
-   tar.gz), artifacts named `mangaEasy-<version>-<os>-<arch>[...]`.
-5. Publishes a GitHub Release with every platform's artifacts attached.
+3. Freezes the CLI with PyInstaller (`packaging/mangaeasy.spec`) into
+   `dist/mangaEasy/` (or `dist/mangaEasy.app/` on macOS) and **smoke-tests it**
+   (`--version`, `doctor --json`).
+4. Packages the frozen build into a per-OS archive
+   (`mangaeasy-<platform>.zip` / `.tar.gz`).
+5. Publishes a GitHub Release with every platform's archive attached.
 
-Core binaries (ffmpeg/ffprobe/uv/git-lfs) are **not** bundled — the app
-downloads them once on first launch (Setup tab → Download core tools). This
-keeps installers ~50-70% smaller.
+Core binaries (ffmpeg/ffprobe/uv/git-lfs) are **not** bundled — `mangaeasy
+bootstrap-tools` downloads them once on first use, keeping archives small.
 
 Monitor the build at `https://github.com/tawhidUnhappy/mangaEasy/actions`.
 The Release appears at `https://github.com/tawhidUnhappy/mangaEasy/releases`
@@ -48,15 +45,13 @@ uv run ruff check .
 uv run pytest
 uv run python -m compileall -q mangaeasy
 uv run python scripts/release.py --check
-cd desktop && npm run lint && npm run build
 ```
 
 Make sure these are **not** committed (git-ignored by default): `.venv/`,
 generated output (`audio/`, `output/`, `work/`), user media (`library/`,
-`music/`, …), local `config.json`/`config.system.json`, `.mangaeasy/`,
-`desktop/node_modules|out|dist`, `desktop/resources/backend/`.
+`music/`, …), local `config.json`/`config.system.json`, `.mangaeasy/`, `dist/`.
 
 ## How users install
 
-See [docs/install.md](install.md) — Releases page download (no Python
-needed), `uv tool install`, or from source.
+See [docs/install.md](install.md) — `uv tool install`, a frozen release
+download (no Python needed), or from source.

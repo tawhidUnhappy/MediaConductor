@@ -8,12 +8,15 @@
 [![Install with uv](https://img.shields.io/badge/install-uv%20tool-261230.svg)](https://docs.astral.sh/uv/)
 
 `mangaeasy` is a batteries-included pipeline for building narrated videos from
-image panels. It downloads/cuts pages, helps you write narration, generates
-text-to-speech audio, renders a video per item, and stitches everything into one
-long video. Heavy AI models (TTS, panel detection) stay in their **own isolated
-environments**, so the core tool installs fast and stays conflict-free.
+image panels. It downloads chapters, crops panels, verifies them, takes a
+narration script, generates text-to-speech audio, renders a video per item, and
+stitches everything into one long video. Heavy AI models (TTS, panel detection)
+stay in their **own isolated environments**, so the core tool installs fast and
+stays conflict-free.
 
-Everything is exposed through a single command:
+**mangaEasy is a CLI + MCP tool built for LLM agents — there is no GUI.** New to
+the repo? Open **[START_HERE.md](START_HERE.md)**. Everything is exposed through
+a single command:
 
 ```console
 $ mangaeasy --help
@@ -31,10 +34,8 @@ Usage:
 ## Contents
 
 - [Features](#features)
-- [Download — no Python needed](#download--no-python-needed)
+- [Install — nothing left behind](#install--nothing-left-behind)
 - [Requirements](#requirements)
-- [Install (developers / advanced)](#install-developers--advanced)
-- [The desktop app](#the-desktop-app)
 - [Install the AI tools (one command)](#install-the-ai-tools-one-command)
 - [Quick start: image folders → video](#quick-start-image-folders--video)
 - [The `mangaeasy` command](#the-mangaeasy-command)
@@ -51,8 +52,8 @@ Usage:
 ## Features
 
 - **One command, many tools** — `mangaeasy <subcommand>`, discoverable via `--help`.
-- **Desktop app** — `mangaeasy app` opens a control center: install AI tools with
-  one click, edit configs, run the pipeline, and launch editors with live logs.
+- **Agent-native** — every command has a `--json` / machine-readable contract,
+  and `mangaeasy mcp` exposes the same engine as typed MCP tools for an agent host.
 - **One-command AI tool install** — `mangaeasy install-tool index-tts` or
   `mangaeasy install-tool deepseek-ocr2` builds isolated model environments for you.
 - **General item-based video pipeline** — point it at numbered folders of images +
@@ -66,76 +67,38 @@ Usage:
   to Kokoro otherwise, so `mangaeasy video` always works out of the box.
 - **Direct YouTube upload** — connect your channel once (your own free
   Google OAuth client, see [docs/youtube.md](docs/youtube.md)) and upload
-  finished videos from the app, the CLI (`mangaeasy youtube-upload`), or an
-  AI assistant. Resumable uploads with progress; tokens stay in the app's
-  own data folder.
-- **Legacy manga workflow included** — MangaDex download, page-cutting and
-  narration web editors, watermarking, PDF export, and more.
+  finished videos from the CLI (`mangaeasy youtube-upload`) or an AI assistant.
+  Resumable uploads with progress; tokens stay in the install's own data folder.
 - **Cross-platform** — Windows, macOS, and Linux.
 
-## Download — nothing to install, nothing left behind
+## Install — nothing left behind
 
-The easiest way to get mangaEasy is to download the desktop app from the
-[**Releases page**](https://github.com/tawhidUnhappy/mangaEasy/releases/latest).
-It's a self-contained Electron app with the Python backend bundled inside —
-**no Python, Node, or ffmpeg install required**, and it auto-detects your
-GPU (NVIDIA CUDA, Apple Silicon, or CPU-only) with no setup. On first launch
-the Setup tab offers a one-time ~100 MB **Download core tools** (ffmpeg and
-friends) into the app's own data folder — on all three platforms, macOS
-included. Plain `git` is the one thing still expected on your system (used
-to fetch the optional AI tools).
+Get the `mangaeasy` command one of three ways (full details in
+[docs/install.md](docs/install.md)):
 
-**Windows**
+```bash
+# 1. uv tool (recommended)
+uv tool install git+https://github.com/tawhidUnhappy/mangaEasy.git
 
-| File | Type | How to use |
-|---|---|---|
-| `mangaEasy-X.Y.Z-windows-x64-portable.exe` | Portable | No install — just run it (SmartScreen: *More info → Run anyway*) |
+# 2. from source
+git clone https://github.com/tawhidUnhappy/mangaEasy.git && cd mangaEasy && uv sync
 
-There is deliberately no Windows installer (`.exe` setup). An installer would
-write a registry uninstall key and a Start Menu shortcut outside wherever you
-put the app, and those wouldn't go away if you just delete the folder. The
-portable build keeps the promise below literal: drop the folder anywhere,
-run the exe, delete the folder when you're done.
+# 3. a frozen release build (no Python) — from the Releases page:
+#    mangaeasy-windows.zip / mangaeasy-macos-arm64.zip / mangaeasy-linux.tar.gz
+```
 
-**macOS**
+Then grab the core binaries and whichever AI tools you want (each downloads on
+demand into the install's own self-contained data folder, never your home dir):
 
-| File | Type | How to use |
-|---|---|---|
-| `mangaEasy-X.Y.Z-mac-arm64.dmg` | Installer | Drag to Applications |
-| `mangaEasy-X.Y.Z-mac-arm64.zip` | Portable | Extract, `xattr -cr mangaEasy.app`, run it |
+```bash
+mangaeasy bootstrap-tools               # ffmpeg/ffprobe/uv/git-lfs
+mangaeasy install-tool kokoro-82m       # CPU TTS (add index-tts / magi-v3 / z-image-turbo as needed)
+```
 
-**Linux**
-
-| File | Type | How to use |
-|---|---|---|
-| `mangaEasy-X.Y.Z-linux-x86_64.AppImage` | Portable | `chmod +x`, run it — no install |
-| `mangaEasy-X.Y.Z-linux-amd64.deb` | Installer | `sudo dpkg -i mangaEasy-*.deb` |
-| `mangaEasy-X.Y.Z-linux-x64.tar.gz` | Portable | Extract, run the binary inside |
-
-Launch the app and use the **Setup** tab to install whichever AI tools you
-want (index-tts, kokoro, magi-v3, deepseek-ocr2, z-image-turbo) — each downloads on demand into
-the app's own self-contained data folder, never your home directory.
-
-**Everything mangaEasy ever writes lives in one data folder** — AI tool
-installs, model weights, Hugging Face/torch/uv caches, app state, logs, even
-Electron's own browser caches:
-
-| Platform | Data folder |
-|---|---|
-| Windows (portable) | next to the `.exe` — the folder *is* the install |
-| macOS | `~/Library/Application Support/mangaEasy` |
-| Linux | `~/.local/share/mangaEasy` |
-
-The Setup tab's **About** section shows the exact path with an Open button.
-Delete that folder (plus the app itself) and nothing is left anywhere else
-on the machine. Override the location with the `MANGAEASY_ROOT` environment
-variable if you want it somewhere specific.
-
-> **macOS Gatekeeper note:** the first time you may need to right-click → Open
-> to bypass the "unidentified developer" warning, or run
-> `xattr -cr mangaEasy.app` in the terminal after extracting.
-
-See [docs/install.md](docs/install.md) for full installation instructions.
+GPU acceleration (NVIDIA CUDA, Apple Silicon) is auto-detected, with CPU
+fallback everywhere. **Everything mangaEasy ever writes lives in one data
+folder** — tool installs, model weights, HF/torch/uv caches, logs — so
+deleting it leaves nothing behind. Override its location with `MANGAEASY_ROOT`.
 
 ### Using mangaEasy with an AI assistant
 
@@ -152,12 +115,11 @@ tools in any MCP-capable assistant.
 
 ## Requirements
 
-**Using the desktop app from the Releases page:** just `git` — used to fetch
-the optional AI tools. Python ships inside the app on every platform;
-ffmpeg/ffprobe/uv/git-lfs download once via the Setup tab's
-**Download core tools** button (all platforms, macOS included).
+**Using a frozen release build:** just `git` (used to fetch the optional AI
+tools); Python ships inside the build, and `mangaeasy bootstrap-tools`
+downloads ffmpeg/ffprobe/uv/git-lfs on demand.
 
-**Running from source / as a CLI tool (developers):**
+**Running from source / as a CLI tool:**
 
 - Python **3.10+**
 - [`uv`](https://docs.astral.sh/uv/) (recommended installer/runner) — or let
@@ -203,8 +165,7 @@ uv run mangaeasy --help
 ```
 
 Or just run `./run.sh` (macOS/Linux) or `run.bat` (Windows) from the repo
-root — it syncs Python deps, builds the desktop app on first run, and opens
-`mangaeasy app` for you in one step.
+root — it syncs Python deps and prints the command list.
 
 Optional extras (only if you want heavy models *inside* the main env instead of
 managed external tool environments — most users should not need these):
@@ -214,29 +175,6 @@ uv sync --extra whisper   # faster-whisper
 uv sync --extra ml        # torch, transformers, opencv, MAGI deps, ...
 uv sync --extra all        # everything above
 ```
-
-## The desktop app
-
-```bash
-mangaeasy app
-```
-
-Opens the native Electron desktop app (the same app the Releases page ships)
-with everything in one place:
-
-- **Setup** — checks git / GPU, shows which AI tools are installed, installs
-  or updates them with one click while streaming the logs live in the
-  built-in terminal.
-- **Project** — pick your project folder with a real folder dialog and edit
-  `config.json` / `config.system.json` with forms (or the raw JSON via a
-  Monaco editor), no manual JSON wrangling.
-- **Make a video** / **Batch videos** — choose your manga folder and output
-  folder with Browse… buttons, pick what to run, press Start; watch progress
-  in the built-in terminal. Your folder choices are remembered between launches.
-- **Editor** — launch the panel / narration web editors with one click,
-  embedded right in the app window.
-
-See [docs/app.md](docs/app.md) for details.
 
 ## Install the AI tools (one command)
 
@@ -257,8 +195,7 @@ folder. The installer **detects your hardware**: NVIDIA GPU → CUDA builds,
 Apple Silicon → MPS-enabled builds, otherwise CPU builds that work on any
 machine (force one with `--cuda` / `--cpu`). Other flags: `--ref <branch/tag>`
 to pin a version, `--skip-model` to skip the big weight download, `--update`
-to pull the latest version of an already-installed tool. The same installs
-(and updates) are available as buttons in `mangaeasy app`'s Setup tab.
+to pull the latest version of an already-installed tool.
 
 See [docs/install-tools.md](docs/install-tools.md) for what each installer does.
 
@@ -329,13 +266,12 @@ Command groups:
 
 | Group | What it covers |
 |-------|----------------|
-| **Setup & app** | `app` (desktop control center), `doctor` (environment report), `install-tool` (provision AI tools from GitHub/Hugging Face). |
+| **Setup** | `where`, `commands`, `doctor` (environment report), `bootstrap-tools`, `install-tool` (provision AI tools), `library-list`, `mcp`. |
 | **Video pipeline** | `video`, `video-audio`, `video-render`, `video-join`, `video-check`, `video-validate`, and audio/clean helpers — the general image-folder workflow. |
+| **YouTube** | `youtube-auth`, `youtube-status`, `youtube-upload`, `youtube-delete`. |
 | **External tools** | `tools` (show where envs resolve), `index-tts`, `deepseek-ocr2`, `zimage`. |
-| **Manga: acquire** | `download`, `cut-page`, `panel-editor`, `gutter-split`, `process-panels`. |
-| **Manga: narration** | `narration-editor`, `narration-editor-all`, `narration-review`, `join-narration`, `normalize-narration`, `clean-narration`, `backup-narration`, `rename-file`. |
-| **Manga: render** | `render-video`, `add-bgm`, `join-chapters`, `timestamps`, `to-pdf`, `watermark`, `convert-images`, … |
-| **Manga: chapters** | `init-chapter`, `increment-chapter`, `reset-chapter`, `fix-name`, `clean-chapter`. |
+| **Manga: acquire** | `download`, `webtoon-split`, `page-split`, `gutter-split` — crop → verify → narrate ([guide](docs/operate/crop-verify-narrate.md)). |
+| **Manga: export** | `to-pdf`, `to-pdf-lossless`, `convert-images`, `watermark`, `ai-zip`. |
 
 ## External AI tools
 
@@ -381,20 +317,22 @@ See [docs/external-tools.md](docs/external-tools.md) for how each tool is invoke
 
 ## Manga chapter workflow
 
-The original chapter-based manga tools are still here for end-to-end manga work
-(download → cut pages → write narration → render). These are **config-driven**:
-they read `config.json` (per-manga settings) and `config.system.json`
-(machine/render settings) from the folder you run them in.
+End-to-end manga work is: download → crop panels → verify → write narration →
+build video. The crop → verify → narrate loop has its own guide:
+[docs/operate/crop-verify-narrate.md](docs/operate/crop-verify-narrate.md); the
+full recap production recipe is
+[docs/recap-video-playbook.md](docs/recap-video-playbook.md).
 
 ```bash
 # copy the examples and edit them in your project folder
 cp config.example.json config.json
 cp config.system.example.json config.system.json
 
-mangaeasy download         # fetch a chapter from MangaDex
-mangaeasy cut-page         # web editor: cut pages into panels
-mangaeasy narration-editor # web editor: write narration
-mangaeasy render-video     # render the chapter video
+mangaeasy download                                    # fetch a chapter from MangaDex
+mangaeasy webtoon-split --project-root library/<Proj> --items 01   # crop (webtoons)
+mangaeasy page-split    --project-root library/<Proj> --items 01   # crop (paged manga)
+# ...verify the crops, write narration.json, then build:
+mangaeasy video         --project-root library/<Proj> --items 01 --build-long-video
 ```
 
 `download` records where each manga came from in
@@ -436,8 +374,11 @@ work/<project>/                        # scratch / intermediates
 
 ## Documentation
 
-- [Installation guide](docs/install.md) — standalone download, uv tool, and from-source options
-- [The desktop app](docs/app.md) — the `mangaeasy app` control center
+- [**START_HERE.md**](START_HERE.md) — the repo entry map (read this first)
+- [Installation guide](docs/install.md) — uv tool, frozen release, and from-source options
+- [AI/CLI guide](docs/ai-guide.md) — the complete operating manual + machine-readable contract
+- [Crop → verify → narrate](docs/operate/crop-verify-narrate.md) — the core loop
+- [Recap video playbook](docs/recap-video-playbook.md) — full end-to-end production recipe
 - [Installing AI tools](docs/install-tools.md) — what `install-tool` sets up for each tool
 - [Architecture](docs/architecture.md) — how the package and external tools fit together
 - [External tools](docs/external-tools.md) — Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2, Z-Image Turbo

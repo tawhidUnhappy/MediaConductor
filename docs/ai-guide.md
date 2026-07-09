@@ -46,29 +46,28 @@ uv sync
 uv run mangaeasy --version
 ```
 
-### Mode 3 — the user's installed desktop app (share its data!)
+### Mode 3 — a frozen release build (no Python needed)
 
-The desktop app bundles the full CLI as its backend binary:
-
-| Platform | Backend CLI path |
-|---|---|
-| macOS | `/Applications/mangaEasy.app/Contents/Resources/backend/mangaeasy` |
-| Linux (deb) | `/opt/mangaEasy/resources/backend/mangaeasy` |
-| Linux (tar.gz) | `<extracted>/resources/backend/mangaeasy` |
-| Windows (portable) | not stable (self-extracts to temp) — use Mode 1/2 instead |
-
-The app's Setup → About shows its data folder. To operate on the **same
-projects and installed tools** as the user's GUI, set `MANGAEASY_ROOT` to
-that folder before running any command:
+Each GitHub release ships a self-contained frozen `mangaeasy` per OS
+(`mangaeasy-<platform>.zip` / `.tar.gz`). Unpack it and run the executable
+directly — `mangaEasy is a CLI + MCP tool; there is no GUI`:
 
 ```bash
-MANGAEASY_ROOT="$HOME/Library/Application Support/mangaEasy" \
-  /Applications/mangaEasy.app/Contents/Resources/backend/mangaeasy library-list \
-  --project-root "$HOME/Library/Application Support/mangaEasy" --json
+./mangaEasy/mangaeasy --version      # dist folder from the archive
+./mangaEasy/mangaeasy commands       # the full command list
 ```
 
-Default data folders: Windows portable = next to the exe; macOS =
-`~/Library/Application Support/mangaEasy`; Linux = `~/.local/share/mangaEasy`.
+To point a run at a specific data root (models, tools, projects), set
+`MANGAEASY_ROOT` before the command:
+
+```bash
+MANGAEASY_ROOT="/data/mangaeasy" ./mangaEasy/mangaeasy library-list \
+  --project-root "/data/mangaeasy/library" --json
+```
+
+Default data folders when `MANGAEASY_ROOT` is unset: Windows = next to the exe;
+macOS = `~/Library/Application Support/mangaEasy`; Linux =
+`~/.local/share/mangaEasy`.
 
 ## 2. First-run setup
 
@@ -171,9 +170,8 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 Run `mangaeasy commands --json` for the always-current list and
 `mangaeasy <command> --help` for flags. Highlights per group:
 
-**Setup & app** — `where`, `commands`, `doctor`, `bootstrap-tools`,
-`install-tool <name>`, `tools`, `library-list`, `mcp`, `app` (GUI —
-don't launch from agents).
+**Setup** — `where`, `commands`, `doctor`, `bootstrap-tools`,
+`install-tool <name>`, `tools`, `library-list`, `mcp`.
 
 **External tools** — `index-tts`, `deepseek-ocr2`, `zimage` (Z-Image Turbo
 text-to-image: `mangaeasy zimage --prompt "..." --output out.png --width
@@ -188,17 +186,16 @@ the generated files; needs `install-tool z-image-turbo` once).
 `video-fade-audio`, `video-clean-audio|video|work|all`,
 `audio-takes-list`, `audio-takes-restore`.
 
-**Manga acquire/narration/render (single-chapter era)** — `download`
+**Manga acquire & crop** — `download`
 (MangaDex; `--chapter N` overrides config, `--chapters 0-12 14 20.5`
 batch-downloads with one feed fetch, skipping chapters that don't exist and
 preferring the fullest version when several scanlations share a number),
-`gutter-split`, `process-panels`, the browser editors
-(`narration-editor`, `panel-editor`, `cut-page` — interactive, for humans),
-`join-narration`, `normalize-narration`, `clean-narration`,
-`backup-narration`, `render-video`, `add-bgm`, `join-chapters`,
-`timestamps`, `to-pdf`, `watermark`, `convert-images`, `ai-zip`, and
-chapter bookkeeping (`init-chapter`, `increment-chapter`, ...). Prefer the
-`video-*` pipeline for new work.
+`webtoon-split` (vertical strips), `page-split` (paged manga, MAGI v3),
+`gutter-split` (low-level engine). The crop → verify → narrate loop is
+documented in [operate/crop-verify-narrate.md](operate/crop-verify-narrate.md).
+
+**Image export & AI context** — `to-pdf`, `to-pdf-lossless`,
+`convert-images`, `watermark`, `ai-zip`.
 
 ## 6. Recipes
 
@@ -299,7 +296,7 @@ Agent rules for uploads:
 
 | Variable | Meaning |
 |---|---|
-| `MANGAEASY_ROOT` | Override the data root (app root). The desktop app sets this for its children; set it yourself to share the GUI's data. |
+| `MANGAEASY_ROOT` | Override the data root (app root) — where models, tools, and projects live. Set it to run against a specific install's data. |
 | `MANGAEASY_HOME` | Override just the `.mangaeasy` data dir (default `<root>/.mangaeasy`). |
 | `MANGAEASY_TOOLS_DIR` | Override where AI tool envs live. |
 | `PROJECT_ROOT`, `AUDIO_ROOT`, `OUTPUT_ROOT`, `WORK_DIR` | Defaults for the corresponding `--*-root` flags. Agents should pass explicit flags instead. |
@@ -322,7 +319,7 @@ mangaeasy mcp        # newline-delimited JSON-RPC 2.0 over stdio
 
 Register: `claude mcp add mangaeasy -- mangaeasy mcp` (or client config
 `{"command": "mangaeasy", "args": ["mcp"]}`; add `"env": {"MANGAEASY_ROOT":
-"..."}` to share a GUI install's data). Tools: `doctor`, `where`,
+"..."}` to run against a specific install's data). Tools: `doctor`, `where`,
 `library_list`, `video_check`, `video_validate`, `audio_audit`,
 `generate_audio`, `render_videos`, `build_long_video`, `add_bgm`,
 `run_full_pipeline`, `bootstrap_tools`, `install_tool`, `generate_image`,

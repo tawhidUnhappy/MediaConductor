@@ -1,7 +1,7 @@
 """mangaeasy.images.ai_zip_cli — CLI wrapper for panels_to_ai_zip.
 
-Exposed as `mangaeasy ai-zip`. Lets non-Python frontends (the Electron
-desktop app) trigger an AI-context ZIP export without importing the package.
+Exposed as `mangaeasy ai-zip`. Lets non-Python callers (scripts, agents)
+trigger an AI-context ZIP export without importing the package.
 """
 
 from __future__ import annotations

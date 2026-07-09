@@ -1,10 +1,10 @@
 # Uploading to YouTube from mangaEasy
 
 mangaEasy can upload your finished videos straight to your YouTube channel —
-from the desktop app (Batch tab → **Upload to YouTube**), the CLI
-(`mangaeasy youtube-upload`), or an AI assistant (MCP tool
-`youtube_upload`). You connect your account once; the login token lives in
-mangaEasy's own data folder and can be removed any time with one click.
+from the CLI (`mangaeasy youtube-upload`) or an AI assistant (MCP tool
+`youtube_upload`). You connect your account once (`mangaeasy youtube-auth`);
+the login token lives in mangaEasy's own data folder and can be removed any
+time with `mangaeasy youtube-logout`.
 
 Uploading requires a one-time ~10 minute Google setup, because YouTube's
 API rules make every user bring their **own** (free) API credentials —
@@ -43,14 +43,8 @@ explained at the bottom. Follow the steps in order.
 
 ## Part 2 — Attach the project & connect mangaEasy
 
-**Desktop app (simplest):** Setup tab → **YouTube account** → paste the
-**Client ID** and **Client secret** → **Attach & connect** → your browser
-opens Google's consent page → approve. The section now shows *Connected as
-\<your channel\>*; the **Verify** button re-checks the connection live any
-time. (Prefer the file? Click **Browse client_secret.json…** under the form
-and pick the downloaded file instead.)
-
-**CLI:**
+Connect with `youtube-auth` (this opens Google's consent page in your
+browser; approve it once):
 
 ```bash
 # paste the two values...
@@ -62,8 +56,8 @@ mangaeasy youtube-status --verify   # → Connected as <channel> / verified: yes
 ```
 
 The client file and token are stored in `<data folder>/.mangaeasy/youtube/`
-— nothing outside mangaEasy's own folder. Disconnect any time (Setup →
-Disconnect, or `mangaeasy youtube-logout`); you can also revoke access at
+— nothing outside mangaEasy's own folder. Disconnect any time with
+`mangaeasy youtube-logout`; you can also revoke access at
 https://myaccount.google.com/permissions.
 
 **What you're granting:** full management of your channel's *videos* —
@@ -73,16 +67,9 @@ of a manual YouTube Studio trip. mangaEasy never touches comments,
 playlists, live chat, or account settings. If you connected with an older
 mangaEasy version, your token is upload-only — video management will fail
 with a 403 "insufficient authentication scopes" until you reconnect once
-(`mangaeasy youtube-auth`, or Setup → Connect).
+(`mangaeasy youtube-auth`).
 
 ## Part 3 — Upload
-
-**Desktop app:** Batch tab → step **Upload to YouTube** → it defaults to
-your most recent joined long video (or pick any file) → set title,
-description, tags → **Start**. Progress streams in the terminal pane; the
-result line contains the video URL.
-
-**CLI:**
 
 ```bash
 mangaeasy youtube-upload \
