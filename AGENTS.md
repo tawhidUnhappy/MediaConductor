@@ -18,9 +18,11 @@ mangaeasy doctor --json      # machine readiness (ffmpeg, GPU, AI tools)
 
 No command prompts for input. `--json` commands print one JSON object;
 generation commands end with a `MANGAEASY_RESULT {"outputs": [...]}` line.
-An MCP server is available: `mangaeasy mcp` (stdio). Fresh machine?
-`mangaeasy setup` provisions everything in one command
-([docs/setup.md](docs/setup.md)).
+An MCP server is available: `mangaeasy mcp` (stdio). Fresh clone or fresh
+machine? Follow the agent runbook in [docs/setup.md](docs/setup.md):
+`uv sync` → `mangaeasy setup` → `mangaeasy doctor --json` → `mangaeasy
+smoke-test` (renders and verifies a tiny real video — proof the env works,
+not just that its parts are installed).
 
 **Producing a recap series** (MangaDex URL → uploaded videos, 12 chapters per
 video): follow the skill at

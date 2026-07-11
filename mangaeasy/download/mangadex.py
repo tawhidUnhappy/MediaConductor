@@ -608,6 +608,11 @@ def _resolve_dl_cfg(args) -> dict:
                 project = {}
         merged = {**load_system_config().get("download_defaults", {}), **project}
         merged["manga_id"] = args.url
+        if not args.name and str(merged.get("name") or "").strip():
+            # A config-supplied name beating --url title derivation has
+            # misnamed a real project before — make the override loud.
+            print(f"[INFO] project name '{merged['name']}' comes from config.json, "
+                  f"NOT from the manga title — pass --name to override", flush=True)
     else:
         merged = load_download_config()
     if args.name:

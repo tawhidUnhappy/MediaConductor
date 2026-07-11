@@ -265,6 +265,17 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         [],
         {"check_updates": ("--check-updates", "flag")},
     ),
+    "smoke_test": (
+        "smoke-test",
+        "Prove the install works end to end: builds a tiny throwaway project, renders a real "
+        "MP4 through the pipeline and verifies its streams/duration, then cleans up. Run after "
+        "`setup` — doctor says the parts are installed, this proves they work together. "
+        "tts='kokoro' additionally exercises the real TTS toolchain (model download on first use).",
+        {"tts": {"type": "string", "enum": ["silent", "kokoro"]},
+         "keep": {**_BOOL, "description": "Keep <work-dir>/smoke_test/ for inspection."}},
+        [],
+        {"tts": ("--tts", "value"), "keep": ("--keep", "flag")},
+    ),
     "where": (
         "where",
         "Show this install's resolved paths (data root, tools home) and version. Run this first.",

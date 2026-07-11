@@ -29,10 +29,13 @@ mangaeasy where --json      # install paths + version
 mangaeasy doctor --json     # ffmpeg/GPU/tool readiness
 ```
 
-Fresh machine? `mangaeasy setup` provisions everything (GPU-aware; `--all` /
-`--minimal` / `--skip <tool>`; re-run to resume). Working dir for a
-production run should be the install root — projects live in `library/`,
-generated output in `audio/`, `output/`, `work/`.
+Fresh clone/machine? Follow the agent runbook in `docs/setup.md`:
+`uv sync` → `mangaeasy setup` (GPU-aware; `--all` / `--minimal` /
+`--skip <tool>`; re-run to resume) → verify `doctor --json` → `mangaeasy
+smoke-test` (renders and checks a tiny real video; `SMOKE TEST PASS` = the
+machine can produce videos). Working dir for a production run should be the
+install root — projects live in `library/`, generated output in `audio/`,
+`output/`, `work/`.
 
 ## 1. Download the series (user gives a MangaDex URL)
 

@@ -99,7 +99,12 @@ self-contained data folder, never your home dir):
 ```bash
 mangaeasy setup      # core binaries + GPU-appropriate AI tools + models
                      # (--minimal / --all / --skip <tool> — see docs/setup.md)
+mangaeasy smoke-test # proves it: renders and verifies a tiny real video
 ```
+
+LLM agents: [docs/setup.md](docs/setup.md) is a full from-clone runbook
+(prerequisite bootstrap, `doctor --json` verification contract,
+troubleshooting) designed to be followed unattended.
 
 GPU acceleration (NVIDIA CUDA, Apple Silicon) is auto-detected, with CPU
 fallback everywhere. **Everything mangaEasy ever writes lives in one data

@@ -368,7 +368,12 @@ URL→upload flow without hand-holding; their invariants:
 - `setup` (`tools/setup.py`) — chains `ensure_core_tools()` + GPU-aware
   `install_tool()` calls. It must stay idempotent/resumable and must keep
   going past individual tool failures (one flaky 33 GB download must not
-  waste the others' progress).
+  waste the others' progress). `smoke-test` (`tools/smoke.py`) is its
+  companion proof: fixture project → real render → ffprobe assertions,
+  silent-audio by default so it stays fast and model-free (`--tts kokoro`
+  opts into the TTS check); it must keep cleaning up after itself. The
+  from-clone sequence for agents is documented in `docs/setup.md`
+  (runbook: uv sync → setup → doctor --json → smoke-test).
 - `download --url/--name/--all` — `--url` must keep working without any
   config.json. The complete-chapter fast-skip in `_download_one_chapter()`
   exists so an `--all` re-run doesn't cost one at-home API call per

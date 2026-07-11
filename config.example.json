@@ -1,8 +1,8 @@
 {
-  "_comment": "Copy to config.json for the legacy manga chapter tools.",
+  "_comment": "Copy to config.json only if you want per-project download defaults. Leave `name` null — a non-null name here SILENTLY overrides the project name `mangaeasy download --url` derives from the manga title; agents should pass --name explicitly instead.",
   "download": {
     "manga_id": "https://mangadex.org/title/your-title-id",
-    "name": "my_manga",
+    "name": null,
     "chapter": 1
   }
 }

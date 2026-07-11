@@ -1,37 +1,100 @@
-# One-command setup
+# Setup — from a fresh clone to a verified install
 
-From a fresh clone to a fully provisioned install:
+The short version, for a machine that already has `git` and `uv`:
 
 ```bash
 git clone https://github.com/tawhidUnhappy/mangaEasy.git
 cd mangaEasy
 uv sync
 uv run mangaeasy setup
+uv run mangaeasy smoke-test     # proves the install actually produces video
 ```
 
 (Installed via `uv tool install` or a frozen release instead? Just run
-`mangaeasy setup`.)
+`mangaeasy setup` then `mangaeasy smoke-test`.)
 
-## What it does, in order
+The rest of this page is the **agent runbook**: the exact sequence an LLM
+agent follows on a machine it has never seen, with a machine-checkable
+verification step after each stage and a troubleshooting table of real
+failures. Every command is non-interactive and safe to re-run.
 
-1. **Core binaries** — downloads ffmpeg/ffprobe, uv, and git-lfs (~100 MB)
-   into this install's own tools dir. Nothing goes system-wide.
-2. **Hardware detection** — checks for an NVIDIA GPU.
-3. **AI tool environments** — each into its own isolated `uv` env under
+---
+
+## Agent runbook
+
+### Step 0 — Prerequisites (`git`, `uv`)
+
+Only two host tools are needed; everything else (Python included — `uv`
+downloads and pins its own interpreter) is provisioned into the repo folder.
+
+```bash
+git --version || echo MISSING git
+uv --version  || echo MISSING uv
+```
+
+Install `uv` if missing:
+
+| Platform | Command |
+|---|---|
+| Windows (PowerShell) | `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` |
+| Windows (winget) | `winget install astral-sh.uv` |
+| macOS / Linux | `curl -LsSf https://astral.sh/uv/install.sh | sh` |
+
+After installing, open a fresh shell (or add `~/.local/bin` to PATH) and
+re-check `uv --version`. `git` comes from the platform package manager
+(`winget install Git.Git`, `apt install git`, Xcode CLT on macOS).
+
+> **Windows note:** never invoke bare `python` — on many machines it is the
+> Microsoft Store stub that opens a browser. Always go through
+> `uv run mangaeasy ...` / `uv run python ...`.
+
+### Step 1 — Clone and sync the Python environment
+
+```bash
+git clone https://github.com/tawhidUnhappy/mangaEasy.git
+cd mangaEasy
+uv sync
+```
+
+`uv sync` creates `.venv/` from the committed lockfile (interpreter
+included). Verify:
+
+```bash
+uv run mangaeasy --version
+uv run mangaeasy where --json     # resolved data/tool paths for THIS install
+```
+
+**Run every subsequent command from the repo root.** All data roots
+(`library/`, `audio/`, `output/`, `work/`, `.mangaeasy/`) resolve relative
+to the install; running from elsewhere is the classic "Failed to spawn:
+mangaeasy" / wrong-paths failure.
+
+### Step 2 — Provision binaries, tool envs and models
+
+```bash
+uv run mangaeasy setup
+```
+
+GPU-aware and profile-driven — what gets installed, in order:
+
+1. **Core binaries** — ffmpeg/ffprobe, uv, git-lfs, vendored into this
+   install's own tools dir (~100 MB). Nothing goes system-wide.
+2. **Hardware detection** — NVIDIA GPU check picks the profile.
+3. **AI tool environments** — each in its own isolated `uv` env under
    `.mangaeasy/tools/`, models included:
 
-   | Tool | Installed when | Role |
-   |---|---|---|
-   | `kokoro-82m` | always | CPU TTS — the universal fallback voice |
-   | `index-tts` | NVIDIA GPU | voice-cloning TTS (the recap voice) |
-   | `magi-v3` | NVIDIA GPU | panel detection for paged manga |
-   | `deepseek-ocr2` | NVIDIA GPU | reading panel text into narration JSON |
-   | `z-image-turbo` | NVIDIA GPU | thumbnail/key-art generation (~33 GB) |
+   | Tool env | Installed when | Role | Download budget |
+   |---|---|---|---|
+   | `kokoro-82m` | always | CPU TTS (universal fallback voice) | ~1 GB |
+   | `index-tts` | NVIDIA GPU | voice-cloning TTS (the recap voice) | ~6 GB |
+   | `magi-v3` | NVIDIA GPU | panel detection for paged manga | ~4 GB |
+   | `deepseek-ocr2` | NVIDIA GPU | panel OCR (`panel-transcript`) | ~7 GB |
+   | `z-image-turbo` | NVIDIA GPU | thumbnail/key-art generation | ~33 GB |
 
-4. **Readiness report** — the same data as `mangaeasy doctor --json`,
-   plus a `MANGAEASY_RESULT` line with per-tool ok/failed status.
+4. **Readiness report** — the same data as `mangaeasy doctor --json`, plus
+   a `MANGAEASY_RESULT` line with per-tool ok/failed status.
 
-## Variants
+Useful variants:
 
 ```bash
 mangaeasy setup --minimal              # core binaries only (fast)
@@ -42,15 +105,107 @@ mangaeasy setup --dry-run              # print the plan, change nothing
 mangaeasy setup --cpu | --cuda         # force the torch build choice
 ```
 
-## Properties worth knowing
+Expect the full GPU profile to take tens of minutes on a fast connection —
+it is **idempotent and resumable**: if the run is interrupted (network,
+power), just run `mangaeasy setup` again; it skips what's done and resumes
+partial model downloads. One tool failing does not abort the others (exit
+code 1 + a named failure in the summary — fix with another `setup` run or
+`mangaeasy install-tool <name>`; per-tool options live in
+[install-tools.md](install-tools.md)).
 
-- **Idempotent** — re-running updates existing tools and resumes partial
-  model downloads; an interrupted run just needs `mangaeasy setup` again.
-- **Self-contained** — HF/torch/uv caches are force-pinned under the
-  install's `.mangaeasy/` (see [external-tools.md](external-tools.md));
-  deleting the folder removes everything.
-- **Failure-tolerant** — one tool failing doesn't abort the rest; the
-  summary names failures and exit code 1 signals them. Fix with
-  `mangaeasy install-tool <name>` or another `setup` run.
-- Per-tool installs (choosing refs, forcing dirs) remain available via
-  [`mangaeasy install-tool`](install-tools.md).
+### Step 3 — Verify with `doctor --json` (the machine contract)
+
+```bash
+uv run mangaeasy doctor --json
+```
+
+One JSON object. Assert, for the profile you installed:
+
+- `executables.ffmpeg` and `executables.ffprobe` are non-null paths;
+  `executables.uv` non-null.
+- `gpu` / `cuda` reflect the hardware you expect (`cuda_device` names the
+  card); `gpu_backend` is `cuda`, `mps`, or `cpu`.
+- For each tool you installed: `tools.<name>.installed == true`
+  (`configured` true means the catalog entry itself is valid).
+
+Anything false → re-run `mangaeasy setup` (or `mangaeasy install-tool
+<name>` for one tool) and check again. `doctor` is read-only and cheap; use
+it as the fix-loop oracle.
+
+### Step 4 — Prove it end to end with `smoke-test`
+
+```bash
+uv run mangaeasy smoke-test
+```
+
+Builds a tiny throwaway project (two generated panels + narration),
+synthesizes silent audio with ffmpeg, renders a real MP4 through the actual
+pipeline (encoder autodetection included — NVENC on NVIDIA, libx264
+otherwise), ffprobes the result (h264 + aac, expected duration) and cleans
+up after itself. `SMOKE TEST PASS` + exit 0 means this machine can produce
+videos. `doctor` says the parts are installed; this proves they work
+together.
+
+Optionally prove the TTS toolchain too (downloads the Kokoro model on first
+use if `--skip-models` was used):
+
+```bash
+uv run mangaeasy smoke-test --tts kokoro
+```
+
+`--keep` leaves `work/smoke_test/` behind for inspection on failure.
+
+### Step 5 — Optional per-channel assets (not in the repo)
+
+Nothing below is required — the pipeline runs without them — but recaps
+produced for a real channel usually want:
+
+- **Voice-clone reference WAV** (IndexTTS): a clean ~10–30 s speech sample.
+  Point `config.system.json → tts.speaker_wav` at it, or pass
+  `--speaker-wav` to `mangaeasy video`. Without it, `--tts auto` falls back
+  to Kokoro.
+- **Background music track**: any music file; pass `--background-music
+  <path>`. It is QC'd, conditioned, loudness-aligned and ducked
+  automatically (see [recap-video-playbook.md](recap-video-playbook.md)).
+- **YouTube upload**: a one-time interactive `mangaeasy youtube-auth` by a
+  human (OAuth consent in a browser) — see [youtube.md](youtube.md).
+  Everything else about uploading is non-interactive.
+- **Config files**: none are needed to start. `config.system.json` (copy of
+  `config.system.example.json`) holds machine-wide defaults; `config.json`
+  holds per-project download defaults — if you copy the example, leave
+  `download.name` null: a non-null name there silently overrides the
+  project name `download --url` derives from the manga title (the CLI
+  prints an `[INFO]` when that happens; agents should pass `--name`
+  explicitly instead).
+
+### Fix loop summary
+
+| Symptom | Fix |
+|---|---|
+| `uv: command not found` | Step 0 install, then open a fresh shell |
+| `Failed to spawn: mangaeasy` | you left the repo root — `cd` back before `uv run` |
+| `doctor` shows a tool `installed: false` | `mangaeasy install-tool <name>` or re-run `setup` |
+| model download interrupted / partial | re-run `mangaeasy setup` (resumes) |
+| `ffmpeg not found` in smoke-test | `mangaeasy bootstrap-tools`, re-check `doctor` |
+| GPU expected but `cuda: false` | check `nvidia-smi` works on the host; fix drivers, re-run `setup --cuda` |
+| no GPU at all | fine — CPU profile: TTS = Kokoro, encoding = libx264; `page-split`/`zimage` need `setup --all` and are slow on CPU |
+| disk pressure | `--skip z-image-turbo` saves ~33 GB; `--skip-models` defers the rest |
+| corporate proxy blocks Hugging Face | set `HTTPS_PROXY` before `setup`; caches stay in-tree (`.mangaeasy/`) |
+
+### Where everything lands
+
+Self-contained by design: tool envs and model caches under `.mangaeasy/`
+(HF/torch/uv caches are force-pinned there — a global `HF_HOME` will NOT
+leak downloads elsewhere; set `MANGAEASY_SHARE_CACHES=1` if you want shared
+caches; see [external-tools.md](external-tools.md)), projects under
+`library/`, generated output under `audio/`, `output/`, `work/`. Deleting
+the folder removes everything. `MANGAEASY_ROOT` relocates the data root.
+
+### After setup
+
+- Producing a recap as an agent: follow
+  [.claude/skills/manga-recap/SKILL.md](../.claude/skills/manga-recap/SKILL.md)
+  (Claude Code loads it automatically) or
+  [recap-video-playbook.md](recap-video-playbook.md).
+- CLI contract and full command catalog:
+  [ai-guide.md](ai-guide.md) / `mangaeasy commands --json`.

@@ -42,7 +42,7 @@ and the best place to start understanding the code:
 | I want to… | Read |
 |---|---|
 | Understand the whole thing (this) | **START_HERE.md** |
-| Set up a fresh machine in one command | [docs/setup.md](docs/setup.md) |
+| Set up a fresh clone/machine and verify it (agent runbook) | [docs/setup.md](docs/setup.md) |
 | Produce a recap series as an agent (URL → uploads) | [.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) |
 | Crop panels, verify them, write narration | [docs/operate/crop-verify-narrate.md](docs/operate/crop-verify-narrate.md) |
 | Produce a full recap video end-to-end | [docs/recap-video-playbook.md](docs/recap-video-playbook.md) |
