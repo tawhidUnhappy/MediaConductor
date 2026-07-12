@@ -22,6 +22,16 @@ nothing ever prompts for input.
 source items; never touch `narration.backup.json`; clear generated output
 only with `video-clean-*`; keep `--gpu-workers` ≤ 4.
 
+**Run long steps in the background, then wait — don't burn compute polling.**
+`download`, `page-split`/`webtoon-split`, `panel-transcript`, `video`,
+`zimage`, and `youtube-upload` each run for minutes to tens of minutes. Launch
+each as a background job and stop; let the harness's completion notification
+wake you instead of sleeping or re-checking in a loop. GPU tools (MAGI,
+DeepSeek-OCR, IndexTTS, Z-Image) block-buffer stdout, so their logs look empty
+until the end — judge health from filesystem signals (growing panel/transcript
+counts, output files appearing, `nvidia-smi`), not by tailing the log. Only
+foreground the quick `--json`/validation commands.
+
 ## 0. Orient (every session)
 
 ```bash
@@ -132,8 +142,14 @@ viewer complaints about a shipped recap):
 Verify in two passes:
 
 1. **Structural** — `mangaeasy narration-check --project-root
-   library/<Project> --item-range 01-12 --json` must pass: full panel
-   coverage, no dangling images, no empty text.
+   library/<Project> --item-range 01-12 --json`: no dangling images, no empty
+   text. It also lists panels with no narration entry as "uncovered" — that is
+   only an error for *story* panels. Deliberately leaving the credits/title
+   banners, scanlator pages, SFX-only frames, and duplicate reaction beats out
+   of narration.json is correct: the renderer builds the video **only** from
+   narrated panels, so an uncovered non-story panel simply never appears.
+   Confirm the uncovered list is exactly those skips, not a real story beat you
+   forgot.
 2. **Semantic** — `mangaeasy narration-review-sheets --project-root
    library/<Project> --item-range 01-12`, then Read EVERY sheet (panel +
    narration + OCR side by side) and check the grounding rules above.
@@ -159,6 +175,13 @@ narration by design — conditioned, loudness-aligned, side-chain ducked at
 normalized to −14 LUFS first). **Rebuilding after any panel/narration/audio
 change: pass `--overwrite-video`** (stale item videos are also mtime-detected
 now, but be explicit — a silent skip once shipped six outdated chapters).
+**Chapter genuinely missing from the source** (e.g. a scanlation gap — a
+chapter that just isn't on MangaDex): the join is strict by design and stops
+with `Missing item videos: NN`. Add **`--allow-gaps`** so it stitches the
+chapters that exist, in order, and skips the hole with a warning — the story
+still reads continuously; bridge the gap in the narration of the following
+chapter's first line. (Don't reach for it to paper over a *failed render* —
+re-render that chapter instead.)
 After the run:
 `mangaeasy video-validate --project-root library/<Project> ... --json` —
 `warnings` (unnarrated panels, orphan audio) are informational; anything in
@@ -200,11 +223,16 @@ mangaeasy youtube-upload --video output/<Project>/<Project>_full.mp4 \
     --thumbnail final_thumb.png --privacy public --json
 ```
 
-Needs a prior human `youtube-auth` (see `docs/youtube.md`). Default privacy
-is `private` and unaudited API projects are force-locked to it — use
-`--privacy public` only when the channel's API project supports it, and
-verify the JSON result says the privacy you asked for. Then record the batch
-so the plan advances:
+Needs a prior human `youtube-auth` (see `docs/youtube.md`). **Check the token
+is live first: `mangaeasy youtube-status --verify --json`.** The stored OAuth
+token expires/gets revoked silently, and a dead one only surfaces mid-upload as
+`invalid_grant: Token has been expired or revoked` after the whole video was
+built. If `verified` is false, the user must re-run `youtube-auth` (interactive
+browser consent — an agent can't do it headless); everything else is already
+done, so just retry the upload afterward. Default privacy is `private` and
+unaudited API projects are force-locked to it — use `--privacy public` only
+when the channel's API project supports it, and verify the JSON result says the
+privacy you asked for. Then record the batch so the plan advances:
 
 ```bash
 mangaeasy series-mark-published --project-root library/<Project> \

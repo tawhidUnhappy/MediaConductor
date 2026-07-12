@@ -11,6 +11,16 @@ Read `docs/ai-guide.md` (CLI contract) and the repo `CLAUDE.md` first.
 All commands run from the install root (`uv run mangaeasy ...` in a dev
 checkout).
 
+**Working style — go idle between long steps.** Downloading, cropping, OCR,
+audio/render, image generation, and upload each take minutes to tens of
+minutes. Launch each as a background job and then **stop and wait for the
+completion notification** instead of polling or sleeping in a loop — it is the
+biggest compute saver on a full run. GPU tools block-buffer stdout (their logs
+stay empty until they exit), so check progress from the filesystem (crops /
+`transcript.json` filling in, output files appearing) rather than tailing the
+log. Transcripts and crops land per chapter, so you can start writing narration
+for a finished chapter while the GPU works through the rest.
+
 ---
 
 ## Phase 0 — Environment
@@ -453,8 +463,18 @@ mangaeasy video --project-root library/<Project> --items 01 \
   re-renders them ("inputs changed since last render"), but be explicit —
   a silent skip-if-exists once joined six outdated chapters into a
   "successful" build that was caught only by validate's duration check.
-- Run it in the background and poll/wait; IndexTTS for ~100 panels is a
-  long job. If audio state is ever in doubt:
+- **Chapter genuinely missing from the source** (a scanlation gap — a
+  chapter that simply isn't on MangaDex): the join is strict and stops with
+  `Missing item videos: NN`, which is what catches a silently-dropped render.
+  When the chapter really doesn't exist, add `--allow-gaps` (on `video`, or on
+  `video-join` if joining separately) — it stitches the chapters that exist, in
+  order, skips the hole with a `[long-video] --allow-gaps:` log line, and lets
+  the batch ship (e.g. ship 01, 03–12 as "chapters 1–12"; bridge the gap in the
+  first narration line of the chapter after it). Don't use it to mask a failed
+  render — re-render that chapter instead.
+- Run it in the background and **wait for the completion notification**;
+  IndexTTS for ~100 panels is a long job (see "Working style" above — don't
+  sit in a poll loop). If audio state is ever in doubt:
   `mangaeasy video-audio-audit --project-root library/<Project> --json`.
 
 ## Phase 7 — Verify the build (measure, don't assume)
@@ -626,12 +646,23 @@ Mandatory checks, all from real failures:
 ## Phase 11 — Upload (and replacing a bad take)
 
 ```bash
+# Verify the token is live BEFORE uploading (it expires silently):
+mangaeasy youtube-status --verify --json
+
 mangaeasy youtube-upload \
   --video output/<Project>/<Project>_full_<timestamp>.mp4 \
   --title "<title>" --description-file description.txt \
   --tags "tag1,tag2,..." --thumbnail thumbnail.png \
   --privacy public --json
 ```
+
+- **Check `youtube-status --verify` first.** The stored OAuth token expires or
+  gets revoked with no warning; a dead one doesn't surface until mid-upload as
+  `invalid_grant: Token has been expired or revoked` — after the whole video is
+  already built and you're ready to publish. If `verified` is false, the human
+  must re-run `mangaeasy youtube-auth` (interactive browser consent — an agent
+  can't do it headless). Nothing else is lost; just retry the upload once the
+  token is refreshed.
 
 - **Upload with `--privacy public`** — the channel owner's standing
   instruction is to publish directly, not leave the video private for a

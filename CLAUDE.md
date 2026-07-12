@@ -144,6 +144,13 @@ entry point. It shells out to the narrower commands in this order:
    re-joining every item clip from scratch:
    - `video-join` (`long_video_builder.py` / `make_long_video.py`) — joins
      item videos into one long video, **with no background music**, always.
+     The join is strict: a missing item video in the range fails the build
+     (`Missing item videos: NN`), which catches a chapter whose render silently
+     dropped. When a chapter is *genuinely* absent (e.g. a scanlation gap — the
+     source never had it), pass `--allow-gaps` (also on `video`) and it stitches
+     the chapters that exist, in order, skipping the hole. `included_chapters()`
+     computes that set; `chapter_narration_files()`/`validate_items_strict()`
+     take the resulting number list, not a raw `range()`.
    - `video-normalize-audio` (only if `--normalize-audio`) — two-pass
      loudness normalization to −14 LUFS (YouTube target), replaces in place.
    - `video-add-bgm` (only if `--background-music` is set) —
@@ -257,6 +264,31 @@ each silently undid the −14 LUFS target once — both are guarded by tests in
   online on failure (`build_pipeline()` in `kokoro_batch_worker.py`) — avoids
   a redundant network freshness check on every single run once the model is
   cached locally.
+
+## Long-running steps: launch in the background, then wait for the notification
+
+Almost every real step here is slow: `download` (politely rate-limited),
+`page-split`/`webtoon-split`, `panel-transcript`, `video` (TTS + render),
+`zimage`, `video-normalize-audio`, `youtube-upload` — minutes to tens of
+minutes each. An agent should **start each as a background job and then stop
+working, letting the harness's completion notification wake it**, rather than
+sleeping or re-checking in a poll loop. That is the single biggest compute
+saver on a long production run, and it costs nothing: the pipeline is designed
+around it (`MANGAEASY_RESULT {...}` on the final line, exit-code contract, no
+interactive prompts).
+
+- **GPU tools block-buffer stdout.** MAGI (`page-split`), DeepSeek-OCR
+  (`panel-transcript`), IndexTTS (`video --tts indextts`), and Z-Image
+  (`zimage`) emit nothing until they exit, so tailing their log to gauge
+  progress is pointless. Judge liveness from **filesystem signals** instead —
+  crops/transcripts appearing (e.g. `transcript.json` gets filled per chapter),
+  output files growing, `nvidia-smi` showing utilization — or just wait for the
+  completion notification. Only the quick `--json`/validation commands are
+  worth running in the foreground.
+- Because these transcripts/crops land **per item as each finishes**, later
+  steps for an already-finished chapter (e.g. writing narration) can start
+  while the GPU is still working through the rest — no need to block the whole
+  batch on the slowest tool.
 
 ## Pre-flight validation tools
 

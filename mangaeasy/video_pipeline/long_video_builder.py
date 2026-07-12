@@ -44,6 +44,11 @@ class LongVideoConfig:
     background_music: Path | None = None
     music_volume_db: float = -25.0
     narration_volume: float = 1.0
+    # Off by default: a missing item video is normally a failed render and
+    # must stop the build. Turn on only when a chapter genuinely does not
+    # exist (e.g. a scanlation gap on the source) so the join stitches the
+    # chapters that DO exist, in order, and skips the hole with a warning.
+    allow_gaps: bool = False
 
 
 def default_output_name(name: str) -> str:
@@ -89,9 +94,23 @@ def selected_range(config: LongVideoConfig, chapters: dict[int, Path]) -> tuple[
     return item_number(config.start), item_number(config.end) if config.end else max(chapters)
 
 
-def chapter_narration_files(narration_dir: Path, start: int, end: int) -> list[Path]:
+def included_chapters(chapters: dict[int, Path], start: int, end: int, allow_gaps: bool) -> tuple[list[int], list[int]]:
+    """Item numbers to join across ``[start, end]``, plus the gap numbers.
+
+    Strict (default): every number in the range is expected, so the caller
+    treats any gap as a fatal missing render. With ``allow_gaps`` the join is
+    limited to the item videos that actually exist (sorted), and the gap
+    numbers are returned only so the caller can report what it skipped.
+    """
+    gaps = [n for n in range(start, end + 1) if n not in chapters]
+    if allow_gaps:
+        return sorted(n for n in chapters if start <= n <= end), gaps
+    return list(range(start, end + 1)), gaps
+
+
+def chapter_narration_files(narration_dir: Path, numbers: list[int]) -> list[Path]:
     files: list[Path] = []
-    for number in range(start, end + 1):
+    for number in numbers:
         path = narration_dir / f"item_{number:02d}_narration.wav"
         if not path.exists():
             legacy = narration_dir / f"chapter_{number:02d}_narration.wav"
@@ -175,19 +194,22 @@ def validate_config(config: LongVideoConfig) -> None:
         raise ValueError("Narration volume must be non-negative.")
 
 
-def validate_items_strict(config: LongVideoConfig, chapters: dict[int, Path], start: int, end: int) -> None:
+def validate_items_strict(config: LongVideoConfig, chapters: dict[int, Path], numbers: list[int]) -> None:
     """Check every item's panels, narration entries, audio, and rendered video.
 
-    The long video cannot be missing or mismatched content for any item, so
-    any problem stops the build instead of just warning. Panels are checked
-    before narration text because a missing panel image breaks rendering
-    outright, while a bad narration entry only affects that one audio line.
+    The long video cannot be missing or mismatched content for any item it
+    joins, so any problem stops the build instead of just warning. ``numbers``
+    is the exact set being joined (already gap-filtered by the caller when
+    ``--allow-gaps`` is on), so genuinely-absent chapters are never checked
+    here. Panels are checked before narration text because a missing panel
+    image breaks rendering outright, while a bad narration entry only affects
+    that one audio line.
     """
     name = project_name(config.project_root, config.project_name_override)
     audio_root = config.audio_root.resolve() if config.audio_root else None
     problems: list[str] = []
 
-    for number in range(start, end + 1):
+    for number in numbers:
         label = f"item {number:02d}"
         found = item_dirs(config.project_root, [f"{number:02d}"])
         if not found:
@@ -252,12 +274,25 @@ def build_long_video(config: LongVideoConfig) -> Path:
     if not chapters:
         raise FileNotFoundError(f"No item_*.mp4 files found in {input_dir(config)}")
     start, end = selected_range(config, chapters)
-    missing = [n for n in range(start, end + 1) if n not in chapters]
-    if missing:
-        raise FileNotFoundError("Missing item videos: " + ", ".join(f"{n:02d}" for n in missing))
-    validate_items_strict(config, chapters, start, end)
+    numbers, gaps = included_chapters(chapters, start, end, config.allow_gaps)
+    if gaps and not config.allow_gaps:
+        raise FileNotFoundError(
+            "Missing item videos: " + ", ".join(f"{n:02d}" for n in gaps)
+            + "\nRe-render them, or if these chapters genuinely do not exist "
+            "(e.g. a scanlation gap on the source) pass --allow-gaps to join "
+            "the chapters that do exist."
+        )
+    if gaps:
+        print(
+            "[long-video] --allow-gaps: joining "
+            + ", ".join(f"{n:02d}" for n in numbers)
+            + "; skipping absent chapter(s) "
+            + ", ".join(f"{n:02d}" for n in gaps),
+            flush=True,
+        )
+    validate_items_strict(config, chapters, numbers)
 
-    selected = [chapters[n] for n in range(start, end + 1)]
+    selected = [chapters[n] for n in numbers]
     for path in selected:
         validate_video_stream(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -268,7 +303,7 @@ def build_long_video(config: LongVideoConfig) -> Path:
     full_narration = None
     if config.narration_dir is not None:
         full_narration = build_full_narration_wav(
-            chapter_narration_files(config.narration_dir.resolve(), start, end),
+            chapter_narration_files(config.narration_dir.resolve(), numbers),
             work_dir,
             out_path.name,
         )

@@ -19,8 +19,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
     parser.add_argument("--start", default="01")
     parser.add_argument("--end", default=None)
-    parser.add_argument("--items", nargs="*", help="Item names or ranges. Long video expects a continuous range.")
+    parser.add_argument("--items", nargs="*", help="Item names or ranges. By default the range must be continuous; use --allow-gaps if a chapter is genuinely missing.")
     parser.add_argument("--item-range", help="Convenience range, for example: 01-12.")
+    parser.add_argument("--allow-gaps", action="store_true",
+                        help="Join only the item videos that exist across the range and skip absent chapters "
+                             "(e.g. a scanlation gap) with a warning, instead of failing. Off by default so a "
+                             "failed render still stops the build.")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--reencode", action="store_true")
     parser.add_argument("--copy-all", action="store_true")
@@ -52,6 +56,7 @@ def main() -> int:
             end=args.end,
             items=args.items,
             item_range=args.item_range,
+            allow_gaps=args.allow_gaps,
             overwrite=args.overwrite,
             reencode=args.reencode,
             copy_all=args.copy_all,

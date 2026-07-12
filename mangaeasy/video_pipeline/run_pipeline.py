@@ -93,6 +93,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--speed", type=float, default=1.0)
     parser.add_argument("--device", choices=("auto", "cuda", "mps", "cpu"), default="auto")
     parser.add_argument("--build-long-video", action="store_true")
+    parser.add_argument("--allow-gaps", action="store_true",
+                        help="When joining the long video, skip chapters that are genuinely missing "
+                             "(e.g. a scanlation gap) instead of failing. Off by default.")
     parser.add_argument("--normalize-audio", action="store_true",
                         help="After the long video is built, loudness-normalize it in place "
                              "for YouTube (-14 LUFS integrated, two-pass).")
@@ -269,6 +272,8 @@ def main() -> int:
             long_cmd += ["--project-name", args.project_name]
         if selected_items:
             long_cmd += ["--items", *selected_items]
+        if args.allow_gaps:
+            long_cmd.append("--allow-gaps")
         run(long_cmd, cwd)
 
         if args.normalize_audio:
