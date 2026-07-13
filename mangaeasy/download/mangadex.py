@@ -187,15 +187,28 @@ def load_manga_json(manga_root: Path) -> dict:
         return {}
 
 
-def fetch_manga_title(sess: requests.Session, manga_id: str) -> str | None:
-    """Best-effort canonical title from the MangaDex API — never fatal."""
+def fetch_manga_info(sess: requests.Session, manga_id: str) -> dict:
+    """Best-effort {title, original_language} from the MangaDex API — never fatal.
+
+    ``originalLanguage`` drives automatic reading-direction resolution
+    (ja/zh-hk -> right-to-left; ko/zh/en -> left-to-right), so paged Japanese
+    manga and Korean/Chinese sources crop in the correct panel order without
+    per-run flags. See mangaeasy/panels/direction.py.
+    """
     try:
         resp = _api_get(sess, f"{API_BASE}/manga/{manga_id}", retries=2)
-        titles = (resp.json().get("data", {}).get("attributes", {})
-                  .get("title") or {})
-        return titles.get("en") or next(iter(titles.values()), None)
+        attributes = resp.json().get("data", {}).get("attributes", {}) or {}
+        titles = attributes.get("title") or {}
+        return {
+            "title": titles.get("en") or next(iter(titles.values()), None),
+            "original_language": attributes.get("originalLanguage"),
+        }
     except Exception:
-        return None
+        return {}
+
+
+def fetch_manga_title(sess: requests.Session, manga_id: str) -> str | None:
+    return fetch_manga_info(sess, manga_id).get("title")
 
 
 def merge_manga_record(
@@ -209,6 +222,7 @@ def merge_manga_record(
     pages: int,
     source_url: str | None = None,
     title: str | None = None,
+    original_language: str | None = None,
     when: str | None = None,
 ) -> dict:
     """Merge one downloaded chapter into a manga.json record (pure)."""
@@ -219,6 +233,8 @@ def merge_manga_record(
     record["url"] = manga_url(manga_id)
     if title:
         record["title"] = title
+    if original_language:
+        record["original_language"] = original_language
     # Keep the user's original link only when it adds information
     # (e.g. the slugged URL they pasted) — not a bare UUID.
     if source_url and source_url.startswith(("http://", "https://")) \
@@ -549,10 +565,16 @@ def _download_one_chapter(
     })
 
     # ── Record the manga's source link (library/<name>/manga.json) ────────
-    title = load_manga_json(manga_root).get("title") \
-        or fetch_manga_title(sess, manga_id)
+    existing = load_manga_json(manga_root)
+    title = existing.get("title")
+    original_language = existing.get("original_language")
+    if not title or not original_language:
+        info = fetch_manga_info(sess, manga_id)
+        title = title or info.get("title")
+        original_language = original_language or info.get("original_language")
     info_path = update_manga_json(
         manga_root,
+        original_language=original_language,
         name=str(dl_cfg.get("name")),
         manga_id=manga_id,
         lang=lang,

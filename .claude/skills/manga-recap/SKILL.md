@@ -87,7 +87,12 @@ mangaeasy style-detect --project-root library/<Project> --json
 
 Open 2–3 of the returned `sample_images` and confirm the verdict yourself:
 endless vertical strips → `webtoon-split`; discrete pages with panel grids →
-`page-split` (needs `install-tool magi-v3`). Then crop the batch, e.g.:
+`page-split` (needs `install-tool magi-v3`). For paged sources the panel
+reading order is auto-resolved from the language `download` recorded in
+`manga.json` (ja / zh-hk → right-to-left; ko / zh / en → left-to-right) and
+announced as `[page-split] reading direction: …` — sanity-check that line
+and override with `--reading-direction rtl|ltr` if the source metadata is
+wrong. Then crop the batch, e.g.:
 
 ```bash
 mangaeasy webtoon-split --project-root library/<Project> --item-range 01-12

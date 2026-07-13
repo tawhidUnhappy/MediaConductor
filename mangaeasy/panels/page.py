@@ -293,6 +293,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not respect_claims_gate(args.project_root, args.items, args.item_range, ("crop",), args.agent):
             return 1
     project_root = args.project_root.resolve()
+    if args.reading_direction == "auto":
+        from mangaeasy.panels.direction import project_reading_direction
+
+        args.reading_direction, reason = project_reading_direction(project_root)
+        print(f"[page-split] reading direction: {args.reading_direction} ({reason})", flush=True)
     selection = merge_item_selection(args.items, args.item_range)
     selected = item_dirs(project_root, selection)
     if not selected:

@@ -80,7 +80,8 @@ library/<project-name>/
   (`update_manga_json()` in `mangaeasy/download/mangadex.py`): `source`,
   canonical `url` (`https://mangadex.org/title/<uuid>`), the original
   `source_url` the user pasted, `title` (fetched from the API once, then
-  cached), and a `chapters` map (`chapter_id`, `language`, `pages`,
+  cached), `original_language` (drives automatic RTL/LTR panel ordering in
+  `page-split` — see `mangaeasy/panels/direction.py`), and a `chapters` map (`chapter_id`, `language`, `pages`,
   `downloaded_at`). `library-list` surfaces it (human view prints
   `title:`/`source:` lines; `--json` has a per-project `manga` field, null
   when absent). Config.json only holds the *current* download target, so
