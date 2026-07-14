@@ -1,21 +1,37 @@
 """mangaeasy.config
-Central config loader and project-root-relative cache directory setup.
+Loader for the two workspace config files.
 
-Two config files:
   config.json         — per-manga / per-run settings (name, chapter, bgm file …)
   config.system.json  — system-wide settings that rarely change (resolution,
-                        fps, encoder params, whisper model, ports …)
+                        fps, encoder params, whisper model …)
 
-Import this module BEFORE any ML library (torch, transformers) so that
-HF_HOME and TORCH_HOME are set to project-local paths in time.
+PROJECT_ROOT here is the **workspace root** (the folder holding config.json,
+library/, music/, …) — resolved from $MANGAEASY_PROJECT_ROOT or the cwd. It is
+NOT the `--project-root` flag of the video pipeline (that one names the folder
+containing item folders, e.g. library/<name>); the two concepts share a name
+for historical reasons only.
+
+This module is import-safe for libraries and servers: loaders raise
+ConfigError instead of exiting, and nothing mutates os.environ at import time.
+(It used to set HF_HOME to <cwd>/.hf_cache on import, which fought the
+force-pinned per-install caches in mangaeasy.tools.external.tool_env() — the
+tool envs own ML cache placement now; see that module.)
 """
 
 import json
 import os
-import sys
 from pathlib import Path
 
 _PACKAGE_ROOT: Path = Path(__file__).resolve().parent.parent
+
+
+class ConfigError(RuntimeError):
+    """A required config file is missing or unparseable.
+
+    Raised instead of sys.exit so the MCP server, tests, and any embedder
+    get an exception they can handle; the CLI dispatcher converts it into a
+    clean `[ERROR] ...` on stderr with exit code 1.
+    """
 
 
 def _project_root() -> Path:
@@ -30,16 +46,10 @@ PROJECT_ROOT: Path = _project_root()
 CONFIG_FILE:        Path = PROJECT_ROOT / "config.json"
 SYSTEM_CONFIG_FILE: Path = PROJECT_ROOT / "config.system.json"
 
-# ── Local cache dirs (nothing leaves the project folder) ─────────────────────
+# Legacy in-workspace ML cache location. Only used as a last-resort fallback
+# by code that may run outside a tool env; tool_env() pins the real caches.
 HF_CACHE_DIR:   Path = PROJECT_ROOT / ".hf_cache"
 TORCH_HOME_DIR: Path = PROJECT_ROOT / ".cache" / "torch"
-
-# Set env vars before any ML import — use setdefault so an explicit user
-# export (e.g. HF_HOME in your shell) still takes precedence.
-os.environ.setdefault("HF_HOME",              str(HF_CACHE_DIR))
-os.environ.setdefault("HF_HUB_CACHE",         str(HF_CACHE_DIR / "hub"))
-os.environ.setdefault("TORCH_HOME",           str(TORCH_HOME_DIR))
-os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 
 # ── Config loaders ────────────────────────────────────────────────────────────
@@ -47,13 +57,11 @@ os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 def load_config() -> dict:
     """Return the full parsed config.json (per-manga / per-run settings)."""
     if not CONFIG_FILE.exists():
-        print(f"[ERROR] config.json not found at {CONFIG_FILE}")
-        sys.exit(1)
+        raise ConfigError(f"config.json not found at {CONFIG_FILE}")
     try:
         return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception as exc:
-        print(f"[ERROR] Invalid config.json: {exc}")
-        sys.exit(1)
+    except ValueError as exc:
+        raise ConfigError(f"Invalid config.json: {exc}") from exc
 
 
 _warned_missing_system_config = False
@@ -69,14 +77,15 @@ def load_system_config() -> dict:
     if not SYSTEM_CONFIG_FILE.exists():
         # Many helpers re-read the config; one warning per process is enough.
         if not _warned_missing_system_config:
-            print(f"[WARN] config.system.json not found at {SYSTEM_CONFIG_FILE} — using defaults")
+            import sys
+            print(f"[WARN] config.system.json not found at {SYSTEM_CONFIG_FILE} — using defaults",
+                  file=sys.stderr)
             _warned_missing_system_config = True
         return {}
     try:
         return json.loads(SYSTEM_CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception as exc:
-        print(f"[ERROR] Invalid config.system.json: {exc}")
-        sys.exit(1)
+    except ValueError as exc:
+        raise ConfigError(f"Invalid config.system.json: {exc}") from exc
 
 
 def load_download_config() -> dict:
@@ -91,8 +100,7 @@ def load_download_config() -> dict:
     defaults = syscfg.get("download_defaults", {})
     project  = cfg.get("download")
     if not project or not isinstance(project, dict):
-        print("[ERROR] 'download' key missing in config.json")
-        sys.exit(1)
+        raise ConfigError("'download' key missing in config.json")
     # Merge: defaults first, project values override
     merged = {**defaults, **project}
     return merged

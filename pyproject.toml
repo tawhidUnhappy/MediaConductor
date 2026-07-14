@@ -7,10 +7,9 @@ requires-python = ">=3.10"
 license = "MIT"
 keywords = ["manga", "video", "tts", "kokoro", "ffmpeg", "cuda"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
-    "Framework :: Flask",
-    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -20,15 +19,12 @@ classifiers = [
     "Topic :: Multimedia :: Video",
 ]
 dependencies = [
+    # Every entry here is imported by the main package — additions must be.
+    # (The deleted GUI's deps — flask, playwright, cloudscraper, curl-cffi,
+    # pydub, beautifulsoup4 — were purged 2026-07; don't reintroduce them.)
     "requests>=2.28.0",
-    "beautifulsoup4>=4.14.3",
-    "cloudscraper>=1.2.71",
-    "curl-cffi>=0.14.0",
-    "flask>=3.0.0",
-    "playwright>=1.58.0",
     "pillow>=12.1.1",
     "img2pdf>=0.5.0",
-    "pydub>=0.25.1",
     "numpy>=1.24.0",
     "pywinpty>=2.0; sys_platform == 'win32'",
     # YouTube connect + upload (OAuth loopback flow / token refresh only —
@@ -37,45 +33,10 @@ dependencies = [
     "google-auth-oauthlib>=1.2.0",
 ]
 
-[project.optional-dependencies]
-ml = [
-    "torch>=2.5.0",
-    "torchvision>=0.20.0",
-    "transformers>=4.41,<5.0",
-    "accelerate>=1.12.0",
-    "safetensors>=0.4.0",
-    "timm>=0.9.0",
-    "einops>=0.8.2",
-    "basicsr>=1.4.2",
-    "realesrgan>=0.3.0",
-    "opencv-python>=4.8.0",
-    "scipy>=1.10.0",
-    "networkx>=3.0",
-    "shapely>=2.1.2",
-    "matplotlib>=3.10.8",
-    "pulp>=3.3.0",
-]
-whisper = [
-    "faster-whisper>=1.2.1",
-]
-all = [
-    "torch>=2.5.0",
-    "torchvision>=0.20.0",
-    "transformers>=4.41,<5.0",
-    "accelerate>=1.12.0",
-    "safetensors>=0.4.0",
-    "timm>=0.9.0",
-    "einops>=0.8.2",
-    "basicsr>=1.4.2",
-    "realesrgan>=0.3.0",
-    "opencv-python>=4.8.0",
-    "scipy>=1.10.0",
-    "networkx>=3.0",
-    "shapely>=2.1.2",
-    "matplotlib>=3.10.8",
-    "pulp>=3.3.0",
-    "faster-whisper>=1.2.1",
-]
+# No ML extras: torch/transformers/opencv live in the isolated external tool
+# envs (`mangaeasy install-tool <name>` / `mangaeasy setup`), never in the
+# main env. The old [ml]/[whisper]/[all] extras promised an install path the
+# architecture abandoned; nothing referenced them.
 
 [build-system]
 requires = ["hatchling"]

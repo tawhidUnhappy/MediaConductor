@@ -15,7 +15,8 @@ stay in their **own isolated environments**, so the core tool installs fast and
 stays conflict-free.
 
 **mangaEasy is a CLI + MCP tool built for LLM agents — there is no GUI.** New to
-the repo? Open **[START_HERE.md](START_HERE.md)**. Everything is exposed through
+the repo? Agents start at **[AGENTS.md](AGENTS.md)**; developers at
+**[CLAUDE.md](CLAUDE.md)** (doc map + code map). Everything is exposed through
 a single command:
 
 ```console
@@ -389,7 +390,7 @@ work/<project>/                        # scratch / intermediates
 
 ## Documentation
 
-- [**START_HERE.md**](START_HERE.md) — the repo entry map (read this first)
+- [**AGENTS.md**](AGENTS.md) — agent entry point · [**CLAUDE.md**](CLAUDE.md) — developer guide, doc map, code map
 - [Installation guide](docs/install.md) — uv tool, frozen release, and from-source options
 - [AI/CLI guide](docs/ai-guide.md) — the complete operating manual + machine-readable contract
 - [Crop → verify → narrate](docs/operate/crop-verify-narrate.md) — the core loop

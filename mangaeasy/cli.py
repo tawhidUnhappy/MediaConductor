@@ -8,7 +8,7 @@ Every tool in the package is reachable as a subcommand::
     mangaeasy --version
 
 Subcommand modules are imported lazily, so ``mangaeasy --help`` stays fast and
-never pulls in heavy optional dependencies (torch, opencv, flask, ...) unless
+never pulls in heavy optional dependencies (torch, opencv, ...) unless
 the command you run actually needs them.
 """
 
@@ -63,6 +63,12 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "smoke-test":           ("mangaeasy.tools.smoke",                          "main",        "Setup",            "Prove the install works: build and verify a tiny real video (run after setup)."),
     "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup",            "Install an external AI tool (index-tts, magi-v3, deepseek-ocr2, z-image-turbo, ...) from GitHub/Hugging Face."),
     "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup",         "Download ffmpeg/uv/git-lfs into this install's own tools dir (the setup step runs this when they're missing)."),
+
+    # ── Background jobs (the right way to run anything long) ─────────────────
+    "job-start":            ("mangaeasy.jobs",                                 "start_main",  "Jobs",             "Run any command as a detached background job; returns a job id immediately (prints JSON)."),
+    "job-status":           ("mangaeasy.jobs",                                 "status_main", "Jobs",             "Status/progress/result/log-tail of one background job (--json)."),
+    "jobs":                 ("mangaeasy.jobs",                                 "list_main",   "Jobs",             "List background jobs and their states (--json)."),
+    "job-run":              ("mangaeasy.jobs",                                 "run_main",    "Jobs",             "(internal) Supervisor spawned by job-start; not for direct use."),
 
     # ── Multi-agent coordination (see docs/multi-agent.md) ────────────────────
     "work-status":          ("mangaeasy.workboard",                            "status_main", "Multi-agent",      "Per-item pipeline stage from the filesystem + claims + notes; --next lists unclaimed actionable tasks (the resume command)."),
@@ -158,11 +164,13 @@ def _print_help(stream=None) -> None:
 
 
 def commands_main() -> int:
-    """`mangaeasy commands [--json]` — the machine-readable command catalog.
+    """`mangaeasy commands [--json] [--full]` — the machine-readable catalog.
 
-    Static data straight from COMMANDS (no module imports, so the lazy-import
-    design survives); each command's own ``--help`` remains the source of
-    truth for its flags.
+    Static data straight from COMMANDS (no heavy module imports, so the
+    lazy-import design survives). `--full` merges in each command's argument
+    schema from mangaeasy/command_spec.py — flags, types, required — so an
+    agent can build a command line without running one `--help` per command.
+    Commands without a spec entry fall back to `usage` (`<cmd> --help`).
     """
     import argparse
     import json
@@ -170,17 +178,28 @@ def commands_main() -> int:
     parser = argparse.ArgumentParser(description="List every mangaeasy command.")
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="Emit the catalog as a single JSON object on stdout.")
+    parser.add_argument("--full", action="store_true",
+                        help="With --json: include each command's argument schema "
+                             "(flags, types, required) and long-running marker.")
     args = parser.parse_args()
 
-    catalog = [
-        {
+    if args.full:
+        from mangaeasy.command_spec import LONG_RUNNING, cli_args_schema
+
+    catalog = []
+    for name, (_, _, group, help_text) in COMMANDS.items():
+        entry: dict = {
             "name": name,
             "group": group,
             "help": help_text,
             "usage": f"mangaeasy {name} --help",
         }
-        for name, (_, _, group, help_text) in COMMANDS.items()
-    ]
+        if args.full:
+            entry["long_running"] = name in LONG_RUNNING
+            schema = cli_args_schema(name)
+            if schema is not None:
+                entry["args"] = schema
+        catalog.append(entry)
     if args.as_json:
         print(json.dumps({"version": __version__, "commands": catalog}, ensure_ascii=False))
     else:
@@ -195,7 +214,16 @@ def _dispatch(command: str, rest: list[str]) -> int:
     # Present the subcommand's own argparse with a sensible prog name and let it
     # parse the remaining args exactly as if it were a standalone tool.
     sys.argv = [f"mangaeasy {command}", *rest]
-    result = func()
+    try:
+        result = func()
+    except Exception as exc:
+        # Library code raises ConfigError instead of sys.exit; the CLI is the
+        # one place that turns it into a clean message + exit 1.
+        from mangaeasy.config import ConfigError
+        if isinstance(exc, ConfigError):
+            sys.stderr.write(f"[ERROR] {exc}\n")
+            return 1
+        raise
     return result if isinstance(result, int) else 0
 
 

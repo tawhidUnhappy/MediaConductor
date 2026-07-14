@@ -12,9 +12,13 @@ background music, ready for YouTube. Everything is driven by one command:
 **Orient yourself with two calls** (do this first on any machine):
 
 ```bash
-mangaeasy where --json      # where this install keeps data/tools + version
-mangaeasy commands --json   # the full command catalog
+mangaeasy where --json             # where this install keeps data/tools + version
+mangaeasy commands --json --full   # the full catalog, WITH argument schemas
 ```
+
+`--full` includes each command's arguments (flag, type, required) and a
+`long_running` marker, so you never need to run per-command `--help` to build
+a command line.
 
 Prefer MCP? `mangaeasy mcp` runs an MCP stdio server with typed tools —
 see [MCP server](#mcp-server) below. The CLI and MCP expose the same engine.
@@ -131,9 +135,9 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 **Safety rules an agent must follow:**
 
 - Never create/delete/rename files inside `library/` items except
-  `narration.json`/`intro.json` content edits the user asked for.
-  `narration.backup.json` and the project-level `manga.json` are
-  machine-managed — read them freely, don't hand-edit them.
+  `narration.json`/`intro.json` content edits the user asked for (prefer
+  `narration-edit` over hand-editing). The project-level `manga.json` and
+  `publish.json` are machine-managed — read them freely, don't hand-edit them.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
@@ -151,11 +155,37 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   the 2–5 kHz vocal band, and sidechain-ducks the music under the voice —
   the pro voiceover chain. Opt out per-stage with `--no-condition-bed`,
   `--no-eq-carve`, `--no-duck`.
-- `--gpu-workers` above 4 is known to crash consumer NVIDIA cards; default
-  is safe.
+- `--gpu-workers` above 4 crashes consumer NVIDIA cards, so the CLI clamps
+  it to 4 with a warning (`MANGAEASY_UNSAFE_GPU_WORKERS=1` overrides on
+  tested hardware); default is safe.
 - Everything works CPU-only; GPU is an optimization, not a requirement.
 
-## 4. Machine-output contract
+## 4. Background jobs (how to run anything long)
+
+Real steps run minutes to hours (TTS, panel detection, OCR, renders,
+uploads) — `commands --json --full` marks them `long_running`. Never block a
+foreground call on them. If your harness offers background shells with
+completion notifications, use those; otherwise (or from MCP) use the built-in
+job runner — it works everywhere, including frozen installs:
+
+```bash
+mangaeasy job-start video --project-root library/<P> --item-range 01-12 --tts auto
+# -> {"ok": true, "job_id": "20260714-153000-video", "poll": "mangaeasy job-status ..."}
+mangaeasy job-status 20260714-153000-video --json
+# -> status running/succeeded/failed/orphaned, exit_code, last MANGAEASY_PROGRESS,
+#    parsed MANGAEASY_RESULT, log tail
+mangaeasy jobs --json                    # all jobs, newest first
+```
+
+The job survives your session: a detached supervisor writes the exit code and
+final result into `<work>/jobs/<id>.json` (override dir with
+`MANGAEASY_JOBS_DIR` or `--jobs-dir`). If the machine slept or the supervisor
+was killed, `job-status` reports `orphaned` instead of a forever-"running" lie
+— re-run the command (pipeline steps resume/skip completed work). GPU tools
+block-buffer stdout, so an empty log tail on a running job is normal; trust
+`status` and filesystem signals (crops/transcripts appearing), not log volume.
+
+## 5. Machine-output contract
 
 - **Exit codes**: `0` success · `1` runtime failure (bad inputs, missing
   tool, generation error — stderr/stdout has the reason, possibly as a
@@ -163,8 +193,9 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 - **`--json` commands** print exactly one JSON object on stdout:
   `commands`, `where`, `doctor`, `tools`, `library-list`, `video-check`,
   `video-validate`, `video-audio-audit`, `audio-takes-list`,
-  `style-detect`, `narration-check`, `series-plan`. Check the
-  `ok` field where present.
+  `style-detect`, `narration-check`, `series-plan`, `job-status`, `jobs`
+  (`job-start` always prints one JSON object). Check the `ok` field where
+  present.
 - **Marker lines** inside human output (grep for them, ignore the rest):
   - `MANGAEASY_PROGRESS <n>/<total> [label]` — progress ticks.
   - `MANGAEASY_RESULT {"outputs": ["<abs path>", ...]}` — final line of a
@@ -177,7 +208,7 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 - Long-running commands stream plain log lines; `\r`-style progress
   redraws may appear when a TTY is attached — safe to ignore in pipes.
 
-## 5. Command reference (groups)
+## 6. Command reference (groups)
 
 Run `mangaeasy commands --json` for the always-current list and
 `mangaeasy <command> --help` for flags. Highlights per group:
@@ -215,7 +246,7 @@ crop → verify → narrate loop is documented in
 `convert-images`, `watermark`, `thumbnail-compose` (text furniture onto a
 thumbnail base — see [thumbnail.md](thumbnail.md)), `ai-zip`.
 
-## 6. Recipes
+## 7. Recipes
 
 Set once for readability (absolute paths recommended):
 
@@ -304,7 +335,7 @@ mangaeasy audio-takes-list    --project-root "$PROJ" --audio-root "$AUDIO" --jso
 mangaeasy audio-takes-restore --project-root "$PROJ" --audio-root "$AUDIO" --run run_0003
 ```
 
-## 7. Uploading to YouTube
+## 8. Uploading to YouTube
 
 Preconditions (once, by the **human** — a browser consent is required, an
 agent cannot do it): the user creates their own Google OAuth client and
@@ -338,14 +369,16 @@ Agent rules for uploads:
 - `youtube-logout` disconnects; never read or print the token files under
   `<data>/.mangaeasy/youtube/`.
 
-## 8. Environment variables
+## 9. Environment variables
 
 | Variable | Meaning |
 |---|---|
 | `MANGAEASY_ROOT` | Override the data root (app root) — where models, tools, and projects live. Set it to run against a specific install's data. |
 | `MANGAEASY_HOME` | Override just the `.mangaeasy` data dir (default `<root>/.mangaeasy`). |
 | `MANGAEASY_TOOLS_DIR` | Override where AI tool envs live. |
-| `PROJECT_ROOT`, `AUDIO_ROOT`, `OUTPUT_ROOT`, `WORK_DIR` | Defaults for the corresponding `--*-root` flags. Agents should pass explicit flags instead. |
+| `MANGAEASY_ITEMS_ROOT`, `MANGAEASY_AUDIO_ROOT`, `MANGAEASY_OUTPUT_ROOT`, `MANGAEASY_WORK_DIR` | Defaults for the corresponding `--*-root` flags (bare legacy names `PROJECT_ROOT`/`AUDIO_ROOT`/`OUTPUT_ROOT`/`WORK_DIR` still honoured). Agents should pass explicit flags instead. |
+| `MANGAEASY_JOBS_DIR` | Where `job-start` keeps job state/logs (default `<work>/jobs`). |
+| `MANGAEASY_UNSAFE_GPU_WORKERS` | `1` disables the `--gpu-workers` clamp at 4 (only on hardware tested higher). |
 | `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `DEEPSEEK_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT` | Point at externally-managed tool envs (rarely needed). |
 | `MANGAEASY_SHARE_CACHES` | `1` to let external-tool subprocesses inherit an ambient `HF_HOME`/`UV_CACHE_DIR`/… instead of the isolated ones (a shared cross-project cache). Off by default — see below. |
 
@@ -357,7 +390,7 @@ really does leave nothing behind. Set `MANGAEASY_SHARE_CACHES=1` to opt into
 a shared ambient cache instead (models already downloaded there are then
 reused rather than re-fetched under `.mangaeasy`).
 
-## 9. MCP server
+## 10. MCP server
 
 ```bash
 mangaeasy mcp        # newline-delimited JSON-RPC 2.0 over stdio
@@ -365,16 +398,18 @@ mangaeasy mcp        # newline-delimited JSON-RPC 2.0 over stdio
 
 Register: `claude mcp add mangaeasy -- mangaeasy mcp` (or client config
 `{"command": "mangaeasy", "args": ["mcp"]}`; add `"env": {"MANGAEASY_ROOT":
-"..."}` to run against a specific install's data). Tools: `doctor`, `where`,
-`library_list`, `video_check`, `video_validate`, `audio_audit`,
-`generate_audio`, `render_videos`, `build_long_video`, `add_bgm`,
-`run_full_pipeline`, `bootstrap_tools`, `install_tool`, `generate_image`,
-`youtube_status`, `youtube_upload`. Tool results are a
-JSON text block: `exit_code`, parsed `report` (for `--json` commands),
-parsed `result` (the `MANGAEASY_RESULT` payload), and tail `output`.
-Generation/install tools block until done — that can be many minutes.
+"..."}` to run against a specific install's data). The tool schemas come from
+the same table as `commands --json --full` (`mangaeasy/command_spec.py`), so
+CLI and MCP can't drift. Tool results are a JSON text block: `exit_code`,
+parsed `report` (for `--json` commands), parsed `result` (the
+`MANGAEASY_RESULT` payload), and clipped `output`.
 
-## 10. Troubleshooting
+**Long-running tools must go through `job_start`** (returns a job id
+immediately) + `job_status` / `job_list` polling — a blocking `tools/call`
+that runs for minutes to hours will hit the MCP client's timeout. The
+descriptions of the long tools say so explicitly.
+
+## 11. Troubleshooting
 
 | Symptom | Likely cause | Do |
 |---|---|---|
@@ -383,6 +418,6 @@ Generation/install tools block until done — that can be many minutes.
 | `video-render` "have no audio yet" | narration changed since audio was generated | `video-audio` again (skips existing), or `video-audio-audit --fix` first |
 | Long join fails validation | items missing audio/video | `video-check --json`, fix reported items |
 | Output seems stale/missing | it was archived | look in `old/run_NNNN/` next to the output; `audio-takes-list` for audio |
-| GPU crash with many workers | too many CUDA contexts | drop `--gpu-workers` to ≤4 (or omit) |
+| GPU crash with many workers | too many CUDA contexts | the CLI clamps `--gpu-workers` at 4; unset `MANGAEASY_UNSAFE_GPU_WORKERS` |
 | Slow first model run | models downloading to the data folder | expected once; offline afterwards |
 | `unknown command` | typo | the error suggests near-matches; see `mangaeasy commands` |

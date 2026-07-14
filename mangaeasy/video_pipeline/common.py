@@ -7,16 +7,57 @@ from pathlib import Path
 from mangaeasy.utils import LazyArchiveRunDir, archive_into_run
 
 
-DEFAULT_PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", "content"))
-DEFAULT_AUDIO_ROOT = Path(os.environ.get("AUDIO_ROOT", "audio"))
-DEFAULT_OUTPUT_ROOT = Path(os.environ.get("OUTPUT_ROOT", "output"))
-DEFAULT_WORK_DIR = Path(os.environ.get("WORK_DIR", "work"))
+def _env_path(namespaced: str, legacy: str, default: str) -> Path:
+    """Flag-default roots: MANGAEASY_* wins, bare legacy name still honoured.
+
+    The unprefixed names (AUDIO_ROOT, WORK_DIR, ...) are generic enough to
+    collide with unrelated software in a user's shell; new setups should use
+    the MANGAEASY_-prefixed forms. Agents should pass explicit --*-root flags
+    and rely on neither.
+    """
+    value = os.environ.get(namespaced) or os.environ.get(legacy)
+    return Path(value) if value else Path(default)
+
+
+DEFAULT_PROJECT_ROOT = _env_path("MANGAEASY_ITEMS_ROOT", "PROJECT_ROOT", "content")
+DEFAULT_AUDIO_ROOT = _env_path("MANGAEASY_AUDIO_ROOT", "AUDIO_ROOT", "audio")
+DEFAULT_OUTPUT_ROOT = _env_path("MANGAEASY_OUTPUT_ROOT", "OUTPUT_ROOT", "output")
+DEFAULT_WORK_DIR = _env_path("MANGAEASY_WORK_DIR", "WORK_DIR", "work")
 DEFAULT_KOKORO_ROOT = Path(os.environ.get("KOKORO_ROOT", "kokoro-82m"))
 
 # The one home for media-extension sets — modules used to keep drifting
 # private copies (one even counted .gif as a panel; the renderer doesn't).
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".m4a", ".aac"}
+
+# Above 4 concurrent CUDA contexts, consumer NVIDIA cards crash under
+# multi-process TTS (confirmed on an RTX 3060 in production: 4 stable, 8
+# crashes even with cudnn.benchmark off). Enforced in code because "keep it
+# ≤ 4" lived only in the docs, where an agent that skipped the docs could
+# not see it.
+GPU_WORKERS_SAFE_MAX = 4
+
+
+def clamp_gpu_workers(requested: int) -> int:
+    """Clamp --gpu-workers to the known-safe ceiling (warn, don't crash).
+
+    MANGAEASY_UNSAFE_GPU_WORKERS=1 opts out for hardware that has actually
+    been tested higher.
+    """
+    import sys
+
+    if requested <= GPU_WORKERS_SAFE_MAX:
+        return max(1, requested)
+    if os.environ.get("MANGAEASY_UNSAFE_GPU_WORKERS") == "1":
+        print(f"[warn] --gpu-workers {requested} exceeds the tested-safe maximum "
+              f"{GPU_WORKERS_SAFE_MAX}; proceeding because MANGAEASY_UNSAFE_GPU_WORKERS=1.",
+              file=sys.stderr)
+        return requested
+    print(f"[warn] --gpu-workers {requested} clamped to {GPU_WORKERS_SAFE_MAX}: more "
+          f"concurrent CUDA contexts than this crashes consumer GPUs "
+          f"(set MANGAEASY_UNSAFE_GPU_WORKERS=1 to override on tested hardware).",
+          file=sys.stderr)
+    return GPU_WORKERS_SAFE_MAX
 
 def project_name(project_root: Path, override: str | None = None) -> str:
     return override or project_root.resolve().name

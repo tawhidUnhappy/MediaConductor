@@ -2,7 +2,50 @@
 
 ## Unreleased
 
+### Added
+- **Background job runner** — `job-start <command> [args…]` runs any command
+  as a detached, supervised background job (state + log under `<work>/jobs/`);
+  `job-status <id> --json` reports running/succeeded/failed/**orphaned**
+  (dead supervisor — machine sleep/kill) with the last `MANGAEASY_PROGRESS`,
+  the parsed `MANGAEASY_RESULT`, and a log tail; `jobs --json` lists all.
+  Exposed over MCP as `job_start`/`job_status`/`job_list` — long-running MCP
+  tools now direct callers there instead of blocking `tools/call` for hours.
+- **`commands --json --full`** — the machine-readable catalog now includes
+  each command's argument schema (flag, type, required) and a `long_running`
+  marker, ending the one-`--help`-per-command discovery loop for agents.
+- **`mangaeasy/command_spec.py`** — single declarative table of command
+  schemas; the MCP server and `commands --json --full` both render from it,
+  so the two surfaces can no longer drift (the MCP server previously kept a
+  hand-maintained private copy of every schema).
+
+### Changed
+- **`--gpu-workers` is clamped to 4 in code** (was a docs-only rule); the
+  tested-unsafe values warn and clamp, `MANGAEASY_UNSAFE_GPU_WORKERS=1` opts
+  out on tested hardware.
+- **Config loaders raise `ConfigError` instead of `sys.exit`** (the CLI
+  dispatcher renders it as `[ERROR] …`, exit 1) and `mangaeasy/config.py` no
+  longer mutates `HF_HOME`/`TORCH_HOME` at import time; `tts_pipeline` now
+  respects the tool-env cache pin instead of overriding it with a second
+  cache at `<cwd>/.hf_cache`.
+- **Namespaced root env vars** — `MANGAEASY_ITEMS_ROOT`/`MANGAEASY_AUDIO_ROOT`/
+  `MANGAEASY_OUTPUT_ROOT`/`MANGAEASY_WORK_DIR` (bare legacy names still
+  honoured).
+- **MCP hardening** — JSON reports are parsed by scanning from the last line
+  up (a stray print can't blind the parser); truncation keeps head+tail.
+- **Docs diet** — CLAUDE.md cut from ~32 KB to ~9 KB (incident lore moved to
+  `docs/history/incidents.md`); `START_HERE.md` retired into
+  CLAUDE.md/AGENTS.md; stale references (Flask assets, `narration.backup.json`,
+  removed packages) purged from live docs.
+
 ### Removed
+- **Dead GUI-era dependencies and assets** — flask, playwright, cloudscraper,
+  curl-cffi, pydub, and beautifulsoup4 were required dependencies with zero
+  imports anywhere in the package (leftovers of the deleted GUI/scraper era);
+  the unused `[ml]`/`[whisper]`/`[all]` extras (AI deps live in the isolated
+  tool envs, never the main env); `mangaeasy/assets/templates/` +
+  `mangaeasy/assets/static/` (six orphaned Flask editor pages); the stale
+  duplicate `mangaeasy/assets/config/` examples. Classifiers updated
+  (Beta, no Flask, Developers).
 - **Dead pre-Electron web control center** — `mangaeasy/assets/templates/app.html`,
   its 13-file JS bundle (`static/js/app/*.js`), `static/css/app.css`, and the
   vendored `static/vendor/xterm/` (xterm.js terminal) were leftovers from the

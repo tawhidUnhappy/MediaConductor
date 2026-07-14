@@ -40,8 +40,12 @@ from mangaeasy.video_pipeline.common import (
     prune_recent_audio_for_resume,
 )
 
-os.environ["HF_HOME"] = str(HF_CACHE_DIR)
-os.environ["HUGGINGFACE_HUB_CACHE"] = str(HF_CACHE_DIR)
+# setdefault, NOT assignment: when this runs inside the index-tts tool env
+# the parent already force-pinned HF_HOME under <data>/.mangaeasy/ via
+# tool_env() — overriding it here scattered model downloads into a second
+# cache at <cwd>/.hf_cache. The fallback only matters for bare standalone runs.
+os.environ.setdefault("HF_HOME", str(HF_CACHE_DIR))
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(HF_CACHE_DIR))
 os.environ.setdefault("HF_HUB_OFFLINE", "0")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
 

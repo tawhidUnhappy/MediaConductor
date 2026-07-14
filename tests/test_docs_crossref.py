@@ -1,6 +1,6 @@
 """Docs can't rot silently: every `mangaeasy <command>` mentioned in the
 AI-facing docs must exist in the CLI's dispatch table, the repo's own
-navigation docs must not contain broken internal links, and START_HERE must
+navigation docs must not contain broken internal links, and CLAUDE.md must
 name every top-level package so a new package can't appear undocumented."""
 
 import re
@@ -19,15 +19,15 @@ DOCS = [
     REPO / "docs" / "multi-agent.md",
     REPO / "docs" / "thumbnail.md",
     REPO / "docs" / "install.md",
-    REPO / "START_HERE.md",
     REPO / "AGENTS.md",
+    REPO / "CLAUDE.md",
     REPO / ".claude" / "skills" / "manga-recap" / "SKILL.md",
 ]
 
 # Docs whose internal (relative) links are checked for existence. Scoped to
 # the navigation set this reorg controls; widen as older docs are audited.
 LINK_CHECKED_DOCS = [
-    REPO / "START_HERE.md",
+    REPO / "CLAUDE.md",
     REPO / "docs" / "multi-agent.md",
     REPO / "AGENTS.md",
     REPO / "docs" / "operate" / "crop-verify-narrate.md",
@@ -88,11 +88,11 @@ def _packages() -> list:
     )
 
 
-def test_start_here_names_every_top_level_package():
-    """A new mangaeasy/<pkg>/ can't appear without being named in START_HERE."""
-    start_here = (REPO / "START_HERE.md").read_text(encoding="utf-8")
-    missing = [p.name for p in _packages() if p.name not in start_here]
-    assert not missing, f"START_HERE.md does not mention packages: {missing}"
+def test_claude_md_names_every_top_level_package():
+    """A new mangaeasy/<pkg>/ can't appear without being named in CLAUDE.md's code map."""
+    claude_md = (REPO / "CLAUDE.md").read_text(encoding="utf-8")
+    missing = [p.name for p in _packages() if p.name not in claude_md]
+    assert not missing, f"CLAUDE.md does not mention packages: {missing}"
 
 
 def test_every_package_has_a_readme():

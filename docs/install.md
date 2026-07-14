@@ -56,7 +56,7 @@ uv run mangaeasy --help
 
 Or run `./run.sh` (macOS/Linux) / `run.bat` (Windows) from the repo root — it
 runs `uv sync` and prints the command list. New to the code? Open
-[START_HERE.md](../START_HERE.md).
+[CLAUDE.md](../CLAUDE.md).
 
 Build a frozen release yourself with PyInstaller:
 

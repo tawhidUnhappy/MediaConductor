@@ -16,6 +16,7 @@ from mangaeasy.video_pipeline.common import (
     DEFAULT_PROJECT_ROOT,
     DEFAULT_WORK_DIR,
     chunk_list,
+    clamp_gpu_workers,
     item_dirs,
     merge_item_selection,
     project_name,
@@ -237,6 +238,7 @@ def run_kokoro_workers_sharded(args: argparse.Namespace, manifest: list[dict[str
 
 def main() -> int:
     args = parse_args()
+    args.gpu_workers = clamp_gpu_workers(args.gpu_workers)
     project_root = args.project_root.resolve()
     if not project_root.exists():
         raise FileNotFoundError(f"Project root does not exist: {project_root}")

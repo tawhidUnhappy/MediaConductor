@@ -14,6 +14,7 @@ from mangaeasy.video_pipeline.common import (
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PROJECT_ROOT,
     DEFAULT_WORK_DIR,
+    clamp_gpu_workers,
     find_latest_long_video,
     merge_item_selection,
     project_name,
@@ -167,6 +168,7 @@ def run(command: list[str], cwd: Path) -> None:
 
 def main() -> int:
     args = parse_args()
+    args.gpu_workers = clamp_gpu_workers(args.gpu_workers)
     if args.respect_claims:
         from mangaeasy.workboard import respect_claims_gate
 

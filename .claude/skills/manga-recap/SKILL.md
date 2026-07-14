@@ -13,24 +13,30 @@ description: >
 # Manga recap production (mangaEasy)
 
 You drive the whole pipeline through the `mangaeasy` CLI (or its MCP tools —
-same engine). Full reference: `docs/ai-guide.md`. Machine contract: every
-`--json` command prints one JSON object; generation commands end with a
+same engine). Full reference: `docs/ai-guide.md`; discover any command's
+flags with `mangaeasy commands --json --full` (schemas + `long_running`
+markers — no per-command `--help` needed). Machine contract: every `--json`
+command prints one JSON object; generation commands end with a
 `MANGAEASY_RESULT {...}` line; exit 0 = ok, 1 = failure, 2 = usage error;
 nothing ever prompts for input.
 
 **Hard safety rules** — never delete/rename anything inside `library/`
-source items; never touch `narration.backup.json`; clear generated output
-only with `video-clean-*`; keep `--gpu-workers` ≤ 4.
+source items; edit narration via `narration-edit`, not by hand; clear
+generated output only with `video-clean-*` (everything else auto-archives to
+`old/run_NNNN/`). `--gpu-workers` is clamped to 4 in code — don't fight it.
 
 **Run long steps in the background, then wait — don't burn compute polling.**
 `download`, `page-split`/`webtoon-split`, `panel-transcript`, `video`,
 `zimage`, and `youtube-upload` each run for minutes to tens of minutes. Launch
 each as a background job and stop; let the harness's completion notification
-wake you instead of sleeping or re-checking in a loop. GPU tools (MAGI,
-DeepSeek-OCR, IndexTTS, Z-Image) block-buffer stdout, so their logs look empty
-until the end — judge health from filesystem signals (growing panel/transcript
-counts, output files appearing, `nvidia-smi`), not by tailing the log. Only
-foreground the quick `--json`/validation commands.
+wake you instead of sleeping or re-checking in a loop. No harness backgrounding
+(e.g. MCP-only)? Use the built-in runner: `mangaeasy job-start <command>
+[args…]` returns a job id instantly; poll `mangaeasy job-status <id> --json`
+(status/progress/result; reports `orphaned` if the machine slept). GPU tools
+(MAGI, DeepSeek-OCR, IndexTTS, Z-Image) block-buffer stdout, so their logs look
+empty until the end — judge health from filesystem signals (growing
+panel/transcript counts, output files appearing, `nvidia-smi`), not by tailing
+the log. Only foreground the quick `--json`/validation commands.
 
 ## 0. Orient (every session)
 

@@ -3,9 +3,11 @@
 Status: **active** · Started 2026-07-09 · Owner: reorg effort
 
 > This is a historical planning + tracking doc. The living documentation it
-> produces lives in `START_HERE.md`, `docs/`, and per-package `README.md`
-> files. When this reorg is complete, this file stays as the record of *why*
-> the structure is what it is.
+> produced lives in `docs/`, `CLAUDE.md`, `AGENTS.md`, and per-package
+> `README.md` files. (2026-07-14: `START_HERE.md` was retired — its doc map
+> and code map were folded into `CLAUDE.md`, its agent quickstart into
+> `AGENTS.md`.) This file stays as the record of *why* the structure is what
+> it is.
 
 ## Goal
 

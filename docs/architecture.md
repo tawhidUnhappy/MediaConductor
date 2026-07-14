@@ -19,12 +19,14 @@ mangaeasy <command> [args...]  ->  mangaeasy.<area>.<module>:main()
 The main package contains:
 
 - General item-based video pipeline in `mangaeasy.video_pipeline`
-- Original manga/chapter utilities in `mangaeasy.download`, `mangaeasy.web`,
-  `mangaeasy.video`, `mangaeasy.images`, and related modules
+- Acquisition and cropping in `mangaeasy.download`, `mangaeasy.panels`,
+  `mangaeasy.ocr`; image utilities in `mangaeasy.images`
+- Command schemas shared by MCP and `commands --json --full` in
+  `mangaeasy.command_spec`; detached background jobs in `mangaeasy.jobs`
 - External tool lookup/wrappers in `mangaeasy.tools`
-- Packaged Flask templates/static files in `mangaeasy.assets`
+- Agent-facing prompts and in-tool-env scripts in `mangaeasy/assets/`
 
-The default project root is the current working directory. Set
+The default workspace root is the current working directory. Set
 `MANGAEASY_PROJECT_ROOT` to run commands against another folder.
 
 ## External tools
@@ -77,6 +79,6 @@ Video:
 
 ## Package data
 
-Web templates and static files are included under `mangaeasy/assets`. If a
-project folder has its own `templates/` or `static/`, those local files override
-the packaged defaults.
+`mangaeasy/assets/` ships only agent-facing prompts (`prompts/narration.md`)
+and standalone scripts executed inside the external tool envs (`tools/`).
+The old Flask templates/static files were removed with the GUI.

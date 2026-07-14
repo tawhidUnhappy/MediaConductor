@@ -10,6 +10,7 @@ from mangaeasy.tools.external import python_command, resolve_tool_dir, tool_env
 from mangaeasy.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
     DEFAULT_PROJECT_ROOT,
+    clamp_gpu_workers,
     item_dirs,
     merge_item_selection,
 )
@@ -57,6 +58,7 @@ def shard_item_names(names: list[str], shards: int) -> list[list[str]]:
 
 def main() -> int:
     args = parse_args()
+    args.gpu_workers = clamp_gpu_workers(args.gpu_workers)
     speaker_wav = (args.speaker_wav or _default_speaker_wav()).resolve()
 
     tool_dir = (
