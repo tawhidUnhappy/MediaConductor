@@ -6,8 +6,8 @@
     "download_delay": 0.5
   },
   "bgm": {
-    "directory": "D:\\bgm",
-    "file": "D:\\bgm\\tapionBySea.wav",
+    "directory": "bgm",
+    "file": "bgm/tapionBySea.wav",
     "volume_db": -26
   },
   "video": {

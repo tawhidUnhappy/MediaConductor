@@ -422,8 +422,8 @@ descriptions of the long tools say so explicitly.
 | Slow first model run | models downloading to the data folder | expected once; offline afterwards |
 | `unknown command` | typo | the error suggests near-matches; see `mangaeasy commands` |
 
-Background music can live in `D:\bgm`. In `config.system.json`, set
-`bgm.directory` to `D:\bgm` to make that folder the music pool, and keep
-`bgm.file` pointed at the default track `D:\bgm\tapionBySea.wav`.
+Background music can live in `bgm/` inside the repo. In `config.system.json`,
+set `bgm.directory` to `bgm` to make that folder the music pool, and keep
+`bgm.file` pointed at the default track `bgm/tapionBySea.wav`.
 The assistant can choose any other file from that folder by passing
 `--background-music` or by changing `bgm.file` for a specific run.
