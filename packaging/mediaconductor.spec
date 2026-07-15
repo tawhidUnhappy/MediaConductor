@@ -7,8 +7,13 @@
 
 import sys as _sys
 import os
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
+
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path(SPECPATH).resolve().parent  # repo root (spec lives in packaging/)

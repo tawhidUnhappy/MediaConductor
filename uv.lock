@@ -508,6 +508,7 @@ dev = [
     { name = "pyinstaller" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 
 [package.metadata]
@@ -526,6 +527,7 @@ dev = [
     { name = "pyinstaller", specifier = ">=6.20.0" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "ruff", specifier = ">=0.9.0" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0.0" },
 ]
 
 [[package]]

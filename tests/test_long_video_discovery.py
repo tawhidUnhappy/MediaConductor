@@ -2,8 +2,12 @@
 an archived file — plus the version-sync invariant the release relies on."""
 
 import os
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised by the Python 3.10 CI job
+    import tomli as tomllib
 
 import mangaeasy
 from mangaeasy.video_pipeline.common import find_latest_long_video
