@@ -23,6 +23,14 @@ def test_song_toolchain_is_immutably_pinned():
     assert whisperx.extra_models[0].revision == "22aad52d435eb6dbaf354bdad9b0da84ce7d6156"
 
 
+def test_index_tts_skips_build_hostile_extras():
+    # deepspeed needs a matching system CUDA toolkit; accel (flash-attn) has
+    # no wheel and needs torch at build time, killing `uv sync` before the
+    # env exists; webui (gradio) is unused by the CLI pipeline.
+    spec = install.TOOLS["index-tts"]
+    assert set(spec.exclude_extras) == {"deepspeed", "accel", "webui"}
+
+
 @pytest.mark.parametrize(
     ("tool_name", "source_revision", "model_revision"),
     [

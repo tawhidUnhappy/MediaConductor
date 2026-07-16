@@ -197,7 +197,11 @@ TOOLS: dict[str, ToolSpec] = {
         # DeepSpeed is a training accelerator, unused for inference, and its
         # native build fails on most machines (needs the system CUDA toolkit
         # to exactly match torch's, plus aio/cufile libs Windows lacks).
-        exclude_extras=["deepspeed"],
+        # accel (flash-attn) has no prebuilt wheel here and needs torch at
+        # build time, so `uv sync` dies before the env exists; infer_v2 only
+        # imports flash_attn when use_accel=True, which the adapter never
+        # sets. webui is gradio-only and unused by the CLI pipeline.
+        exclude_extras=["deepspeed", "accel", "webui"],
         # Upstream pins requires-python ">=3.10,<3.12" at this ref; the
         # ToolSpec default of 3.12 makes `uv sync` refuse the interpreter.
         python="3.11",
