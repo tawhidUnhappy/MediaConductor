@@ -71,7 +71,11 @@ What the installer does:
 1. Shallow-clones `https://github.com/index-tts/index-tts` at commit
    `13495845e3028f0bb6ca1462ad22aa0e76349e40`, with Git LFS model smudging
    disabled
-2. `uv sync --all-extras` — builds its own env with its own torch/CUDA stack
+2. `uv sync` excluding the `deepspeed`, `accel`, and `webui` extras — builds
+   its own env with its own torch/CUDA stack. DeepSpeed and flash-attn
+   (`accel`) are training/serving accelerators whose native builds fail on
+   most machines (flash-attn needs torch at build time and has no Windows
+   wheel), and inference never imports them; `webui` is gradio-only.
 3. Downloads `IndexTeam/IndexTTS-2` at immutable revision
    `740dcaff396282ffb241903d150ac011cd4b1ede` into `checkpoints/` via the
    Hugging Face CLI and verifies its required inference payload.
