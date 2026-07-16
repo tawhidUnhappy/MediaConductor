@@ -10,6 +10,8 @@
   at −14 LUFS / −1.5 dBTP. Any BGM change requires a new final normalization.
   Narration gain now has a single owner instead of being applied once during
   join and a second time during BGM remixing.
+  Final normalization reserves AAC true-peak headroom so the encoded
+  deliverable, not only the pre-codec filter output, stays within −1.5 dBTP.
 - Clarified that `video-validate` is a structural gate and that visual,
   narration-timing, edge-click, and final loudness/true-peak QA remain separate
   release checks.

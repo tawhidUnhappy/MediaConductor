@@ -117,7 +117,9 @@ dispatcher renders it; never `sys.exit` from library code). Note
   remains the recoverable TTS source. Keep `--audio-source raw` opt-in.
 - **Mix BGM before one final whole-mix normalize** to −14 LUFS / −1.5 dBTP.
   Never normalize narration, add music, and call the result final; every BGM
-  change requires another final two-pass normalization pass.
+  change requires another final two-pass normalization pass. Keep the
+  normalizer's AAC peak margin: codec reconstruction can overshoot the
+  pre-encode true-peak target.
 - **Narration gain has exactly one owner**: a BGM-bound full pipeline joins at
   unity and applies the configured lift during mixing; narration-only joins
   apply it themselves. Standalone BGM remixing defaults to unity because its

@@ -15,6 +15,8 @@ from mangaeasy.video_pipeline.common import (
     project_name,
 )
 
+DEFAULT_CODEC_PEAK_MARGIN_DB = 0.8
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -28,8 +30,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--replace", action="store_true", help="Replace input after writing through a temporary file.")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--target-i", type=float, default=-14.0, help="Integrated loudness target in LUFS.")
-    parser.add_argument("--target-tp", type=float, default=-1.5, help="True peak target in dBTP.")
+    parser.add_argument("--target-tp", type=float, default=-1.5,
+                        help="Maximum true peak required from the encoded deliverable, in dBTP.")
     parser.add_argument("--target-lra", type=float, default=11.0, help="Loudness range target.")
+    parser.add_argument("--codec-peak-margin", type=float, default=DEFAULT_CODEC_PEAK_MARGIN_DB,
+                        help="Extra pre-codec true-peak headroom for AAC reconstruction overshoot "
+                             "(default 0.8 dB; keeps the encoded file at or below --target-tp).")
     parser.add_argument("--audio-bitrate", default="192k")
     parser.add_argument("--sample-rate", type=int, default=48000)
     return parser.parse_args()
@@ -62,8 +68,12 @@ def default_output(input_path: Path) -> Path:
     return input_path.with_name(f"{input_path.stem}_youtube_audio.mp4")
 
 
+def filter_target_tp(args: argparse.Namespace) -> float:
+    return args.target_tp - args.codec_peak_margin
+
+
 def loudnorm_base(args: argparse.Namespace) -> str:
-    return f"loudnorm=I={args.target_i}:TP={args.target_tp}:LRA={args.target_lra}"
+    return f"loudnorm=I={args.target_i}:TP={filter_target_tp(args)}:LRA={args.target_lra}"
 
 
 def parse_loudnorm_json(stderr: str) -> dict[str, str]:
@@ -126,6 +136,8 @@ def second_pass(
 
 def main() -> int:
     args = parse_args()
+    if args.codec_peak_margin < 0:
+        raise ValueError("--codec-peak-margin must be non-negative.")
     input_path = (args.input or default_input(args)).resolve()
     if not input_path.exists():
         raise FileNotFoundError(f"Input video not found: {input_path}")
@@ -140,8 +152,10 @@ def main() -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(
-        f"Normalizing audio to I={args.target_i} LUFS, TP={args.target_tp} dBTP, "
-        f"LRA={args.target_lra}. Video stream will be copied.",
+        f"Normalizing audio to I={args.target_i} LUFS, encoded TP<={args.target_tp} dBTP, "
+        f"LRA={args.target_lra}. The filter target is {filter_target_tp(args):g} dBTP "
+        f"to reserve {args.codec_peak_margin:g} dB for AAC peak overshoot. "
+        "Video stream will be copied.",
         flush=True,
     )
     measured = first_pass(input_path, args)
