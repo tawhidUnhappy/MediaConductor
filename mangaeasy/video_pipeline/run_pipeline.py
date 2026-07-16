@@ -8,6 +8,8 @@ from mangaeasy.brand import CLI_NAME
 from mangaeasy.defaults import (
     DEFAULT_NARRATION_VOLUME,
     default_background_music,
+    default_manga_video_audio_fade_ms,
+    default_manga_video_audio_source,
     default_music_volume_db,
     default_tts_engine,
 )
@@ -91,10 +93,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-audio", action="store_true",
                         help="Skip narration audio generation entirely and reuse whatever audio "
                              "already exists on disk; just re-render and re-join the video.")
-    parser.add_argument("--audio-source", choices=("raw", "faded"), default="raw",
+    parser.add_argument("--audio-source", choices=("raw", "faded"), default=default_manga_video_audio_source(),
                         help="Which audio render/join read. 'raw' is the straight TTS output. "
                              "'faded' adds tiny fade-in/out copies (removes edge clicks/pops) written "
-                             "to a sibling folder; the raw audio is never deleted.")
+                             "to a sibling folder; the raw audio is never deleted. Defaults to "
+                             "config.system.json -> manga_video.audio_source, else faded.")
+    parser.add_argument("--audio-fade-ms", type=float, default=default_manga_video_audio_fade_ms(),
+                        help="Symmetric fade at both edges of each narration clip when --audio-source=faded "
+                             "(config: manga_video.audio_fade_ms; default 8 ms).")
     parser.add_argument("--voice", default="af_heart")
     parser.add_argument("--lang", default="a")
     parser.add_argument("--speed", type=float, default=1.0)
@@ -125,12 +131,11 @@ def parse_args() -> argparse.Namespace:
                         help="Do not add background music even if a default BGM file is configured.")
     parser.add_argument("--music-volume-db", type=float, default=default_music_volume_db(),
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
-                             "stem is loudness-aligned to the narration's -14 LUFS reference first, so this is "
+                             "stem is loudness-aligned to the actual joined narration first, so this is "
                              "a true LU separation; default -26 suits dense recap narration, -20 to -22 sparser "
                              "voiceover.")
     parser.add_argument("--no-music-loudnorm", action="store_true",
-                        help="Apply --music-volume-db to the raw music file without aligning its loudness "
-                             "to the -14 LUFS reference first.")
+                        help="Apply --music-volume-db without aligning music loudness to the narration first.")
     parser.add_argument("--condition-bed", action=argparse.BooleanOptionalAction, default=True,
                         help="Compress the music's dynamic range so it sits at a consistent level under the "
                              "narration (on by default; --no-condition-bed applies only the flat dB offset).")
@@ -174,6 +179,8 @@ def run(command: list[str], cwd: Path) -> None:
 
 def main() -> int:
     args = parse_args()
+    if args.audio_fade_ms <= 0:
+        raise ValueError("--audio-fade-ms must be positive.")
     args.gpu_workers = clamp_gpu_workers(args.gpu_workers)
     if args.respect_claims:
         from mangaeasy.workboard import respect_claims_gate
@@ -233,6 +240,7 @@ def main() -> int:
             "--project-root", str(args.project_root),
             "--source-audio-root", str(args.audio_root),
             "--output-audio-root", str(effective_audio_root),
+            "--fade-ms", str(args.audio_fade_ms),
             "--overwrite",
         )
         if args.project_name:
@@ -278,14 +286,10 @@ def main() -> int:
     run(video_cmd, cwd)
     if args.build_long_video:
         name = project_name(args.project_root, args.project_name)
-        # Always join without background music first, even when one is
-        # configured -- a clean, narration-only long video is the one thing
-        # every later step (re-normalizing, swapping in different music,
-        # retrying just the music mix) should be able to build from without
-        # re-joining every item clip from scratch. Background music is
-        # layered on last, via video-add-bgm, after normalization, so the
-        # narration gets normalized to target loudness on its own and the
-        # music isn't pulled up to that same level underneath it.
+        # Join narration first. If music is requested it is mixed next; one
+        # final normalization pass then targets the complete deliverable.
+        # Normalizing before BGM is incorrect because adding a stem changes
+        # both integrated loudness and true peak.
         long_cmd = cli_command(
             "video-join",
             "--project-root", str(args.project_root),
@@ -304,30 +308,25 @@ def main() -> int:
             long_cmd.append("--allow-gaps")
         run(long_cmd, cwd)
 
-        if args.normalize_audio:
-            norm_cmd = cli_command(
-                "video-normalize-audio",
-                "--project-root", str(args.project_root),
-                "--output-root", str(args.output_root),
-                "--replace",
-            )
-            if args.project_name:
-                norm_cmd += ["--project-name", args.project_name]
-            run(norm_cmd, cwd)
+        long_video = find_latest_long_video(args.output_root, name)
+        if long_video is None:
+            raise FileNotFoundError(f"Join completed but no long video was found for '{name}'.")
 
         if background_music is not None:
             bgm_cmd = cli_command(
                 "video-add-bgm",
                 "--project-root", str(args.project_root),
                 "--output-root", str(args.output_root),
+                "--input", str(long_video),
                 "--background-music", str(background_music),
                 "--music-volume-db", str(args.music_volume_db),
                 "--narration-volume", str(args.narration_volume),
-                # The full pipeline's output filename should stay predictable
-                # (always <name>_full.mp4) for anything that watches for it,
-                # so opt into in-place replacement here. Trying out several
-                # mixes without overwriting one another is what the
-                # standalone video-add-bgm step (its own default) is for.
+                "--audio-bitrate", args.audio_bitrate,
+                "--work-dir", str(args.work_dir),
+                # Keep the exact timestamped join path stable for anything
+                # watching the full pipeline, so opt into in-place
+                # replacement here. Trying several mixes without overwriting
+                # one another is the standalone video-add-bgm default.
                 "--replace",
             )
             if args.no_music_loudnorm:
@@ -343,6 +342,19 @@ def main() -> int:
             if args.project_name:
                 bgm_cmd += ["--project-name", args.project_name]
             run(bgm_cmd, cwd)
+
+        if args.normalize_audio:
+            norm_cmd = cli_command(
+                "video-normalize-audio",
+                "--project-root", str(args.project_root),
+                "--output-root", str(args.output_root),
+                "--input", str(long_video),
+                "--audio-bitrate", args.audio_bitrate,
+                "--replace",
+            )
+            if args.project_name:
+                norm_cmd += ["--project-name", args.project_name]
+            run(norm_cmd, cwd)
 
     # Machine-parsable summary of what this run produced: the sub-commands
     # each emit their own MANGAEASY_RESULT, but agents driving the all-in-one

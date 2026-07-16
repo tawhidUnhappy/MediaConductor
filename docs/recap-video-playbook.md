@@ -408,7 +408,8 @@ mediaconductor narration-edit --project-root library/<Project> --item 01 \
 
 ## Phase 6 — Build the video
 
-One command runs audio → render → join → normalize → BGM:
+One command runs audio → 8 ms fade derivatives → render → join → BGM → one
+final whole-mix normalize:
 
 ```bash
 # IndexTTS voice clone (default, best quality; leave gpu-workers at default):
@@ -428,14 +429,20 @@ mediaconductor video --project-root library/<Project> --items 01 \
 - Use the **default audio/output roots** (don't pass `--audio-root
   audio/<Project>` — the project name is appended automatically and you
   get a doubled path).
+- Production defaults to `--audio-source faded`: every panel WAV is copied to
+  the separate `audio_faded/<Project>/...` tree with a symmetric 8 ms fade-in
+  and fade-out before rendering. Raw IndexTTS/Kokoro WAVs in `audio/` stay
+  untouched. `--audio-source raw` is for an intentional diagnostic comparison,
+  not a normal production render.
 - `--music-volume-db -26` (the default) is the tuned recap-channel value
   for this mixing chain: with the bed conditioned, EQ-carved, and ducked
   (all default-on) plus the 1.2 narration lift, −26 keeps the bed felt but
   never competing (−15 is the masking boundary on phone speakers, −28 the
-  inaudibility boundary under this chain). The music
-  stem is loudness-aligned to the narration's −14 LUFS reference before
-  the offset (`[music-loudnorm]` log line), so the value is a true LU
-  separation whatever the track's mastering; `--no-music-loudnorm`
+  inaudibility boundary under this chain). The music stem is loudness-aligned
+  to the measured narration after its configured gain before the offset
+  (`[music-loudnorm]` log line), so the value is a true LU separation whatever
+  the track's mastering. The complete voice-plus-music mix is then normalized
+  once, in two passes, to −14 LUFS / −1.5 dBTP; `--no-music-loudnorm`
   restores the old raw-offset behavior. An earlier production used −17
   before the loudnorm existed — with a hot-mastered YouTube-rip bed that
   was effectively ~−16 LU, slightly hot.
@@ -463,12 +470,15 @@ mediaconductor video --project-root library/<Project> --items 01 \
   the 2026-07-06 incident shipped audible music cut-outs at 1:24 and 2:15
   of a published video before this existed). `--raw-music` bypasses the
   whole mechanism when you really want the file untouched. Re-mixing is
-  still cheap: run `video-add-bgm` alone against the archived pre-BGM
-  long video in `old/run_NNNN/` — no re-render needed, and the duration
-  (hence chapter timestamps) stays identical.
-- A published bad take can be replaced without a Studio trip: upload the
-  fixed file first, verify, then `mediaconductor youtube-delete --profile
-  <profile> --video-id <id> --confirm` the old one.
+  still cheap: run `video-add-bgm` against the archived pre-BGM long video in
+  `old/run_NNNN/`, then run `video-normalize-audio --input <mixed-file>
+  --replace --target-i -14 --target-tp -1.5`. No re-render is needed and the
+  duration (hence chapter timestamps) stays identical, but any BGM change
+  invalidates the previous normalization.
+- A published bad take can be replaced without a Studio trip. The safe default
+  is upload the fixed file first, verify it, then delete the old id. Delete
+  first only when the user explicitly requests that irreversible sequence;
+  follow the exact replacement checklist in Phase 11.
 - Old takes are archived to `old/run_NNNN/`, never destroyed.
 - **After changing panels, narration or audio, pass `--overwrite-video`.**
   The renderer now also detects stale item videos by input mtimes and
@@ -495,7 +505,8 @@ mediaconductor video --project-root library/<Project> --items 01 \
 mediaconductor video-validate --project-root library/<Project> --items 01 --json
 ```
 
-Deliberately-unnarrated panels and orphan audio now surface as `warnings`
+This command is a structural gate, not a visual, timing, click, or loudness
+approval. Deliberately-unnarrated panels and orphan audio surface as `warnings`
 (exit 0); anything in `errors` is real breakage — missing panels/audio for
 *referenced* entries, duration mismatches (the item-WAV expectation is
 frame-aligned; pass `--fps` if you rendered at a non-default rate), stream
@@ -506,8 +517,12 @@ Then verify the actual MP4:
 - `ffprobe` duration/streams (expect 1920×1080, h264 + aac).
 - Extract frames near the start / middle / end (`ffmpeg -ss <t> -i <mp4>
   -frames:v 1 out.png`) and **look at them**.
+- Inspect narration-to-panel timing and listen across representative panel
+  boundaries. Audit the first/last samples of the faded WAV derivatives; a
+  structural `video-validate` pass cannot detect an edge click.
 - Measure loudness: `ffmpeg -i <mp4> -map 0:a -af ebur128=peak=true -f null -`
-  → integrated must be ≈ **−14 to −13.5 LUFS**. If it comes out ~−20,
+  → integrated must be ≈ **−14 LUFS** and true peak no higher than
+  **−1.5 dBTP**. If it comes out ~−20,
   something reintroduced the amix attenuation bug (see CLAUDE.md,
   "normalize=0") — YouTube never boosts quiet uploads.
 
@@ -691,13 +706,27 @@ mediaconductor youtube-upload --profile <profile> \
 - Custom thumbnails need an eligible YouTube account. An authorization failure
   triggers the same browser reauthorization and one retry; a remaining failure
   is reported as `[warn] thumbnail not set ...` after the video upload succeeds.
-- **Replacing a take**: upload the new video first, verify the `--json`
-  result, *then* delete the old one — never the reverse. Deletion needs
-  the full-management token (see docs/youtube.md; re-consent the same profile
-  if a delete returns insufficient scopes) and must use
-  `mediaconductor youtube-delete --profile <profile> --video-id <id> --confirm`
-  or one click in Studio. Never handle the stored bearer token. Update the description's
-  chapter timestamps *before* re-uploading — a new voice changes them.
+- **Replacing a take:** the safe default is upload new → verify → delete old.
+  Deletion-first creates immediate downtime and is allowed only when the user
+  explicitly asks for that order. For either sequence:
+
+  1. Run `youtube-status --profile <profile> --verify --json`, then
+     `youtube-list --profile <profile> --json`; confirm the exact channel
+     title/id and old video id/title.
+  2. If deletion-first was explicitly requested, preview
+     `youtube-delete --profile <profile> --video-id <old-id>`, then repeat
+     with `--confirm --json` and verify the old id is absent.
+  3. Upload the corrected, fully normalized file using that same explicit
+     profile and verify the returned channel id, video id, URL, and privacy.
+     In the safe default order, delete the old id only after this verification.
+  4. Replace the matching `series-mark-published` record (including profile,
+     channel id, and replaced video id when supported), then confirm both
+     `youtube-list` and `series-plan --json` show the replacement.
+
+  Deletion needs the full-management token (re-consent the same profile if it
+  returns insufficient scopes). Never handle the stored bearer token. Update
+  the description's chapter timestamps before re-uploading — a new voice can
+  change them.
 
 ## Final checklist
 
@@ -705,9 +734,11 @@ mediaconductor youtube-upload --profile <profile> \
 - [ ] Whole chapter actually read; unsafe panels listed and excluded
 - [ ] Hook = 4-ish late-chapter shock panels as renamed copies; CTA outro present
 - [ ] `mediaconductor video-check --json` ok before building
-- [ ] Final MP4: duration sane, frames spot-checked, integrated ≈ −14 LUFS
+- [ ] Faded per-panel derivatives audited; raw TTS unchanged; no edge clicks
+- [ ] Final MP4: duration/timing sane, frames spot-checked, ≈ −14 LUFS and ≤ −1.5 dBTP
 - [ ] Timestamps recomputed from the *current* WAVs; total matches duration
 - [ ] Thumbnail rendered, viewed, no unsafe bubble text; if generated with
       Z-Image, all variants checked against the prompt-writing safety rules
 - [ ] Title ≤ 100 chars, tags ≤ 500 chars, description leads with the hook
-- [ ] Uploaded with `--privacy public` + thumbnail set; `--json` result's privacy verified (and human told what to delete, if replacing)
+- [ ] Uploaded with `--privacy public` + thumbnail set; profile/channel/id/privacy verified
+- [ ] Replacement publish record written and YouTube list + series plan rechecked

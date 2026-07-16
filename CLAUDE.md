@@ -37,7 +37,7 @@ Each package has its own README.md with entry points and gotchas.
 | acquire | `download/` | MangaDex fetch (polite, resumable, writes `manga.json`) |
 | acquire | `panels/` | crop: `webtoon-split`, `page-split` (MAGI), cutcheck, overrides, remap |
 | read | `ocr/` | DeepSeek-OCR 2 panel transcripts |
-| produce | `video_pipeline/` | audio → render → join → normalize → BGM |
+| produce | `video_pipeline/` | audio → faded derivatives → render → join → BGM → final normalize |
 | produce | `story/` | AI Story manifest, continuity prompts, visual QA gates, orchestration |
 | produce | `song/` | Song manifest, canonical lyric alignment, subtitle/render orchestration |
 | produce | `audio/` | IndexTTS pipeline + emotion mapping |
@@ -69,11 +69,13 @@ Each package has its own README.md with entry points and gotchas.
   `jobs` read it back, detecting orphaned (dead-supervisor) jobs.
 - **The item pipeline** (`video-*`): `video` = audio (`video-audio` Kokoro /
   `video-audio-indextts`; `--tts auto` prefers IndexTTS when GPU + model +
-  speaker WAV exist) → `video-render` (frame-aligned to audio) → optional
-  `video-join` → `video-normalize-audio` (−14 LUFS) → `video-add-bgm`.
-  Join → normalize → BGM are deliberately **three separate steps** so
-  re-mixing music never re-joins, and normalization happens *before* music is
-  layered at a fixed dB offset below the voice.
+  speaker WAV exist) → symmetric 8 ms per-clip fade derivatives →
+  `video-render` (frame-aligned to faded audio) → optional `video-join` →
+  `video-add-bgm` → one final two-pass `video-normalize-audio` (−14 LUFS,
+  −1.5 dBTP). Production defaults to `audio_faded/<project>/...`; raw TTS
+  under `audio/` is never modified and `--audio-source raw` is an explicit
+  diagnostic override. Any BGM change invalidates final normalization, so a
+  standalone re-mix must be normalized again after the music is mixed.
 - **External AI tools** (Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2, Z-Image)
   live in isolated uv envs under `<install>/.mangaeasy/tools/<tool>/`
   (`install-tool`, resolved by `tools/external.resolve_tool_dir()`).
@@ -89,6 +91,7 @@ Each package has its own README.md with entry points and gotchas.
 library/<project>/            source items; manga.json (machine-managed source record)
   01/panels/ 01/narration.json [01/intro.json] [01/transcript.json]
 audio/<project>/<item>/*.wav  per-panel narration; _items/ holds per-item tracks
+audio_faded/<project>/<item>/*.wav  production render derivatives; raw TTS untouched
 output/<project>/             item videos + <project>_full.mp4
 work/                         scratch incl. jobs/ — video-clean-work clears it
 ```
@@ -109,6 +112,12 @@ dispatcher renders it; never `sys.exit` from library code). Note
   `video-clean-*` are the only sanctioned deleters and never touch `library/`.
 - **`load_narration()` (`video_pipeline/item_assets.py`) is the only
   narration reader** — it alone knows `intro.json` prepending.
+- **Production manga renders use faded derivatives, not raw clip edges**:
+  `audio_faded/` contains symmetric 8 ms fade-in/fade-out copies and `audio/`
+  remains the recoverable TTS source. Keep `--audio-source raw` opt-in.
+- **Mix BGM before one final whole-mix normalize** to −14 LUFS / −1.5 dBTP.
+  Never normalize narration, add music, and call the result final; every BGM
+  change requires another final two-pass normalization pass.
 - **`amix=…:normalize=0` and `alimiter=level=disabled`** in
   `build_mix_filter()` — each silently undid the −14 LUFS target once;
   test-guarded in `test_music_bed.py`.
@@ -135,6 +144,11 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - **YouTube**: tokens are secrets (print paths/booleans, never contents);
   default privacy stays `private`; scopes stay video-management-only; the
   upload is hand-rolled resumable `requests` — don't add the discovery client.
+  Replacement defaults to upload-new → verify → delete-old. Deletion-first is
+  irreversible and permitted only when the user explicitly requests it; first
+  verify the exact profile, channel, and old video id, then delete with
+  `--confirm`, upload the replacement, replace the publish record, and verify
+  the new listing.
 - **MangaDex politeness is a feature** — keep the complete-chapter fast-skip
   and the rate spacing; never parallelize downloads.
 - **Batches don't shift**: `series-plan` windows are fixed over the sorted

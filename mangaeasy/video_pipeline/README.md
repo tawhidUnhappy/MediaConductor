@@ -17,15 +17,23 @@ build by shelling out to the narrower commands, in this order:
 1. **Audio** — [`generate_audio.py`](generate_audio.py) (Kokoro, worker pool) or
    [`generate_audio_indextts.py`](generate_audio_indextts.py) (IndexTTS voice
    clone). `resolve_tts_engine()` picks IndexTTS only on a capable GPU machine.
-2. **(opt) Fade** — [`preprocess_audio_fades.py`](preprocess_audio_fades.py).
+2. **Fade derivatives** —
+   [`preprocess_audio_fades.py`](preprocess_audio_fades.py) writes a separate
+   `audio_faded/<project>/...` tree with a symmetric 8 ms fade at both edges
+   of every panel WAV. Production renders use these derivatives by default;
+   raw TTS under `audio/` is never changed. `--audio-source raw` is an
+   explicit diagnostic override.
 3. **Render** — [`make_videos.py`](make_videos.py) /
    [`item_video_builder.py`](item_video_builder.py): one video per item,
    frame-aligned to audio.
-4. **(opt) Join → normalize → BGM** — always three separate steps so re-mixing
-   music doesn't re-join clips:
+4. **(opt) Join → BGM → final normalize** — the final audio pass always sees
+   the complete mix:
    [`make_long_video.py`](make_long_video.py) →
-   [`normalize_long_audio.py`](normalize_long_audio.py) →
-   [`add_long_video_bgm.py`](add_long_video_bgm.py) (+ [`music_bed.py`](music_bed.py) QC).
+   [`add_long_video_bgm.py`](add_long_video_bgm.py) (+
+   [`music_bed.py`](music_bed.py) QC) →
+   one two-pass [`normalize_long_audio.py`](normalize_long_audio.py) run at
+   −14 LUFS / −1.5 dBTP. Any BGM change invalidates normalization; normalize
+   the whole mix again after every standalone re-mix.
 
 ## Key shared modules
 
@@ -43,14 +51,23 @@ build by shelling out to the narrower commands, in this order:
 `video-check` ([check_items.py](check_items.py)), `narration-check`
 ([narration_check.py](narration_check.py) — structural narration validation
 before audio: coverage, dangling images, empty text), `video-validate`
-([validate_generation.py](validate_generation.py)), `video-audio-audit`
+([validate_generation.py](validate_generation.py); structural coverage,
+streams, and duration only), `video-audio-audit`
 ([audio_audit.py](audio_audit.py)), and the `video-clean-*` family (never touch
 `library/` sources; generated output is archived, not deleted).
 
+`video-validate` is necessary but does not certify a production upload.
+Separately inspect representative frames, confirm narration/panel timing,
+audit faded WAV starts/ends for edge clicks, and measure the final whole mix
+near −14 LUFS with true peak no higher than −1.5 dBTP.
+
 ## Load-bearing invariants (guarded by tests — don't "optimize" away)
 
+- Production rendering uses separate symmetric 8 ms per-panel fade derivatives;
+  never destructively fade or replace the raw TTS WAVs.
 - Music mix uses `amix=…:normalize=0` and `alimiter=level=disabled`; BGM volume
-  is **dB-native** (`--music-volume-db`, default −22). See
+  is **dB-native** (`--music-volume-db`, default −26). Mix music before one
+  final two-pass whole-mix normalize at −14 LUFS / −1.5 dBTP. See
   [test_music_bed.py](../../tests/test_music_bed.py) and [CLAUDE.md](../../CLAUDE.md).
 - `torch.backends.cudnn.benchmark` stays `False` in
   [`kokoro_batch_worker.py`](kokoro_batch_worker.py); `--gpu-workers` ≤ 4 on a

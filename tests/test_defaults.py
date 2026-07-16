@@ -28,3 +28,34 @@ def test_default_background_music_picks_first_file_from_directory(tmp_path, monk
     monkeypatch.setattr(defaults, "SYSTEM_CONFIG_FILE", cfg)
     assert defaults.default_background_music() == bgm_dir / "a_track.mp3"
 
+
+def test_manga_video_audio_defaults_to_faded_eight_ms(tmp_path, monkeypatch):
+    cfg = tmp_path / "missing-config.system.json"
+    monkeypatch.setattr(defaults, "SYSTEM_CONFIG_FILE", cfg)
+
+    assert defaults.default_manga_video_audio_source() == "faded"
+    assert defaults.default_manga_video_audio_fade_ms() == 8.0
+
+
+def test_manga_video_audio_defaults_are_configurable(tmp_path, monkeypatch):
+    cfg = tmp_path / "config.system.json"
+    cfg.write_text(
+        json.dumps({"manga_video": {"audio_source": "raw", "audio_fade_ms": 12.5}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(defaults, "SYSTEM_CONFIG_FILE", cfg)
+
+    assert defaults.default_manga_video_audio_source() == "raw"
+    assert defaults.default_manga_video_audio_fade_ms() == 12.5
+
+
+def test_invalid_manga_video_audio_config_falls_back_safely(tmp_path, monkeypatch):
+    cfg = tmp_path / "config.system.json"
+    cfg.write_text(
+        json.dumps({"manga_video": {"audio_source": "unknown", "audio_fade_ms": 0}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(defaults, "SYSTEM_CONFIG_FILE", cfg)
+
+    assert defaults.default_manga_video_audio_source() == "faded"
+    assert defaults.default_manga_video_audio_fade_ms() == 8.0

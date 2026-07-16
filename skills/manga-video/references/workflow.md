@@ -100,6 +100,13 @@ and `webtoon-cutcheck`. The default is `download`.
    by `commands --json --full` and MCP. Keep licensed music below narration and
    re-render after any changed panel, narration, or audio input.
 
+   Production defaults to separate `audio_faded/<project>/...` derivatives:
+   every panel WAV gets a symmetric 8 ms fade-in and fade-out while the raw TTS
+   under `audio/` remains untouched. Use `audio_source: raw` only for an
+   intentional diagnostic comparison. With BGM, the order is join → mix music
+   → one final two-pass whole-mix normalize to −14 LUFS / −1.5 dBTP. Any music
+   change invalidates final normalization.
+
 8. Loop QA until clean, then validate the joined video:
 
    ```bash
@@ -107,11 +114,26 @@ and `webtoon-cutcheck`. The default is `download`.
    <mc> video-validate --project-root D:/MediaProjects/library/example --audio-root D:/MediaProjects/audio --output-root D:/MediaProjects/output --items 01 --json
    ```
 
+   `video-validate` is a structural gate (coverage, streams, duration), not a
+   complete media review. Also inspect representative start/middle/end frames,
+   check narration-to-panel timing, audit faded WAV boundaries for edge clicks,
+   and measure the final complete mix at approximately −14 LUFS with true peak
+   no higher than −1.5 dBTP.
+
 9. Create and visually inspect a thumbnail. Confirm source, music, voice, and
    upload rights. Only on an explicit publish request, list profiles, verify
    the intended channel with `youtube-status --profile <name> --verify --json`,
    pass the same `--profile <name>` to the upload, and record the returned
    profile, channel id, and video id with `series-mark-published`.
+
+   For a replacement, default to upload new → verify → delete old. Delete-first
+   is irreversible and allowed only when the user explicitly requests that
+   order. Before deleting, verify the exact profile, live channel id, and old
+   video id/title with `youtube-status` and `youtube-list`; preview deletion,
+   repeat it with `--confirm --json`, and verify the id is gone. Upload the
+   corrected file using the same profile, replace the matching publish record
+   (including profile/channel/replaced id when supported), then verify both the
+   YouTube listing and `series-plan --json`.
 
 Use absolute project/audio/output/work roots. Preserve `manga.json`,
 `publish.json`, source pages, panels, and archived takes.

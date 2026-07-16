@@ -171,6 +171,12 @@ def mark_main() -> int:
     parser.add_argument("--video-id", required=True, help="YouTube video id from youtube-upload.")
     parser.add_argument("--title", default=None, help="The uploaded video's title (optional).")
     parser.add_argument("--url", default=None, help="Watch URL (optional; derived from id if omitted).")
+    parser.add_argument("--profile", default=None,
+                        help="YouTube account profile used for the upload (optional).")
+    parser.add_argument("--channel-id", default=None,
+                        help="YouTube channel id that owns the upload (optional).")
+    parser.add_argument("--replaces-video-id", default=None,
+                        help="Previous YouTube video id replaced by this upload (optional).")
     args = parser.parse_args()
 
     selection = merge_item_selection(args.items, None)
@@ -193,6 +199,12 @@ def mark_main() -> int:
         "title": args.title,
         "published_at": datetime.now(timezone.utc).isoformat(),
     }
+    optional_metadata = {
+        "profile": args.profile,
+        "channel_id": args.channel_id,
+        "replaces_video_id": args.replaces_video_id,
+    }
+    record.update({key: value for key, value in optional_metadata.items() if value is not None})
     replaced = [rec for rec in publish["published"] if rec.get("items") == names]
     publish["published"] = [rec for rec in publish["published"] if rec.get("items") != names]
     publish["published"].append(record)

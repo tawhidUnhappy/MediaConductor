@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -48,14 +49,14 @@ def parse_args() -> argparse.Namespace:
                         help="Scratch dir for the cached music bed (default: the pipeline work dir).")
     parser.add_argument("--music-volume-db", type=float, default=default_music_volume_db(),
                         help="How far the music sits below the narration, in dB (negative = quieter). The music "
-                             "stem is loudness-normalized to the narration's -14 LUFS reference first (see "
+                             "stem is loudness-aligned to the joined narration first (see "
                              "--no-music-loudnorm), so this value is a true LU separation regardless of how hot "
                              "the source track was mastered. Default -26 is the recommendation for dense, "
                              "wall-to-wall narration (recaps); -20 to -22 suits sparser voiceover, -28 is the "
                              "'inaudible on phone speakers' floor.")
     parser.add_argument("--no-music-loudnorm", action="store_true",
-                        help="Skip measuring the music's integrated loudness and aligning it to the -14 LUFS "
-                             "reference before applying --music-volume-db. With this flag the offset is applied "
+                        help="Skip measuring both stems and aligning music to narration before applying "
+                             "--music-volume-db. With this flag the offset is applied "
                              "to the raw file, so the effective separation depends on the track's mastering.")
     parser.add_argument("--condition-bed", action=argparse.BooleanOptionalAction, default=True,
                         help="Compress the music's dynamic range so it sits at a consistent level under the "
@@ -196,8 +197,19 @@ def resolve_default_input(output_root: Path, name: str) -> Path:
     return found
 
 
+def narration_loudness_reference(measured_lufs: float | None, narration_volume: float) -> float | None:
+    """Return voice loudness after the linear narration gain used by the mix."""
+    if narration_volume <= 0:
+        raise ValueError("--narration-volume must be positive.")
+    if measured_lufs is None:
+        return None
+    return measured_lufs + 20.0 * math.log10(narration_volume)
+
+
 def main() -> int:
     args = parse_args()
+    if args.narration_volume <= 0:
+        raise ValueError("--narration-volume must be positive.")
     name = project_name(args.project_root, args.project_name)
     video_in = (args.input or resolve_default_input(args.output_root, name)).resolve()
     if args.replace:
@@ -238,9 +250,9 @@ def main() -> int:
             elif cond_report.get("note"):
                 print(f"[music-condition] {cond_report['note']}", flush=True)
 
-    # Align the music stem to the -14 LUFS narration reference before the
-    # user's offset, so --music-volume-db is a true LU separation (a hot
-    # master and a quiet ambient track end up equally far under the voice).
+    # Align the music stem to the actual joined narration before the user's
+    # offset. The narration gain is included in the reference; final whole-
+    # mix normalization can then move both stems without changing separation.
     effective_volume_db = args.music_volume_db
     if not args.no_music_loudnorm:
         from mangaeasy.video_pipeline.music_bed import (
@@ -249,14 +261,24 @@ def main() -> int:
             music_loudnorm_pregain,
         )
 
-        measured = measure_integrated_lufs(music)
-        pregain = music_loudnorm_pregain(measured)
-        if measured is None:
+        narration_measured = measure_integrated_lufs(video_in)
+        narration_reference = narration_loudness_reference(narration_measured, args.narration_volume)
+        music_measured = measure_integrated_lufs(music)
+        reference = narration_reference if narration_reference is not None else MUSIC_LOUDNESS_REF
+        pregain = music_loudnorm_pregain(music_measured, reference)
+        if music_measured is None:
             print("[music-loudnorm] could not measure music loudness; applying the offset to the raw file", flush=True)
         else:
             effective_volume_db = args.music_volume_db + pregain
-            print(f"[music-loudnorm] music measured {measured:.1f} LUFS; pre-gain {pregain:+.1f} dB "
-                  f"to the {MUSIC_LOUDNESS_REF:g} LUFS reference -> effective volume "
+            if narration_reference is None:
+                print(f"[music-loudnorm] could not measure narration; using fallback reference "
+                      f"{MUSIC_LOUDNESS_REF:g} LUFS", flush=True)
+            else:
+                print(f"[music-loudnorm] narration measured {narration_measured:.1f} LUFS; "
+                      f"after {args.narration_volume:g}x gain the reference is "
+                      f"{narration_reference:.1f} LUFS", flush=True)
+            print(f"[music-loudnorm] music measured {music_measured:.1f} LUFS; pre-gain {pregain:+.1f} dB "
+                  f"to the {reference:g} LUFS reference -> effective volume "
                   f"{effective_volume_db:.1f} dB (a true {abs(args.music_volume_db):g} LU below narration)",
                   flush=True)
 

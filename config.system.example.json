@@ -10,6 +10,10 @@
     "file": null,
     "volume_db": -26
   },
+  "manga_video": {
+    "audio_source": "faded",
+    "audio_fade_ms": 8.0
+  },
   "video": {
     "width": 1920,
     "height": 1080,
@@ -33,8 +37,6 @@
   "audio": {
     "sample_rate": 48000,
     "channels": 1,
-    "fade_in_ms": 15,
-    "fade_out_ms": 220,
     "tail_silence_ms": 80
   },
   "paths": {

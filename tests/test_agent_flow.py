@@ -9,7 +9,7 @@ from PIL import Image
 
 from mangaeasy.download.mangadex import _chapter_sort_key, _slugify_project_name
 from mangaeasy.panels.style_detect import measure_item, verdict_from_stats
-from mangaeasy.series_plan import build_plan, load_publish_json, save_publish_json
+from mangaeasy.series_plan import build_plan, load_publish_json, mark_main, save_publish_json
 from mangaeasy.tools.setup import BASE_TOOLS, GPU_TOOLS, plan_tools
 from mangaeasy.video_pipeline.narration_check import check_item
 
@@ -171,3 +171,18 @@ def test_series_plan_readiness_requires_narration(tmp_path):
     root = _make_project(tmp_path, items, narrated=set(items[:6]))
     plan = build_plan(root, batch_size=12)
     assert plan["batches"][0]["ready_to_render"] is False
+
+
+def test_mark_published_records_account_and_replacement_provenance(tmp_path, monkeypatch):
+    root = _make_project(tmp_path, ["01", "02"], narrated={"01", "02"})
+    monkeypatch.setattr("sys.argv", [
+        "mediaconductor", "--project-root", str(root), "--items", "01-02",
+        "--video-id", "new-video", "--profile", "manga",
+        "--channel-id", "channel-123", "--replaces-video-id", "old-video",
+    ])
+
+    assert mark_main() == 0
+    record = load_publish_json(root)["published"][0]
+    assert record["profile"] == "manga"
+    assert record["channel_id"] == "channel-123"
+    assert record["replaces_video_id"] == "old-video"

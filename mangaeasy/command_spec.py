@@ -288,10 +288,19 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "items": {"type": "array", "items": {"type": "string"},
                    "description": "The batch's items, e.g. [\"01-12\"]."},
          "video_id": {**_STR, "description": "YouTube video id returned by youtube_upload."},
-         "title": _STR},
+         "title": _STR,
+         "url": {**_STR, "description": "Watch URL (derived from video_id when omitted)."},
+         "profile": {**_YOUTUBE_PROFILE,
+                     "description": "YouTube account profile used for the upload."},
+         "channel_id": {**_STR, "description": "YouTube channel id that owns the upload."},
+         "replaces_video_id": {**_STR,
+                               "description": "Previous YouTube video id replaced by this upload."}},
         ["project_root", "items", "video_id"],
         {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
-         "video_id": ("--video-id", "value"), "title": ("--title", "value")},
+         "video_id": ("--video-id", "value"), "title": ("--title", "value"),
+         "url": ("--url", "value"), "profile": ("--profile", "value"),
+         "channel_id": ("--channel-id", "value"),
+         "replaces_video_id": ("--replaces-video-id", "value")},
     ),
     "doctor": (
         "doctor",
@@ -406,17 +415,26 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "run_full_pipeline": (
         "video",
-        "The all-in-one pipeline: audio -> render -> optional join/normalize/BGM. VERY "
+        "The all-in-one pipeline: audio -> fade -> render -> optional join/BGM/final normalize. VERY "
         "LONG-RUNNING — prefer job_start. Prefer the single-step tools when iterating.",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR, "items": _ITEMS,
          "tts": {"type": "string", "enum": ["auto", "kokoro", "indextts"]},
          "speaker_wav": {**_STR, "description": "IndexTTS speaker reference WAV (defaults to "
                          "config.system.json -> tts.speaker_wav)."},
+         "skip_audio": {**_BOOL, "description": "Reuse existing narration WAVs instead of "
+                        "running TTS; the selected audio_source is still prepared and rendered."},
+         "audio_source": {"type": "string", "enum": ["raw", "faded"], "default": "faded",
+                          "description": "Narration source for rendering. 'faded' prepares a "
+                                         "separate edge-faded derivative; 'raw' preserves the "
+                                         "original waveform."},
+         "audio_fade_ms": {**_NUM, "exclusiveMinimum": 0, "default": 8.0,
+                           "description": "Fade duration at both edges of each narration WAV, "
+                                          "in milliseconds, when audio_source='faded'."},
          "build_long_video": _BOOL,
          "allow_gaps": {**_BOOL, "description": "Skip chapters genuinely missing from the source "
                         "when joining instead of failing."},
-         "normalize_audio": {**_BOOL, "description": "Loudness-normalize the joined long video "
-                             "for YouTube (-14 LUFS, two-pass) before music is added."},
+         "normalize_audio": {**_BOOL, "description": "Two-pass loudness-normalize the complete "
+                             "long-video mix for YouTube (-14 LUFS) after background music is added."},
          "overwrite_audio": {**_BOOL, "description": "Regenerate narration WAVs that already exist."},
          "overwrite_video": {**_BOOL, "description": "Re-render item videos that already exist — "
                              "REQUIRED after any panel/narration/audio change."},
@@ -430,6 +448,9 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "items": ("--items", "list"),
          "tts": ("--tts", "value"), "speaker_wav": ("--speaker-wav", "value"),
+         "skip_audio": ("--skip-audio", "flag"),
+         "audio_source": ("--audio-source", "value"),
+         "audio_fade_ms": ("--audio-fade-ms", "value"),
          "build_long_video": ("--build-long-video", "flag"),
          "allow_gaps": ("--allow-gaps", "flag"),
          "normalize_audio": ("--normalize-audio", "flag"),

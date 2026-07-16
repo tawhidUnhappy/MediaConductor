@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Changed
+
+- Manga-video production now defaults to separate `audio_faded` per-panel
+  derivatives with symmetric 8 ms edge fades; raw TTS WAVs remain untouched.
+  The long-video order is join → BGM → one final two-pass whole-mix normalize
+  at −14 LUFS / −1.5 dBTP. Any BGM change requires a new final normalization.
+- Clarified that `video-validate` is a structural gate and that visual,
+  narration-timing, edge-click, and final loudness/true-peak QA remain separate
+  release checks.
+- Documented replacement publishing: upload-first remains the safe default;
+  deletion-first is allowed only on an explicit user request and requires
+  profile/channel/video verification, publish-record replacement, and a final
+  live-listing check.
+
 ## 2.0.0 — 2026-07-15
 
 ### MediaConductor platform
@@ -132,11 +146,11 @@
     0 dBFS and fought the gain staging.
 - **Music loudness alignment in `video-add-bgm`** — the (conditioned) music
   stem's integrated loudness is measured (ffmpeg ebur128) and pre-gained to
-  the narration's −14 LUFS reference before `--music-volume-db` is applied,
-  so the offset is a true LU separation regardless of how hot the track was
-  mastered. Disable with `--no-music-loudnorm`. The default offset changed
-  −25 → **−22 dB** — the audio-engineering recommendation for dense,
-  wall-to-wall narration (recaps); sparser voiceover sits at −18…−20.
+  the narration reference before `--music-volume-db` is applied, so the
+  offset is a true LU separation regardless of how hot the track was mastered.
+  Disable with `--no-music-loudnorm`. The production default is **−26 dB**
+  for dense, wall-to-wall narration (recaps); sparser voiceover may use a less
+  negative value after listening and measuring.
 
 ### Fixed
 - `mangaeasy doctor` reported `gpu_backend: "cpu"` (and the app's Setup tab

@@ -154,6 +154,12 @@ def test_pregain_aligns_to_reference():
     assert music_loudnorm_pregain(-20.0) == 6.0
 
 
+def test_pregain_accepts_measured_narration_reference():
+    assert music_loudnorm_pregain(-20.0, reference_lufs=-18.0) == 2.0
+    # The one-argument API remains the fixed -14 LUFS fallback.
+    assert music_loudnorm_pregain(-20.0) == 6.0
+
+
 def test_pregain_clamps_and_handles_missing():
     assert music_loudnorm_pregain(None) == 0.0
     assert music_loudnorm_pregain(-60.0) == MAX_LOUDNORM_GAIN_DB

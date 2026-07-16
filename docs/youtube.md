@@ -154,6 +154,44 @@ mediaconductor youtube-logout --profile manga
 mediaconductor youtube-logout --profile manga --forget-client
 ```
 
+## Replace an uploaded video
+
+The normal low-risk order is upload the corrected file, verify its returned
+channel/video/privacy and live listing, then delete the old id. Deletion-first
+causes immediate downtime and is allowed only when the user explicitly requests
+that irreversible order.
+
+For an explicit deletion-first replacement:
+
+1. Verify identity before mutation:
+
+   ```bash
+   mediaconductor youtube-status --profile manga --verify --json
+   mediaconductor youtube-list --profile manga --limit 25 --json
+   ```
+
+   Match the live channel title/id and old video id/title exactly.
+2. Preview, confirm, and prove deletion:
+
+   ```bash
+   mediaconductor youtube-delete --profile manga --video-id OLD_ID
+   mediaconductor youtube-delete --profile manga --video-id OLD_ID --confirm --json
+   mediaconductor youtube-list --profile manga --limit 25 --json
+   ```
+
+3. Upload the fully reviewed replacement with the same explicit profile.
+   Verify the returned channel id, new video id, URL, privacy, thumbnail, and
+   its presence in `youtube-list`.
+4. Replace the matching mode/series publish record. For manga, call
+   `series-mark-published` with the replacement items and include profile,
+   channel id, and replaced video id when supported; then verify
+   `series-plan --json`. Do not leave `publish.json` pointing at the
+   deleted id.
+
+If deletion-first was not explicitly requested, perform step 3 before step 2.
+Never treat a successful delete as proof that the replacement upload will
+succeed.
+
 Logout removes only the selected profile's token/cache. On a named profile,
 `--forget-client` removes only its optional override. On `default`, it removes
 the shared root client, so other profiles without overrides cannot reauthorize

@@ -46,11 +46,9 @@ from mangaeasy.video_pipeline.audio_audit import ffprobe_duration
 
 Segment = Tuple[float, float]
 
-# Reference loudness the music stem is aligned to before the user's dB offset
-# is applied — the same target `video-normalize-audio` uses for narration
-# (−14 LUFS, YouTube's normalization point). With both stems on the same
-# footing, `--music-volume-db -19` is a true 19 LU separation no matter how
-# hot or quiet the source track was mastered.
+# Fallback reference when narration loudness cannot be measured. Normal mixes
+# pass the joined narration's measured loudness (including its configured
+# gain) so the requested music separation is relative to the actual voice.
 MUSIC_LOUDNESS_REF = -14.0
 # A pre-gain larger than this means the measurement or the file is suspect
 # (near-silent or clipping-hot source) — clamp instead of applying blindly.
@@ -309,15 +307,18 @@ def measure_integrated_lufs(path: Path) -> float | None:
         return None
 
 
-def music_loudnorm_pregain(measured_lufs: float | None) -> float:
-    """Static gain (dB) that brings the music stem to MUSIC_LOUDNESS_REF.
+def music_loudnorm_pregain(
+    measured_lufs: float | None,
+    reference_lufs: float = MUSIC_LOUDNESS_REF,
+) -> float:
+    """Static gain (dB) that brings the music stem to the reference.
 
     Clamped to ±MAX_LOUDNORM_GAIN_DB; 0.0 when measurement failed so the
     user's offset is applied to the raw file exactly as before.
     """
     if measured_lufs is None:
         return 0.0
-    gain = MUSIC_LOUDNESS_REF - measured_lufs
+    gain = reference_lufs - measured_lufs
     return max(-MAX_LOUDNORM_GAIN_DB, min(MAX_LOUDNORM_GAIN_DB, gain))
 
 
@@ -333,7 +334,7 @@ def music_loudnorm_pregain(measured_lufs: float | None) -> float:
 # level, then places it under the voice. `condition_bed()` bakes that
 # compression (plus a gentle dip in the 2-5 kHz speech-intelligibility band
 # so the music masks the voice less) into a cached copy; the caller then
-# measures *this* file and aligns it to the -14 LUFS reference, so the
+# measures *this* file and aligns it to the joined narration, so the
 # `--music-volume-db` offset stays a true, consistent LU separation.
 
 COND_COMPRESS_THRESHOLD_DB = -18.0

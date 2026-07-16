@@ -139,7 +139,10 @@ chapter-local folder, pass `--source-subdir <folder>` to `style-detect`,
 Generated output goes to separate roots you pass explicitly (recommended
 for agents — never rely on cwd defaults):
 
-- `--audio-root <dir>` → `<dir>/<project>/<item>/<panel>.wav` per-panel narration
+- `--audio-root <dir>` → `<dir>/<project>/<item>/<panel>.wav` raw per-panel
+  narration. Production rendering writes symmetric 8 ms edge-faded copies
+  under the sibling `<dir>_faded/<project>/...` tree and leaves raw TTS
+  untouched.
 - `--output-root <dir>` → `<dir>/<project>/items/item_<NN>.mp4` per-item videos
   and `<dir>/<project>/<project>_full_<timestamp>.mp4` joined long videos
 - `--work-dir <dir>` → scratch, safe to delete (`video-clean-work`)
@@ -156,11 +159,13 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
   `--music-volume-db -26`. The value is how far the music sits *below the
-  narration*: mixing never attenuates the narration track, so a long video
-  normalized to −14 LUFS stays at −14 LUFS after `video-add-bgm`. The music
-  stem is loudness-aligned to the same −14 LUFS reference before the offset
-  (disable with `--no-music-loudnorm`), so the number is a true LU
-  separation regardless of the track's mastering. For narration-driven
+  measured narration loudness* after the configured narration gain. The music
+  stem is aligned to that reference before the offset (disable with
+  `--no-music-loudnorm`), so the number is a true LU separation regardless
+  of the track's mastering. The full pipeline mixes BGM first, then performs
+  one final two-pass whole-mix normalization to −14 LUFS / −1.5 dBTP; that
+  last gain affects voice and music together and preserves their separation.
+  Any BGM change invalidates final normalization. For narration-driven
   recap videos (dense, wall-to-wall narration) the tuned value is
   **−26 (the default)**; sparser voiceover sits at −20 to −22;
   below −28 the bed is inaudible on phone speakers, above −15 it masks the
@@ -173,6 +178,12 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   it to 4 with a warning (`MANGAEASY_UNSAFE_GPU_WORKERS=1` overrides on
   tested hardware); default is safe.
 - Everything works CPU-only; GPU is an optimization, not a requirement.
+- Production manga renders default to `--audio-source faded` with a symmetric
+  8 ms fade-in and fade-out per panel. Use `--audio-source raw` only as an
+  intentional diagnostic comparison; never destructively process raw TTS.
+- `video-validate` is structural validation, not final media approval.
+  Separately inspect start/middle/end frames, check narration-to-panel timing,
+  audit faded WAV boundaries for clicks, and measure the final complete mix.
 
 ## 4. Background jobs (how to run anything long)
 
@@ -331,15 +342,19 @@ uv --project D:/MediaConductor run mediaconductor video-render --project-root "$
 uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" \
     --work-dir "$WORK" --item-range 01-12 --tts indextts \
     --build-long-video --normalize-audio \
-    --background-music /abs/path/music.mp3 --music-volume-db -25
+    --background-music /abs/path/music.mp3 --music-volume-db -26
 ```
 
 ### Re-mix only the background music (cheap — no re-render/re-join)
 
 ```bash
 uv --project D:/MediaConductor run mediaconductor video-add-bgm --project-root "$PROJ" --output-root "$OUT" \
+    --input /abs/path/joined.mp4 --output /abs/path/remixed.mp4 \
     --background-music /abs/path/other.mp3 --music-volume-db -26
-# writes a NEW timestamped *_bgm_* file; the clean join is untouched
+uv --project D:/MediaConductor run mediaconductor video-normalize-audio \
+    --input /abs/path/remixed.mp4 --replace --target-i -14 --target-tp -1.5
+# Pass both paths explicitly: standalone *_bgm_* outputs are not implicit join
+# candidates, and every music change requires a new final normalization pass.
 ```
 
 ### Resume an interrupted audio run

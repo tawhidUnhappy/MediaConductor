@@ -13,6 +13,8 @@ DEFAULT_SPEAKER_WAV = Path("media/speaker-reference.wav")
 DEFAULT_MUSIC_VOLUME_DB = -26.0
 DEFAULT_NARRATION_VOLUME = 1.2
 DEFAULT_TTS_ENGINE = "auto"
+DEFAULT_MANGA_VIDEO_AUDIO_SOURCE = "faded"
+DEFAULT_MANGA_VIDEO_AUDIO_FADE_MS = 8.0
 _MUSIC_EXTS = {".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 
 
@@ -57,6 +59,22 @@ def default_music_volume_db() -> float:
         return float(cfg.get("volume_db", DEFAULT_MUSIC_VOLUME_DB))
     except (TypeError, ValueError):
         return DEFAULT_MUSIC_VOLUME_DB
+
+
+def default_manga_video_audio_source() -> str:
+    """Return the safe manga-video audio derivative from system config."""
+    cfg = _system_config().get("manga_video", {})
+    value = str(cfg.get("audio_source", DEFAULT_MANGA_VIDEO_AUDIO_SOURCE)).strip().lower()
+    return value if value in {"raw", "faded"} else DEFAULT_MANGA_VIDEO_AUDIO_SOURCE
+
+
+def default_manga_video_audio_fade_ms() -> float:
+    cfg = _system_config().get("manga_video", {})
+    try:
+        value = float(cfg.get("audio_fade_ms", DEFAULT_MANGA_VIDEO_AUDIO_FADE_MS))
+    except (TypeError, ValueError):
+        return DEFAULT_MANGA_VIDEO_AUDIO_FADE_MS
+    return value if value > 0 else DEFAULT_MANGA_VIDEO_AUDIO_FADE_MS
 
 
 def configured_background_music() -> Path:

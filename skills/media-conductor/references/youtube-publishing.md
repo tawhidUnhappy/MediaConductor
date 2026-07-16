@@ -25,6 +25,32 @@ Before any publish operation:
 5. Publish only after the mode's rights, QA, disclosure, and explicit-user-
    approval gates. Record profile, channel id, and returned video id.
 
+## Replacing an existing upload
+
+The safe default is upload new → verify → delete old, which preserves a
+working public video if the replacement fails. Deletion-first is irreversible,
+creates immediate downtime, and is permitted only when the user explicitly
+requests that order.
+
+For an explicitly requested deletion-first replacement:
+
+1. Run `youtube-status --profile <name> --verify --json` and
+   `youtube-list --profile <name> --json`. Confirm the exact live channel
+   title/id and the old video id/title; never infer them from a cached profile
+   name alone.
+2. Preview `youtube-delete --profile <name> --video-id <old-id>`, then repeat
+   with `--confirm --json`. List again and prove the old id is absent.
+3. Upload the corrected, fully reviewed file with the same explicit profile.
+   Verify the returned channel id, new video id, URL, and privacy, and list the
+   channel again.
+4. Replace the matching publish record with the new id and include the profile,
+   channel id, and replaced video id when the mode supports those fields.
+   Verify the mode's plan/manifest now points to the replacement.
+
+If the user did not explicitly request deletion-first, upload and verify the
+replacement before performing step 2. A BGM change also requires a fresh final
+whole-mix normalization before either replacement sequence begins.
+
 One shared Google Cloud client authorizes all profiles, but each profile owns
 its distinct token/channel. Explicit authorization remains available:
 

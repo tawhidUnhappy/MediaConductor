@@ -80,6 +80,46 @@ def test_build_args_shapes():
     assert _build_args("install_tool", {"name": "kokoro-82m", "update": True}) == ["kokoro-82m", "--update"]
 
 
+def test_run_full_pipeline_exposes_fade_safe_audio_controls():
+    _cli, _description, properties, _required, _flags = mcp_server.TOOLS["run_full_pipeline"]
+    assert properties["skip_audio"]["type"] == "boolean"
+    assert properties["audio_source"]["enum"] == ["raw", "faded"]
+    assert properties["audio_source"]["default"] == "faded"
+    assert properties["audio_fade_ms"]["type"] == "number"
+    assert properties["audio_fade_ms"]["default"] == 8.0
+
+    args = _build_args("run_full_pipeline", {
+        "project_root": "/library/story",
+        "audio_root": "/audio",
+        "output_root": "/output",
+        "skip_audio": True,
+        "audio_source": "faded",
+        "audio_fade_ms": 8.0,
+    })
+    assert "--skip-audio" in args
+    assert args[args.index("--audio-source") + 1] == "faded"
+    assert args[args.index("--audio-fade-ms") + 1] == "8.0"
+
+
+def test_series_mark_published_exposes_replacement_provenance():
+    _cli, _description, properties, _required, _flags = mcp_server.TOOLS["series_mark_published"]
+    assert properties["profile"]["type"] == "string"
+    assert properties["channel_id"]["type"] == "string"
+    assert properties["replaces_video_id"]["type"] == "string"
+
+    args = _build_args("series_mark_published", {
+        "project_root": "/library/story",
+        "items": ["01-12"],
+        "video_id": "new-video",
+        "profile": "manga",
+        "channel_id": "channel-123",
+        "replaces_video_id": "old-video",
+    })
+    assert args[args.index("--profile") + 1] == "manga"
+    assert args[args.index("--channel-id") + 1] == "channel-123"
+    assert args[args.index("--replaces-video-id") + 1] == "old-video"
+
+
 def test_build_args_missing_required():
     with pytest.raises(ValueError):
         _build_args("library_list", {})
