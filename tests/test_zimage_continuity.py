@@ -82,9 +82,10 @@ def test_zimage_img2img_pipeline_reuses_loaded_components(monkeypatch):
 
     class Img2ImgPipeline:
         @classmethod
-        def from_pipe(cls, source):
+        def from_pipe(cls, source, torch_dtype=None):
             instance = cls()
             instance.source = source
+            instance.torch_dtype = torch_dtype
             return instance
 
     fake_diffusers.ZImagePipeline = TextPipeline
@@ -99,3 +100,6 @@ def test_zimage_img2img_pipeline_reuses_loaded_components(monkeypatch):
     )
 
     assert img2img_pipe.source is text_pipe
+    # from_pipe must pin the strategy dtype: it silently re-casts shared
+    # components (the fp32-VAE img2img crash) when left to its default.
+    assert img2img_pipe.torch_dtype == "float32"
