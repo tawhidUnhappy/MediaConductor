@@ -32,7 +32,7 @@ Keep `visual.prompt` anchored on `minimalistic sky`: a restrained sky gradient, 
 
 ## Font reproducibility
 
-The `@bundled/edosz.ttf` token resolves to MediaConductor's packaged Edo SZ asset, so a default install renders repeatably without a system-font dependency. Read `THIRD_PARTY_NOTICES.md` and `mangaeasy/assets/fonts/README.md` before distribution. The font's internal family name matches `font_name`, and FFmpeg/libass receives its containing directory through `fontsdir`.
+The `@bundled/edosz.ttf` token resolves to MediaConductor's packaged Edo SZ asset, so a default install renders repeatably without a system-font dependency. Read `THIRD_PARTY_NOTICES.md` and `mediaconductor/assets/fonts/README.md` before distribution. The font's internal family name matches `font_name`, and FFmpeg/libass receives its containing directory through `fontsdir`.
 
 A project may instead point `font_file` at another licensed `.ttf`, `.otf`, or `.ttc`; a relative path resolves from the directory containing `song.json`. Update `font_name` to that file's internal family name.
 

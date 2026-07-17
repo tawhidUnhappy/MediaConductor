@@ -1,6 +1,6 @@
 """Agent-style end-to-end smoke: drive a tiny fixture project through
 video-check → video-render over plain pipes (no PTY, no ML models), then
-find the output via the MANGAEASY_RESULT marker — exactly how an AI
+find the output via the MEDIACONDUCTOR_RESULT marker — exactly how an AI
 assistant is documented to use the CLI in docs/ai-guide.md."""
 
 import json
@@ -16,7 +16,7 @@ import pytest
 
 # Importing the CLI puts any vendored ffmpeg/ffprobe onto this process'
 # PATH (ensure_vendored_path), which the subprocesses below inherit.
-import mangaeasy.cli  # noqa: F401
+import mediaconductor.cli  # noqa: F401
 
 pytestmark = pytest.mark.skipif(
     shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
@@ -66,7 +66,7 @@ def fixture_project(tmp_path: Path) -> dict:
 
 def run_cli(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-m", "mangaeasy.cli", *args],
+        [sys.executable, "-m", "mediaconductor.cli", *args],
         capture_output=True, text=True, encoding="utf-8", timeout=600, env=os.environ.copy(),
     )
 
@@ -95,9 +95,9 @@ def test_check_then_render_end_to_end(fixture_project):
     )
     assert render.returncode == 0, render.stdout[-3000:] + render.stderr[-3000:]
 
-    result_lines = [ln for ln in render.stdout.splitlines() if ln.startswith("MANGAEASY_RESULT ")]
-    assert result_lines, "video-render must end with a MANGAEASY_RESULT line"
-    payload = json.loads(result_lines[-1][len("MANGAEASY_RESULT "):])
+    result_lines = [ln for ln in render.stdout.splitlines() if ln.startswith("MEDIACONDUCTOR_RESULT ")]
+    assert result_lines, "video-render must end with a MEDIACONDUCTOR_RESULT line"
+    payload = json.loads(result_lines[-1][len("MEDIACONDUCTOR_RESULT "):])
     assert payload["outputs"], payload
     out_file = Path(payload["outputs"][0])
     assert out_file.exists() and out_file.stat().st_size > 0

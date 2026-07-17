@@ -1,7 +1,7 @@
 # Installing the AI Tools
 
 The heavy AI models live in **isolated `uv` environments** so their
-torch/transformers stacks never conflict with the main `mangaeasy` install.
+torch/transformers stacks never conflict with the main `mediaconductor` install.
 `mediaconductor install-tool` provisions them from GitHub and Hugging Face.
 
 ```bash
@@ -12,7 +12,7 @@ mediaconductor doctor                     # check what's installed
 ```
 
 All tools go into the managed folder `<install folder>/.mangaeasy/tools` (override with
-`MANGAEASY_TOOLS_DIR`), so a globally-installed `mediaconductor` finds them from
+`MEDIACONDUCTOR_TOOLS_DIR`), so a globally-installed `mediaconductor` finds them from
 any working directory. Re-running an install resumes interrupted downloads.
 Installer-managed snapshots remain on their immutable manifest revisions.
 The lightweight Hugging Face downloader is also provisioned through `uvx` at
@@ -99,7 +99,7 @@ The installer therefore *authors* a small environment instead of cloning:
 1. Writes a minimal `pyproject.toml` (torch + transformers + pillow + numpy +
    einops + timm, with the torch build matching your hardware)
 2. Copies in `detect_magi.py` — the adapter MediaConductor calls for detection
-   (shipped inside the mangaeasy package)
+   (shipped inside the mediaconductor package)
 3. `uv sync` and verifies `transformers` imports
 
 The model code and weights download from the current Hugging Face default
@@ -108,7 +108,7 @@ immutable. Pass `--clone` if you also want the upstream
 `ragavsachdeva/magi` repo checked out for reference.
 
 Used by: panel detection in `mediaconductor page-split` (and anything calling
-`mangaeasy.panels.ai`).
+`mediaconductor.panels.ai`).
 
 ## deepseek-ocr2 (DeepSeek-OCR 2 panel/document OCR)
 

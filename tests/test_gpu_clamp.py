@@ -1,6 +1,6 @@
 """--gpu-workers is clamped in code, not just warned about in docs."""
 
-from mangaeasy.video_pipeline.common import GPU_WORKERS_SAFE_MAX, clamp_gpu_workers
+from mediaconductor.video_pipeline.common import GPU_WORKERS_SAFE_MAX, clamp_gpu_workers
 
 
 def test_safe_values_pass_through():
@@ -14,11 +14,11 @@ def test_zero_or_negative_becomes_one():
 
 
 def test_above_max_is_clamped(capsys, monkeypatch):
-    monkeypatch.delenv("MANGAEASY_UNSAFE_GPU_WORKERS", raising=False)
+    monkeypatch.delenv("MEDIACONDUCTOR_UNSAFE_GPU_WORKERS", raising=False)
     assert clamp_gpu_workers(8) == GPU_WORKERS_SAFE_MAX
     assert "clamped" in capsys.readouterr().err
 
 
 def test_unsafe_override(monkeypatch):
-    monkeypatch.setenv("MANGAEASY_UNSAFE_GPU_WORKERS", "1")
+    monkeypatch.setenv("MEDIACONDUCTOR_UNSAFE_GPU_WORKERS", "1")
     assert clamp_gpu_workers(8) == 8

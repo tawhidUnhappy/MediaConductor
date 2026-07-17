@@ -53,12 +53,12 @@ jobs:
         run: uv run --no-sync ruff check .
 
       - name: Compile package and release helpers
-        run: uv run --no-sync python -m compileall -q mangaeasy scripts
+        run: uv run --no-sync python -m compileall -q mediaconductor scripts
 
       - name: Test console entry points
         run: |
           uv run --no-sync mediaconductor --version
-          uv run --no-sync mangaeasy --version
+          uv run --no-sync mediaconductor --version
 
       - name: Smoke-test MCP protocol
         run: uv run --no-sync python scripts/smoke_mcp.py mediaconductor mcp

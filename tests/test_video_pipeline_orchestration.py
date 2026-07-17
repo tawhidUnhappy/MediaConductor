@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from mangaeasy import defaults
-from mangaeasy.video_pipeline import run_pipeline
+from mediaconductor import defaults
+from mediaconductor.video_pipeline import run_pipeline
 
 
 def _command_name(command: list[str]) -> str:

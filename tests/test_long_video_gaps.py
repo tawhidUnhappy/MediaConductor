@@ -7,7 +7,7 @@ strict mode treats an integer hole as a failed render; --allow-gaps skips it.
 
 from pathlib import Path
 
-from mangaeasy.video_pipeline.long_video_builder import ITEM_VIDEO_RE, included_chapters
+from mediaconductor.video_pipeline.long_video_builder import ITEM_VIDEO_RE, included_chapters
 
 
 def _chapters(*names: str) -> dict[str, Path]:

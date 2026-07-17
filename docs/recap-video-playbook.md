@@ -151,7 +151,7 @@ them in narration) and the last sheet for trailing promo panels.
 `mediaconductor webtoon-split` (previous section) instead.
 
 The repo ships a single-image adapter
-(`mangaeasy/assets/tools/detect_magi.py`, copied into the tool env by
+(`mediaconductor/assets/tools/detect_magi.py`, copied into the tool env by
 `install-tool`), but it reloads the model per call. For a whole chapter,
 load the model **once** and loop. Find the tool env via
 `mediaconductor tools --json`, then run this with the env's own python
@@ -205,7 +205,7 @@ poison everything downstream (narration written against images the viewer
 never sees correctly).
 
 Crop with the same reading-order algorithm the app uses
-(`_manga_reading_order()` in `mangaeasy/panels/ai.py` — RTL band-overlap
+(`_manga_reading_order()` in `mediaconductor/panels/ai.py` — RTL band-overlap
 topological sort). Working script (drop in a scratch dir):
 
 ```python
@@ -228,7 +228,7 @@ def clamp_box(raw, W, H):
     x2, y2 = max(0, min(x2, W)), max(0, min(y2, H))
     return {"x1": x1, "y1": y1, "x2": x2, "y2": y2} if x2 > x1 and y2 > y1 else None
 
-def reading_order(boxes):  # mirrors mangaeasy/panels/ai.py
+def reading_order(boxes):  # mirrors mediaconductor/panels/ai.py
     if len(boxes) <= 1: return list(boxes)
     cy = lambda b: (b["y1"] + b["y2"]) / 2; cx = lambda b: (b["x1"] + b["x2"]) / 2
     n = len(boxes); adj = {i: [] for i in range(n)}; deg = dict.fromkeys(range(n), 0)
@@ -459,7 +459,7 @@ mediaconductor video --project-root library/<Project> --items 01 \
   low for recaps (default 2) — wall-to-wall narration + a high ratio just
   makes the music uniformly quiet instead of dipping.
 - **Music QC is automatic** — `video-add-bgm` scans the track's 20 ms RMS
-  envelope before mixing (`mangaeasy/video_pipeline/music_bed.py`): splice
+  envelope before mixing (`mediaconductor/video_pipeline/music_bed.py`): splice
   holes (brief 25+ dB collapses mid-phrase — `silencedetect` can't see
   them) are cut out with short crossfades, silent lead/tail is trimmed,
   and when the track is defective or shorter than the video it's replaced
@@ -529,7 +529,7 @@ Then verify the actual MP4:
 ## Phase 8 — Chapter timestamps (exact, not guessed)
 
 Each panel is on screen for `ceil(wav_seconds × fps) / fps` (fps = 15,
-`frame_aligned_duration()` in `mangaeasy/video_pipeline/item_assets.py`),
+`frame_aligned_duration()` in `mediaconductor/video_pipeline/item_assets.py`),
 with no gaps. So cumulative WAV durations give frame-exact chapter marks:
 
 ```python

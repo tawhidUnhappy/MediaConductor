@@ -8,7 +8,7 @@ not a replacement for the upstream license files.
 ## Distributed with MediaConductor
 
 - **Edo SZ** by Vic Fieger is distributed as
-  `mangaeasy/assets/fonts/edosz.ttf`. The author labels the font "100% free"
+  `mediaconductor/assets/fonts/edosz.ttf`. The author labels the font "100% free"
   and permits personal, commercial, and charitable design use as well as
   inclusion in software; selling the font itself is prohibited. See the
   [font page](https://www.dafont.com/edo-sz.font) and the

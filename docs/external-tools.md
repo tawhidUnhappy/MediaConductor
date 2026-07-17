@@ -31,7 +31,7 @@ The resolver checks, in order:
    - `DEEPSEEK_OCR2_ROOT` (or `DEEPSEEK_OCR2_DIR`)
    - `Z_IMAGE_TURBO_ROOT` (or `Z_IMAGE_TURBO_DIR`)
 2. The managed tools dir: `<install folder>/.mangaeasy/tools/<name>`
-   (override with `MANGAEASY_TOOLS_DIR`)
+   (override with `MEDIACONDUCTOR_TOOLS_DIR`)
 If a tool has `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Unix),
 MediaConductor uses it directly. Otherwise it falls back to `uv run --project`.
 
@@ -97,7 +97,7 @@ mediaconductor video-audio
 ```
 
 Install with `mediaconductor install-tool kokoro-82m`. MediaConductor sends a manifest
-to `mangaeasy.video_pipeline.kokoro_batch_worker` and executes it inside the
+to `mediaconductor.video_pipeline.kokoro_batch_worker` and executes it inside the
 Kokoro environment. Its model is a legacy first-use download from the current
 Hub default revision, not an immutable installer snapshot.
 
@@ -118,7 +118,7 @@ readiness verifies every required checkpoint payload.
 
 ## MAGI v3 (panel detection)
 
-Used by panel detection when `MANGAEASY_EXTERNAL_MAGI` is not `0`.
+Used by panel detection when `MEDIACONDUCTOR_EXTERNAL_MAGI` is not `0`.
 
 The external MAGI environment must expose:
 
@@ -127,11 +127,11 @@ magi-v3/detect_magi.py
 ```
 
 `mediaconductor install-tool magi-v3` creates this automatically — the adapter ships
-inside the mangaeasy package (`mangaeasy/assets/tools/detect_magi.py`) and is
+inside the mediaconductor package (`mediaconductor/assets/tools/detect_magi.py`) and is
 copied into the tool folder. The `ragavsachdeva/magiv3` model code/weights
 download from the current Hugging Face default revision on the first run.
 
-Set `MANGAEASY_EXTERNAL_MAGI=0` only when the main package env has the `ml`
+Set `MEDIACONDUCTOR_EXTERNAL_MAGI=0` only when the main package env has the `ml`
 extra installed and you intentionally want in-process detection.
 
 ## DeepSeek-OCR 2
@@ -189,5 +189,5 @@ of 16. Prompts: English and Chinese, up to 512 tokens; long descriptive
 prompts (scene, subject, attire, lighting, composition) give the best
 results, and quoted text renders legibly in the image.
 
-On success the command prints `MANGAEASY_RESULT {"outputs": [...]}` with
+On success the command prints `MEDIACONDUCTOR_RESULT {"outputs": [...]}` with
 every generated file.

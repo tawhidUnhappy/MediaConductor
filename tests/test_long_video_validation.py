@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from mangaeasy.video_pipeline.long_video_builder import LongVideoConfig, validate_items_strict
+from mediaconductor.video_pipeline.long_video_builder import LongVideoConfig, validate_items_strict
 
 
 def make_project(tmp_path, items=("01", "02")):

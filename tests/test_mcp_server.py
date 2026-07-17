@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-import mangaeasy.mcp_server as mcp_server
-from mangaeasy.mcp_server import (
+import mediaconductor.mcp_server as mcp_server
+from mediaconductor.mcp_server import (
     MAX_BRIDGED_TEXT_BYTES,
     _bridge_inline_text,
     _build_args,
@@ -23,7 +23,7 @@ from mangaeasy.mcp_server import (
 def mcp_session(*messages: dict) -> list[dict]:
     stdin = "".join(json.dumps(m) + "\n" for m in messages)
     proc = subprocess.run(
-        [sys.executable, "-m", "mangaeasy.cli", "mcp"],
+        [sys.executable, "-m", "mediaconductor.cli", "mcp"],
         input=stdin, capture_output=True, text=True, encoding="utf-8", timeout=120,
     )
     return [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
@@ -146,7 +146,7 @@ def test_non_object_tool_arguments_return_invalid_params():
 
 
 def test_large_inline_story_uses_private_temp_file_and_cleans_up(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     story = "private opening\n" + ("scene continuity " * 20_000)
     original = {"project_root": "D:/stories/demo", "title": "Demo", "story": story}
 
@@ -167,7 +167,7 @@ def test_large_inline_story_uses_private_temp_file_and_cleans_up(tmp_path, monke
 
 
 def test_inline_text_bridge_is_bounded_and_creates_no_file_on_rejection(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     too_large = "x" * (MAX_BRIDGED_TEXT_BYTES + 1)
     with pytest.raises(ValueError, match="MCP text limit"):
         with _bridge_inline_text("song_init", {
@@ -180,7 +180,7 @@ def test_inline_text_bridge_is_bounded_and_creates_no_file_on_rejection(tmp_path
 
 def test_run_tool_bridges_lyrics_redacts_log_and_internal_path(
         tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     lyrics = "LYRICS_MUST_NOT_LEAK\n" + ("long chorus " * 10_000)
     captured: dict = {}
 
@@ -195,7 +195,7 @@ def test_run_tool_bridges_lyrics_redacts_log_and_internal_path(
             argv, 0, stdout='{"ok": true}\n', stderr=f"input was {path}",
         )
 
-    monkeypatch.setattr(mcp_server.subprocess, "run", fake_run)
+    monkeypatch.setattr(mcp_server.runtime, "run", fake_run)
     body, is_error = _run_tool("song_init", {
         "project_root": "D:/PRIVATE_PROJECT", "title": "PRIVATE_TITLE", "lyrics": lyrics,
     }, mode="song-video")
@@ -217,7 +217,7 @@ def test_run_tool_bridges_lyrics_redacts_log_and_internal_path(
 
 
 def test_bridge_temp_file_is_cleaned_when_child_launch_fails(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     captured = {}
 
     def failed_run(argv, **_kwargs):
@@ -226,7 +226,7 @@ def test_bridge_temp_file_is_cleaned_when_child_launch_fails(tmp_path, monkeypat
         assert path.exists()
         raise OSError("synthetic launch failure")
 
-    monkeypatch.setattr(mcp_server.subprocess, "run", failed_run)
+    monkeypatch.setattr(mcp_server.runtime, "run", failed_run)
     with pytest.raises(OSError, match="synthetic launch failure"):
         _run_tool("story_init", {
             "project_root": "D:/stories/demo", "title": "Demo", "story": "secret story",
@@ -238,7 +238,7 @@ def test_mcp_run_log_redacts_description_and_all_argv_values(monkeypatch, capsys
     def fake_run(argv, **_kwargs):
         return subprocess.CompletedProcess(argv, 0, stdout='{"ok": true}\n', stderr="")
 
-    monkeypatch.setattr(mcp_server.subprocess, "run", fake_run)
+    monkeypatch.setattr(mcp_server.runtime, "run", fake_run)
     _run_tool("youtube_upload", {
         "video": "D:/SECRET_VIDEO.mp4",
         "title": "SECRET_TITLE",
@@ -389,7 +389,7 @@ def test_public_mcp_server_rejects_outside_path_before_tool_launch(tmp_path):
     }
     proc = subprocess.run(
         [
-            sys.executable, "-m", "mangaeasy.cli", "mcp",
+            sys.executable, "-m", "mediaconductor.cli", "mcp",
             "--mode", "manga-video", "--allow-root", str(allowed),
         ],
         input=json.dumps(request) + "\n",

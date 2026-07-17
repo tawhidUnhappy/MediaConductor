@@ -4,15 +4,15 @@ import json
 
 import pytest
 
-from mangaeasy import command_spec
-from mangaeasy.song.lyrics import (
+from mediaconductor import command_spec
+from mediaconductor.song.lyrics import (
     DEFAULT_LYRICS_STYLE,
     align_lyrics,
     lyric_lines,
     write_alignment,
 )
-from mangaeasy.song import workflow
-from mangaeasy.song.workflow import DEFAULT_VISUAL_PROMPT, new_manifest, validate_manifest
+from mediaconductor.song import workflow
+from mediaconductor.song.workflow import DEFAULT_VISUAL_PROMPT, new_manifest, validate_manifest
 
 
 def _transcript(words):

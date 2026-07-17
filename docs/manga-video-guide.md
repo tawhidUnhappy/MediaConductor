@@ -68,14 +68,14 @@ server, not a GUI:
 ```
 
 To point a run at a specific data root (models, tools, projects), set
-`MANGAEASY_ROOT` before the command:
+`MEDIACONDUCTOR_ROOT` before the command:
 
 ```bash
-MANGAEASY_ROOT="/data/mediaconductor" ./MediaConductor/mediaconductor library-list \
-  --project-root "/data/mangaeasy/library" --json
+MEDIACONDUCTOR_ROOT="/data/mediaconductor" ./MediaConductor/mediaconductor library-list \
+  --project-root "/data/mediaconductor/library" --json
 ```
 
-Default data folders when `MANGAEASY_ROOT` is unset: Windows = next to the exe;
+Default data folders when `MEDIACONDUCTOR_ROOT` is unset: Windows = next to the exe;
 macOS = `~/Library/Application Support/mangaEasy`; Linux =
 `~/.local/share/mangaEasy`.
 
@@ -175,7 +175,7 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   the pro voiceover chain. Opt out per-stage with `--no-condition-bed`,
   `--no-eq-carve`, `--no-duck`.
 - `--gpu-workers` above 4 crashes consumer NVIDIA cards, so the CLI clamps
-  it to 4 with a warning (`MANGAEASY_UNSAFE_GPU_WORKERS=1` overrides on
+  it to 4 with a warning (`MEDIACONDUCTOR_UNSAFE_GPU_WORKERS=1` overrides on
   tested hardware); default is safe.
 - Everything works CPU-only; GPU is an optimization, not a requirement.
 - Production manga renders default to `--audio-source faded` with a symmetric
@@ -197,8 +197,8 @@ job runner — it works everywhere, including frozen installs:
 uv --project D:/MediaConductor run mediaconductor job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/example","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output","items":["01-12"],"tts":"auto","build_long_video":true,"normalize_audio":true,"no_background_music":true}'
 # -> {"ok": true, "job_id": "20260714-153000-video-a1b2c3d4", "poll": "mediaconductor job-status ..."}
 uv --project D:/MediaConductor run mediaconductor job-status 20260714-153000-video-a1b2c3d4 --json
-# -> status running/succeeded/failed/orphaned, exit_code, last MANGAEASY_PROGRESS,
-#    parsed MANGAEASY_RESULT, log tail
+# -> status running/succeeded/failed/orphaned, exit_code, last MEDIACONDUCTOR_PROGRESS,
+#    parsed MEDIACONDUCTOR_RESULT, log tail
 uv --project D:/MediaConductor run mediaconductor jobs --json
 ```
 
@@ -213,7 +213,7 @@ rejected.
 
 The job survives your session: a detached supervisor writes the exit code and
 final result into `<work>/jobs/<id>.json` (override dir with
-`MANGAEASY_JOBS_DIR` or `--jobs-dir`). If the machine slept or the supervisor
+`MEDIACONDUCTOR_JOBS_DIR` or `--jobs-dir`). If the machine slept or the supervisor
 was killed, `job-status` reports `orphaned` instead of a forever-"running" lie
 — re-run the command (pipeline steps resume/skip completed work). GPU tools
 block-buffer stdout, so an empty log tail on a running job is normal; trust
@@ -231,8 +231,8 @@ block-buffer stdout, so an empty log tail on a running job is normal; trust
   (`job-start` always prints one JSON object). Check the `ok` field where
   present.
 - **Marker lines** inside human output (grep for them, ignore the rest):
-  - `MANGAEASY_PROGRESS <n>/<total> [label]` — progress ticks.
-  - `MANGAEASY_RESULT {"outputs": ["<abs path>", ...]}` — final line of a
+  - `MEDIACONDUCTOR_PROGRESS <n>/<total> [label]` — progress ticks.
+  - `MEDIACONDUCTOR_RESULT {"outputs": ["<abs path>", ...]}` — final line of a
     successful generation command (`video`, `video-render`, `video-join`,
     `video-add-bgm`, `video-normalize-audio`, `download`, `webtoon-split`,
     `page-split`, `thumbnail-compose`, `setup`); tells you exactly what was
@@ -257,7 +257,7 @@ upload batches: what's next, what's published — see the recipe below), `mcp`.
 **External tools** — `index-tts`, `deepseek-ocr2`, `zimage` (Z-Image Turbo
 text-to-image: `uv --project D:/MediaConductor run mediaconductor zimage
 --prompt "..." --output out.png --width
-1280 --height 720 [--count 4] [--seed N]`; prints `MANGAEASY_RESULT` with
+1280 --height 720 [--count 4] [--seed N]`; prints `MEDIACONDUCTOR_RESULT` with
 the generated files; needs `install-tool z-image-turbo` once).
 
 **Video pipeline (the recommended workflow)** —
@@ -333,7 +333,7 @@ uv --project D:/MediaConductor run mediaconductor video-check  --project-root "$
 uv --project D:/MediaConductor run mediaconductor video-audio  --project-root "$PROJ" --audio-root "$AUDIO" --items 01
 uv --project D:/MediaConductor run mediaconductor video-render --project-root "$PROJ" --audio-root "$AUDIO" \
     --output-root "$OUT" --work-dir "$WORK" --items 01
-# → MANGAEASY_RESULT {"outputs": [".../items/item_01.mp4"], ...}
+# → MEDIACONDUCTOR_RESULT {"outputs": [".../items/item_01.mp4"], ...}
 ```
 
 ### Batch chapters → one long video with background music
@@ -392,7 +392,7 @@ uv --project D:/MediaConductor run mediaconductor youtube-profiles --json
 uv --project D:/MediaConductor run mediaconductor youtube-status --profile <profile> --verify --json
 uv --project D:/MediaConductor run mediaconductor youtube-upload --profile <profile> --video /abs/path/video.mp4 \
     --title "My Recap" --tags "manga,recap" --privacy private --json
-# → MANGAEASY_RESULT {"profile": "...", "video_id": "...", "url": "https://youtu.be/...", "privacy": "private"}
+# → MEDIACONDUCTOR_RESULT {"profile": "...", "video_id": "...", "url": "https://youtu.be/...", "privacy": "private"}
 ```
 
 Agent rules for uploads:
@@ -416,7 +416,7 @@ Agent rules for uploads:
 - Quota: one upload = 1,600 of 10,000 daily units (~6 uploads/day,
   resets midnight Pacific). A `quotaExceeded` error means wait, not retry.
 - Uploads are resumable and LONG-RUNNING; progress comes as
-  `MANGAEASY_PROGRESS <bytes>/<total>` lines.
+  `MEDIACONDUCTOR_PROGRESS <bytes>/<total>` lines.
 - `youtube-logout --profile <profile>` disconnects only that profile; never
   read or print the token files under
   `<data>/.mangaeasy/youtube/`.
@@ -425,20 +425,20 @@ Agent rules for uploads:
 
 | Variable | Meaning |
 |---|---|
-| `MANGAEASY_ROOT` | Override the data root (app root) — where models, tools, and projects live. Set it to run against a specific install's data. |
-| `MANGAEASY_HOME` | Override just the `.mangaeasy` data dir (default `<root>/.mangaeasy`). |
-| `MANGAEASY_TOOLS_DIR` | Override where AI tool envs live. |
-| `MANGAEASY_ITEMS_ROOT`, `MANGAEASY_AUDIO_ROOT`, `MANGAEASY_OUTPUT_ROOT`, `MANGAEASY_WORK_DIR` | Defaults for the corresponding `--*-root` flags (bare legacy names `PROJECT_ROOT`/`AUDIO_ROOT`/`OUTPUT_ROOT`/`WORK_DIR` still honoured). Agents should pass explicit flags instead. |
-| `MANGAEASY_JOBS_DIR` | Where `job-start` keeps job state/logs (default `<work>/jobs`). |
-| `MANGAEASY_UNSAFE_GPU_WORKERS` | `1` disables the `--gpu-workers` clamp at 4 (only on hardware tested higher). |
+| `MEDIACONDUCTOR_ROOT` | Override the data root (app root) — where models, tools, and projects live. Set it to run against a specific install's data. |
+| `MEDIACONDUCTOR_HOME` | Override just the `.mangaeasy` data dir (default `<root>/.mangaeasy`). |
+| `MEDIACONDUCTOR_TOOLS_DIR` | Override where AI tool envs live. |
+| `MEDIACONDUCTOR_ITEMS_ROOT`, `MEDIACONDUCTOR_AUDIO_ROOT`, `MEDIACONDUCTOR_OUTPUT_ROOT`, `MEDIACONDUCTOR_WORK_DIR` | Defaults for the corresponding `--*-root` flags (bare legacy names `PROJECT_ROOT`/`AUDIO_ROOT`/`OUTPUT_ROOT`/`WORK_DIR` still honoured). Agents should pass explicit flags instead. |
+| `MEDIACONDUCTOR_JOBS_DIR` | Where `job-start` keeps job state/logs (default `<work>/jobs`). |
+| `MEDIACONDUCTOR_UNSAFE_GPU_WORKERS` | `1` disables the `--gpu-workers` clamp at 4 (only on hardware tested higher). |
 | `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `DEEPSEEK_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT` | Point at externally-managed tool envs (rarely needed). |
-| `MANGAEASY_SHARE_CACHES` | `1` to let external-tool subprocesses inherit an ambient `HF_HOME`/`UV_CACHE_DIR`/… instead of the isolated ones (a shared cross-project cache). Off by default — see below. |
+| `MEDIACONDUCTOR_SHARE_CACHES` | `1` to let external-tool subprocesses inherit an ambient `HF_HOME`/`UV_CACHE_DIR`/… instead of the isolated ones (a shared cross-project cache). Off by default — see below. |
 
 HF/torch/uv caches for external-tool subprocesses are **force-pinned** under
 the data folder (`<data>/.mangaeasy/{hf_cache,torch_cache,uv_cache}`), so a
 global `HF_HOME`/`UV_CACHE_DIR` you exported for other tools can't scatter
 multi-GB model downloads outside the install folder — deleting the folder
-really does leave nothing behind. Set `MANGAEASY_SHARE_CACHES=1` to opt into
+really does leave nothing behind. Set `MEDIACONDUCTOR_SHARE_CACHES=1` to opt into
 a shared ambient cache instead (models already downloaded there are then
 reused rather than re-fetched under `.mangaeasy`).
 
@@ -451,12 +451,12 @@ uv --project D:/MediaConductor run mediaconductor mcp --mode manga-video --allow
 For a source checkout, register with `claude mcp add media-conductor-manga --
 uv --project D:/MediaConductor run mediaconductor mcp --mode manga-video --allow-root D:/MediaProjects` (or
 client config `{"command":"uv","args":["--project","D:/MediaConductor",
-"run","mediaconductor","mcp","--mode","manga-video","--allow-root","D:/MediaProjects"]}`; add `"env": {"MANGAEASY_ROOT":
+"run","mediaconductor","mcp","--mode","manga-video","--allow-root","D:/MediaProjects"]}`; add `"env": {"MEDIACONDUCTOR_ROOT":
 "..."}` to run against a specific install's data). The tool schemas come from
-the same table as `commands --json --full` (`mangaeasy/command_spec.py`), so
+the same table as `commands --json --full` (`mediaconductor/command_spec.py`), so
 CLI and MCP can't drift. Tool results are a JSON text block: `exit_code`,
 parsed `report` (for `--json` commands), parsed `result` (the
-`MANGAEASY_RESULT` payload), and clipped `output`.
+`MEDIACONDUCTOR_RESULT` payload), and clipped `output`.
 
 **Long-running tools must go through `job_start`** (returns a job id
 immediately) + `job_status` / `job_list` polling — a blocking `tools/call`
@@ -476,7 +476,7 @@ root. This is a same-user stdio guardrail, not an OS sandbox.
 | `video-render` "have no audio yet" | narration changed since audio was generated | `video-audio` again (skips existing), or `video-audio-audit --fix` first |
 | Long join fails validation | items missing audio/video | `video-check --json`, fix reported items |
 | Output seems stale/missing | it was archived | look in `old/run_NNNN/` next to the output; `audio-takes-list` for audio |
-| GPU crash with many workers | too many CUDA contexts | the CLI clamps `--gpu-workers` at 4; unset `MANGAEASY_UNSAFE_GPU_WORKERS` |
+| GPU crash with many workers | too many CUDA contexts | the CLI clamps `--gpu-workers` at 4; unset `MEDIACONDUCTOR_UNSAFE_GPU_WORKERS` |
 | Slow first model run | models downloading to the data folder | expected once; offline afterwards |
 | `unknown command` | typo | the error suggests near-matches; see `uv --project D:/MediaConductor run mediaconductor commands --mode manga-video --json --full` |
 

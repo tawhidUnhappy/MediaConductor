@@ -4,9 +4,9 @@ and the work-qa fix-until-clean loop small models drive."""
 import json
 from datetime import timedelta
 
-from mangaeasy.audio.emotion import emotion_lint, indextts_kwargs, narration_emotion
-from mangaeasy.qa_loop import qa_item
-from mangaeasy.workboard import (
+from mediaconductor.audio.emotion import emotion_lint, indextts_kwargs, narration_emotion
+from mediaconductor.qa_loop import qa_item
+from mediaconductor.workboard import (
     _iso,
     _utcnow,
     acquire_claim,
@@ -193,7 +193,7 @@ def test_emotion_field_contract():
 
 
 def test_respect_claims_gate_blocks_only_live_foreign_claims(tmp_path):
-    from mangaeasy.workboard import respect_claims_gate
+    from mediaconductor.workboard import respect_claims_gate
 
     root = tmp_path / "proj"
     make_item(root, "05")

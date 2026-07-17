@@ -54,9 +54,9 @@ Machine-readable conventions remain stable for 2.x compatibility:
 
 - Exit code `0` means success, `1` means validation/runtime failure, `2` means
   invalid CLI use, and `3` means an artifact exists but QA approval is needed.
-- Generation emits `MANGAEASY_RESULT {...}` and progress emits
-  `MANGAEASY_PROGRESS current/total label`.
-- `MANGAEASY_ROOT` and the other `MANGAEASY_*` names remain supported so old
+- Generation emits `MEDIACONDUCTOR_RESULT {...}` and progress emits
+  `MEDIACONDUCTOR_PROGRESS current/total label`.
+- `MEDIACONDUCTOR_ROOT` and the other `MEDIACONDUCTOR_*` names remain supported so old
   installations do not silently move large model caches.
 - The legacy equivalents `mangaeasy where --json`,
   `mediaconductor commands --json`, and `mediaconductor mcp` remain available.

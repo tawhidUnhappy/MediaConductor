@@ -7,11 +7,11 @@ import json
 import pytest
 from PIL import Image
 
-from mangaeasy.download.mangadex import _chapter_sort_key, _slugify_project_name
-from mangaeasy.panels.style_detect import measure_item, verdict_from_stats
-from mangaeasy.series_plan import build_plan, load_publish_json, mark_main, save_publish_json
-from mangaeasy.tools.setup import BASE_TOOLS, GPU_TOOLS, plan_tools
-from mangaeasy.video_pipeline.narration_check import check_item
+from mediaconductor.download.mangadex import _chapter_sort_key, _slugify_project_name
+from mediaconductor.panels.style_detect import measure_item, verdict_from_stats
+from mediaconductor.series_plan import build_plan, load_publish_json, mark_main, save_publish_json
+from mediaconductor.tools.setup import BASE_TOOLS, GPU_TOOLS, plan_tools
+from mediaconductor.video_pipeline.narration_check import check_item
 
 
 # ── setup planning ──────────────────────────────────────────────────────────

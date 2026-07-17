@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import time
 
-from mangaeasy.images.thumbnail_compose import block_arrow_polygon
-from mangaeasy.panels.cutcheck import parse_forced_cuts, window_bounds
-from mangaeasy.panels.remap import is_regular_panel, map_spans
-from mangaeasy.video_pipeline.check_items import is_speakable
-from mangaeasy.video_pipeline.item_video_builder import stale_reason
+from mediaconductor.images.thumbnail_compose import block_arrow_polygon
+from mediaconductor.panels.cutcheck import parse_forced_cuts, window_bounds
+from mediaconductor.panels.remap import is_regular_panel, map_spans
+from mediaconductor.video_pipeline.check_items import is_speakable
+from mediaconductor.video_pipeline.item_video_builder import stale_reason
 
 
 def _span(file, top, bottom):

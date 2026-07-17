@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from mangaeasy.tools.smoke import NARRATION, build_fixture_project
+from mediaconductor.tools.smoke import NARRATION, build_fixture_project
 
 
 def test_build_fixture_project_layout(tmp_path):

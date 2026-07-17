@@ -1,8 +1,8 @@
 """Shard-aware resume pruning: with --gpu-workers > 1 each shard has its own
 in-progress boundary, and pruning must respect it (see CLAUDE.md)."""
 
-from mangaeasy.utils import LazyArchiveRunDir
-from mangaeasy.video_pipeline.common import prune_recent_audio_for_resume
+from mediaconductor.utils import LazyArchiveRunDir
+from mediaconductor.video_pipeline.common import prune_recent_audio_for_resume
 
 
 def make_paths(tmp_path, count, existing):

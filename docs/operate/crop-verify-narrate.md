@@ -100,7 +100,7 @@ Semantics under the hood (what the tool writes):
   repositioned cut.
 - `replace` swaps an item's whole range list (hand-edit only).
 
-Implementation: [mangaeasy/panels/webtoon.py](../../mangaeasy/panels/webtoon.py).
+Implementation: [mediaconductor/panels/webtoon.py](../../mediaconductor/panels/webtoon.py).
 
 ## Step 1B — Crop **paged manga** (`page-split`)
 
@@ -143,7 +143,7 @@ Overlapping override boxes are fine and often correct — for a diagonal panel
 border, overlap beats clipping a speech bubble. Re-run `page-split` for just
 that item; it re-detects but your override wins for the listed pages.
 
-Implementation: [mangaeasy/panels/page.py](../../mangaeasy/panels/page.py).
+Implementation: [mediaconductor/panels/page.py](../../mediaconductor/panels/page.py).
 MAGI env pins live in [the magi-v3 notes](../../CLAUDE.md) and are baked into
 `batch_detect_magi.py`.
 
@@ -301,7 +301,7 @@ Rules that hold across the pipeline:
 
 The full scriptwriting spec — speaker identification, speech types, tone — is
 the narration prompt at
-[mangaeasy/assets/prompts/narration.md](../../mangaeasy/assets/prompts/narration.md).
+[mediaconductor/assets/prompts/narration.md](../../mediaconductor/assets/prompts/narration.md).
 Feed it plus the panel images to an LLM, or write by hand.
 
 Validate before spending GPU time:
@@ -356,12 +356,12 @@ the video** (audio → render → join → BGM → thumbnail → upload).
 
 | Command | Role | Source |
 |---|---|---|
-| `webtoon-split` | crop vertical strips + verify sheets + ranges manifest | [panels/webtoon.py](../../mangaeasy/panels/webtoon.py) |
-| `webtoon-cutcheck` | full-res review windows for every forced cut / short panel | [panels/cutcheck.py](../../mangaeasy/panels/cutcheck.py) |
-| `webtoon-override` | build the overrides file with auto-resolved indices | [panels/overrides_tool.py](../../mangaeasy/panels/overrides_tool.py) |
-| `narration-edit` | upsert/delete narration lines + prune stale WAVs | [video_pipeline/narration_edit.py](../../mangaeasy/video_pipeline/narration_edit.py) |
-| `panels-remap` | carry narration + audio across a re-crop | [panels/remap.py](../../mangaeasy/panels/remap.py) |
-| `page-split` | crop paged manga (MAGI v3) + verify sheets | [panels/page.py](../../mangaeasy/panels/page.py) |
-| `panel-transcript` | OCR every panel to ground narration/speakers | [ocr/panel_transcript.py](../../mangaeasy/ocr/panel_transcript.py) |
-| `narration-review-sheets` | panel + narration + OCR sheets for semantic QA | [video_pipeline/narration_sheets.py](../../mangaeasy/video_pipeline/narration_sheets.py) |
-| `video-check` | validate item inputs before building (incl. unspeakable text) | [video_pipeline/check_items.py](../../mangaeasy/video_pipeline/check_items.py) |
+| `webtoon-split` | crop vertical strips + verify sheets + ranges manifest | [panels/webtoon.py](../../mediaconductor/panels/webtoon.py) |
+| `webtoon-cutcheck` | full-res review windows for every forced cut / short panel | [panels/cutcheck.py](../../mediaconductor/panels/cutcheck.py) |
+| `webtoon-override` | build the overrides file with auto-resolved indices | [panels/overrides_tool.py](../../mediaconductor/panels/overrides_tool.py) |
+| `narration-edit` | upsert/delete narration lines + prune stale WAVs | [video_pipeline/narration_edit.py](../../mediaconductor/video_pipeline/narration_edit.py) |
+| `panels-remap` | carry narration + audio across a re-crop | [panels/remap.py](../../mediaconductor/panels/remap.py) |
+| `page-split` | crop paged manga (MAGI v3) + verify sheets | [panels/page.py](../../mediaconductor/panels/page.py) |
+| `panel-transcript` | OCR every panel to ground narration/speakers | [ocr/panel_transcript.py](../../mediaconductor/ocr/panel_transcript.py) |
+| `narration-review-sheets` | panel + narration + OCR sheets for semantic QA | [video_pipeline/narration_sheets.py](../../mediaconductor/video_pipeline/narration_sheets.py) |
+| `video-check` | validate item inputs before building (incl. unspeakable text) | [video_pipeline/check_items.py](../../mediaconductor/video_pipeline/check_items.py) |

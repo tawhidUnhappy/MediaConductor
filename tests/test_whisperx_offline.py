@@ -8,8 +8,8 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from mangaeasy.tools import install
-from mangaeasy.tools import whisperx as whisperx_cli
+from mediaconductor.tools import install
+from mediaconductor.tools import whisperx as whisperx_cli
 
 
 def _load_adapter():
@@ -105,7 +105,7 @@ def test_whisperx_cli_forwards_and_applies_minimum_confidence(
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(whisperx_cli, "resolve_tool_dir", lambda *_args, **_kwargs: tool_dir)
-    monkeypatch.setattr(whisperx_cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(whisperx_cli.runtime, "run", fake_run)
     monkeypatch.setattr(
         sys,
         "argv",

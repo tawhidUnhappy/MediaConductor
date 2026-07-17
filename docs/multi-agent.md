@@ -117,7 +117,7 @@ IndexTTS2 blends into the cloned voice for that one line
 ```
 
 - The vocabulary and usage rules live in
-  [../mangaeasy/assets/prompts/narration.md](../mangaeasy/assets/prompts/narration.md):
+  [../mediaconductor/assets/prompts/narration.md](../mediaconductor/assets/prompts/narration.md):
   use it sparingly (reveals, battle cries, goodbyes); most lines stay
   neutral.
 - Engine-portable: Kokoro simply ignores the field. Older IndexTTS2 builds

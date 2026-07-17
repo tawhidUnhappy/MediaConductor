@@ -4,8 +4,8 @@ in their own panel order on the same machine — no install-wide guess."""
 
 import json
 
-from mangaeasy.download.mangadex import merge_manga_record
-from mangaeasy.panels.direction import direction_for_language, project_reading_direction
+from mediaconductor.download.mangadex import merge_manga_record
+from mediaconductor.panels.direction import direction_for_language, project_reading_direction
 
 
 def test_language_to_direction_mapping():

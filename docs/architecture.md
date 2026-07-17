@@ -6,29 +6,29 @@ package and optional external AI tools, all driven through one primary CLI.
 ## One command
 
 Everything is reachable through the `mediaconductor` entry point
-(`mangaeasy.cli:main`; `mangaeasy` remains a 2.x alias). It is a thin
+(`mediaconductor.cli:main`; `mangaeasy` remains a 2.x alias). It is a thin
 dispatcher: it maps a subcommand name to a
 module and calls that module's `main()`, importing the module **lazily** so
 `mediaconductor --help` never pulls in heavy optional dependencies.
 
 ```text
-mediaconductor <command> [args...]  ->  mangaeasy.<area>.<module>:main()
+mediaconductor <command> [args...]  ->  mediaconductor.<area>.<module>:main()
 ```
 
 ## Main package
 
 The main package contains:
 
-- General item-based video pipeline in `mangaeasy.video_pipeline`
-- Acquisition and cropping in `mangaeasy.download`, `mangaeasy.panels`,
-  `mangaeasy.ocr`; image utilities in `mangaeasy.images`
+- General item-based video pipeline in `mediaconductor.video_pipeline`
+- Acquisition and cropping in `mediaconductor.download`, `mediaconductor.panels`,
+  `mediaconductor.ocr`; image utilities in `mediaconductor.images`
 - Command schemas shared by MCP and `commands --json --full` in
-  `mangaeasy.command_spec`; detached background jobs in `mangaeasy.jobs`
-- External tool lookup/wrappers in `mangaeasy.tools`
-- Agent-facing prompts and in-tool-env scripts in `mangaeasy/assets/`
+  `mediaconductor.command_spec`; detached background jobs in `mediaconductor.jobs`
+- External tool lookup/wrappers in `mediaconductor.tools`
+- Agent-facing prompts and in-tool-env scripts in `mediaconductor/assets/`
 
 The default workspace root is the current working directory. Set
-`MANGAEASY_PROJECT_ROOT` to run commands against another folder.
+`MEDIACONDUCTOR_PROJECT_ROOT` to run commands against another folder.
 
 ## External tools
 
@@ -80,6 +80,6 @@ Video:
 
 ## Package data
 
-`mangaeasy/assets/` ships only agent-facing prompts (`prompts/narration.md`)
+`mediaconductor/assets/` ships only agent-facing prompts (`prompts/narration.md`)
 and standalone scripts executed inside the external tool envs (`tools/`).
 The old Flask templates/static files were removed with the GUI.

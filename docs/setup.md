@@ -103,7 +103,7 @@ GPU-aware and profile-driven — what gets installed, in order:
    | `whisperx` | Song Video | offline English lyric timing | model-dependent |
 
 4. **Readiness report** — the same data as `mediaconductor doctor --json`, plus
-   a `MANGAEASY_RESULT` line with per-tool ok/failed status.
+   a `MEDIACONDUCTOR_RESULT` line with per-tool ok/failed status.
 
 Useful variants:
 
@@ -210,10 +210,10 @@ produced for a real channel usually want:
 
 Self-contained by design: tool envs and model caches under `.mangaeasy/`
 (HF/torch/uv caches are force-pinned there — a global `HF_HOME` will NOT
-leak downloads elsewhere; set `MANGAEASY_SHARE_CACHES=1` if you want shared
+leak downloads elsewhere; set `MEDIACONDUCTOR_SHARE_CACHES=1` if you want shared
 caches; see [external-tools.md](external-tools.md)), projects under
 `library/`, generated output under `audio/`, `output/`, `work/`. Deleting
-the folder removes everything. `MANGAEASY_ROOT` relocates the data root.
+the folder removes everything. `MEDIACONDUCTOR_ROOT` relocates the data root.
 
 ### After setup
 

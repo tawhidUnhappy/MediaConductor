@@ -7,7 +7,7 @@ description: Route MediaConductor requests to one isolated production skill and 
 
 1. Choose one invocation form and call it `<mc>`:
    - Source checkout: locate the absolute root containing `pyproject.toml` and
-     `mangaeasy/`, run `uv sync --project <repo>`, and use
+     `mediaconductor/`, run `uv sync --project <repo>`, and use
      `uv --project <repo> run mediaconductor`.
    - Global/wheel install: use `mediaconductor` directly.
    - Frozen archive: use the absolute `mediaconductor` executable supplied by

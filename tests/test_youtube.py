@@ -7,24 +7,24 @@ import sys
 
 import pytest
 
-from mangaeasy.mcp_server import _build_args
-from mangaeasy.youtube import store
-from mangaeasy.youtube.upload import build_metadata, content_range, friendly_api_error, parse_tags
+from mediaconductor.mcp_server import _build_args
+from mediaconductor.youtube import store
+from mediaconductor.youtube.upload import build_metadata, content_range, friendly_api_error, parse_tags
 
 
 def run_cli(env_home, *args: str) -> subprocess.CompletedProcess:
     import os
 
     env = os.environ.copy()
-    env["MANGAEASY_HOME"] = str(env_home)
+    env["MEDIACONDUCTOR_HOME"] = str(env_home)
     return subprocess.run(
-        [sys.executable, "-m", "mangaeasy.cli", *args],
+        [sys.executable, "-m", "mediaconductor.cli", *args],
         capture_output=True, text=True, encoding="utf-8", env=env, timeout=120,
     )
 
 
 def test_status_snapshot_disconnected(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     snapshot = store.status_snapshot()
     assert snapshot["connected"] is False
     assert snapshot["client_secrets_present"] is False
@@ -33,7 +33,7 @@ def test_status_snapshot_disconnected(tmp_path, monkeypatch):
 
 
 def test_status_snapshot_connected(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     store.write_json(store.token_path(), {"refresh_token": "r", "scopes": store.SCOPES})
     store.write_json(store.channel_cache_path(), {"id": "UC123", "title": "My Channel"})
     snapshot = store.status_snapshot()
@@ -116,7 +116,7 @@ def test_mcp_status_args():
 
 
 def test_named_profile_paths_are_isolated_and_default_is_legacy_compatible(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
 
     assert store.profile_dir() == tmp_path / "youtube"
     assert store.token_path() == tmp_path / "youtube" / "token.json"
@@ -133,7 +133,7 @@ def test_named_profile_paths_are_isolated_and_default_is_legacy_compatible(tmp_p
 
 
 def test_named_profile_prefers_override_then_falls_back_to_shared_client(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     shared = store.shared_client_secret_path()
     store.write_json(shared, {"installed": {"client_id": "shared"}})
 
@@ -167,7 +167,7 @@ def test_cli_rejects_profile_traversal_before_file_access(tmp_path):
 
 
 def test_named_profile_directory_rejects_symlink_alias(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     profiles = tmp_path / "youtube" / "profiles"
     real = profiles / "real"
     real.mkdir(parents=True)
@@ -192,7 +192,7 @@ def test_youtube_store_root_rejects_symlink_or_reparse_escape(tmp_path, monkeypa
         root.symlink_to(outside, target_is_directory=True)
     except OSError:
         pytest.skip("directory symlinks are not available on this host")
-    monkeypatch.setenv("MANGAEASY_HOME", str(home))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(home))
 
     with pytest.raises(ValueError, match="credential store.*symlink or reparse"):
         store.profile_dir()
@@ -211,7 +211,7 @@ def test_named_profiles_root_rejects_symlink_or_reparse_escape(tmp_path, monkeyp
         profiles.symlink_to(outside, target_is_directory=True)
     except OSError:
         pytest.skip("directory symlinks are not available on this host")
-    monkeypatch.setenv("MANGAEASY_HOME", str(home))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(home))
 
     with pytest.raises(ValueError, match="profiles directory.*symlink or reparse"):
         store.profile_dir("song")
@@ -222,7 +222,7 @@ def test_named_profiles_root_rejects_symlink_or_reparse_escape(tmp_path, monkeyp
 def test_credential_leaf_rejects_symlink_and_write_json_rejects_outside_path(
     tmp_path, monkeypatch,
 ):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "home"))
     root = store.youtube_dir()
     root.mkdir(parents=True)
     outside = tmp_path / "outside-token.json"
@@ -240,7 +240,7 @@ def test_credential_leaf_rejects_symlink_and_write_json_rejects_outside_path(
 
 
 def test_profile_listing_is_machine_readable_and_does_not_leak_tokens(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     store.write_json(store.token_path("manga"), {"refresh_token": "manga-secret"})
     store.write_json(store.channel_cache_path("manga"), {"id": "UCM", "title": "Manga Channel"})
     store.write_client_config(
@@ -263,7 +263,7 @@ def test_profile_listing_is_machine_readable_and_does_not_leak_tokens(tmp_path, 
 
 def test_status_selects_named_profile_without_touching_default(tmp_path, monkeypatch):
     # Populate only a named account. The legacy default must remain disconnected.
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     store.write_json(store.token_path("ai-story"), {"refresh_token": "r"})
     store.write_json(store.channel_cache_path("ai-story"),
                      {"id": "UCAI", "title": "Story Channel"})
@@ -335,11 +335,11 @@ def test_mcp_profile_mappings_and_validation():
 
 
 def test_upload_json_identifies_selected_profile_and_channel(tmp_path, monkeypatch, capsys):
-    from mangaeasy.youtube import auth, upload
+    from mediaconductor.youtube import auth, upload
 
     video = tmp_path / "video.mp4"
     video.write_bytes(b"video")
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(auth, "load_credentials", lambda profile: object())
     monkeypatch.setattr(auth, "_fetch_channel",
                         lambda _creds: {"id": "UCSONG", "title": "Song Channel"})
@@ -363,13 +363,13 @@ def test_upload_json_identifies_selected_profile_and_channel(tmp_path, monkeypat
 def test_upload_thumbnail_reauthorizes_and_retries_once_on_401(
     tmp_path, monkeypatch, capsys,
 ):
-    from mangaeasy.youtube import auth, upload
+    from mediaconductor.youtube import auth, upload
 
     video = tmp_path / "video.mp4"
     thumbnail = tmp_path / "thumbnail.png"
     video.write_bytes(b"video")
     thumbnail.write_bytes(b"image")
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "home"))
     initial_credentials = object()
     replacement_credentials = object()
     browser_calls = []
@@ -417,9 +417,9 @@ def test_upload_thumbnail_reauthorizes_and_retries_once_on_401(
 
 
 def test_live_verify_drops_stale_channel_identity(tmp_path, monkeypatch):
-    from mangaeasy.youtube import auth
+    from mediaconductor.youtube import auth
 
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     store.write_json(store.token_path("song"), {"refresh_token": "r"})
     store.write_json(store.channel_cache_path("song"), {"id": "OLD", "title": "Old Channel"})
     monkeypatch.setattr(auth, "load_credentials", lambda _profile: object())
@@ -432,9 +432,9 @@ def test_live_verify_drops_stale_channel_identity(tmp_path, monkeypatch):
 
 
 def test_ensure_credentials_auto_authorizes_missing_and_failed_refresh(tmp_path, monkeypatch):
-    from mangaeasy.youtube import auth
+    from mediaconductor.youtube import auth
 
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     sentinel = object()
     calls = []
     monkeypatch.setattr(auth, "authorize_profile",
@@ -451,9 +451,9 @@ def test_ensure_credentials_auto_authorizes_missing_and_failed_refresh(tmp_path,
 
 
 def test_no_auto_auth_never_calls_browser_helper(tmp_path, monkeypatch):
-    from mangaeasy.youtube import auth
+    from mediaconductor.youtube import auth
 
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     monkeypatch.setattr(auth, "load_credentials", lambda _profile: None)
     monkeypatch.setattr(
         auth, "authorize_profile",
@@ -467,9 +467,9 @@ def test_no_auto_auth_never_calls_browser_helper(tmp_path, monkeypatch):
 def test_authorize_profile_reuses_shared_client_but_writes_isolated_tokens(
         tmp_path, monkeypatch, capsys):
     from google_auth_oauthlib.flow import InstalledAppFlow
-    from mangaeasy.youtube import auth
+    from mediaconductor.youtube import auth
 
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     shared = store.shared_client_secret_path()
     store.write_json(shared, {"installed": {"client_id": "shared-client"}})
     opened_with = []
@@ -510,9 +510,9 @@ def test_authorize_profile_reuses_shared_client_but_writes_isolated_tokens(
 
 
 def test_api_auth_rejection_triggers_one_browser_reauthorization(tmp_path, monkeypatch):
-    from mangaeasy.youtube import auth
+    from mediaconductor.youtube import auth
 
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     class Unauthorized:
         status_code = 401
 
@@ -535,9 +535,9 @@ def test_api_auth_rejection_triggers_one_browser_reauthorization(tmp_path, monke
 
 
 def test_live_verify_continues_after_automatic_authorization(tmp_path, monkeypatch):
-    from mangaeasy.youtube import auth
+    from mediaconductor.youtube import auth
 
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     store.write_json(store.shared_client_secret_path(), {"installed": {"client_id": "shared"}})
     credentials = object()
     monkeypatch.setattr(auth, "ensure_credentials", lambda _profile, auto_auth: credentials)
@@ -550,7 +550,7 @@ def test_live_verify_continues_after_automatic_authorization(tmp_path, monkeypat
 
 
 def test_write_client_config_shape(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANGAEASY_HOME", str(tmp_path))
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     store.write_client_config("abc.apps.googleusercontent.com", "GOCSPX-xyz")
     data = store.read_json(store.client_secret_path())
     installed = data["installed"]

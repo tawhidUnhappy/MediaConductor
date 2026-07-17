@@ -1,12 +1,12 @@
-"""The single `mangaeasy` entry point: dispatch table integrity, help,
+"""The single `mediaconductor` entry point: dispatch table integrity, help,
 version, and unknown-command handling."""
 
 import importlib.util
 
 import pytest
 
-import mangaeasy
-from mangaeasy.cli import COMMANDS, main
+import mediaconductor
+from mediaconductor.cli import COMMANDS, main
 
 
 def test_every_command_module_exists():
@@ -20,13 +20,13 @@ def test_every_command_module_exists():
 def test_help_exits_zero(capsys):
     assert main([]) == 0
     out = capsys.readouterr().out
-    assert "mangaeasy" in out
+    assert "mediaconductor" in out
     assert "video" in out
 
 
 def test_version_matches_package(capsys):
     assert main(["--version"]) == 0
-    assert mangaeasy.__version__ in capsys.readouterr().out
+    assert mediaconductor.__version__ in capsys.readouterr().out
 
 
 def test_unknown_command_suggests_and_exits_2(capsys):

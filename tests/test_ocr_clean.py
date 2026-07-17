@@ -1,7 +1,7 @@
 """clean_ocr_text strips the DeepSeek garbage classes seen in real
 production transcripts while preserving real bubble text and line structure."""
 
-from mangaeasy.ocr.ocr_clean import MAX_OCR_LENGTH, clean_ocr_text
+from mediaconductor.ocr.ocr_clean import MAX_OCR_LENGTH, clean_ocr_text
 
 
 def test_real_bubble_text_passes_through():

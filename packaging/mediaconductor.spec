@@ -17,7 +17,7 @@ except ModuleNotFoundError:
 from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path(SPECPATH).resolve().parent  # repo root (spec lives in packaging/)
-PKG  = ROOT / "mangaeasy"
+PKG  = ROOT / "mediaconductor"
 VERSION = os.environ.get("MEDIACONDUCTOR_VERSION") or os.environ.get("MANGAEASY_VERSION")
 if not VERSION:
     with open(ROOT / "pyproject.toml", "rb") as _f:
@@ -33,14 +33,14 @@ elif _sys.platform == "win32":
 else:
     ICON  = str(ROOT / "packaging" / "icon.png")
 
-hiddenimports = collect_submodules("mangaeasy")
+hiddenimports = collect_submodules("mediaconductor")
 
 a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
     pathex=[str(ROOT)],
     datas=[
-        (str(PKG), "mangaeasy"),
-        (str(ROOT / "skills"), "mangaeasy/agent_skills"),
+        (str(PKG), "mediaconductor"),
+        (str(ROOT / "skills"), "mediaconductor/agent_skills"),
         (str(ROOT / "packaging" / "icon.png"), "."),
         (str(ROOT / "packaging" / "icon.ico"), "."),  # loaded at runtime to set the Win32 window icon
     ],

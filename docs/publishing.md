@@ -3,7 +3,7 @@
 ## Cutting a release
 
 One script bumps every version in lockstep (`pyproject.toml`,
-`mangaeasy/__init__.py`) and tags:
+`mediaconductor/__init__.py`) and tags:
 
 ```bash
 uv run python scripts/release.py 1.2.3 --tag
@@ -44,7 +44,7 @@ Tags with a hyphen (e.g. `v1.1.0-beta1`) are automatically marked as
 uv sync --group dev
 uv run ruff check .
 uv run pytest
-uv run python -m compileall -q mangaeasy
+uv run python -m compileall -q mediaconductor
 uv run python scripts/release.py --check
 ```
 

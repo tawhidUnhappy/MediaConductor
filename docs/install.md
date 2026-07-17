@@ -99,11 +99,11 @@ Everything MediaConductor writes — installed AI tools, models, settings, logs,
 no trace. GPU acceleration (NVIDIA CUDA / Apple Silicon) is detected
 automatically. Core video tools and selected models support CPU fallback;
 GPU-only or impractically slow tools are reported by `doctor` for the chosen
-mode. Override the data root with the `MANGAEASY_ROOT` environment variable.
+mode. Override the data root with the `MEDIACONDUCTOR_ROOT` environment variable.
 
 ### Where your data lives
 
-| Platform | Data folder (when `MANGAEASY_ROOT` is unset) |
+| Platform | Data folder (when `MEDIACONDUCTOR_ROOT` is unset) |
 |---|---|
 | Windows (frozen) | next to the exe |
 | macOS | `~/Library/Application Support/mangaEasy` (legacy-compatible path) |

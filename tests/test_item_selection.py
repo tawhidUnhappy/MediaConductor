@@ -1,6 +1,6 @@
 """Item-selection parsing (`--items 01 02 05-08`, `--item-range 01-12`)."""
 
-from mangaeasy.video_pipeline.common import (
+from mediaconductor.video_pipeline.common import (
     chunk_list,
     expand_item_tokens,
     item_dirs,

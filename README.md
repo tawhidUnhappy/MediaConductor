@@ -55,7 +55,7 @@ mediaconductor modes
 ```
 
 `mangaeasy` remains an equivalent compatibility command for existing scripts.
-The internal Python import remains `mangaeasy` during the 2.x migration.
+The internal Python import remains `mediaconductor` during the 2.x migration.
 
 ## Three isolated modes
 
@@ -233,8 +233,8 @@ mediaconductor doctor --mode song-video --json
 ```
 
 All HF, Torch, uv Python, Triton, TorchInductor, NLTK, and extension caches are
-redirected below the application data directory. Set `MANGAEASY_SHARE_CACHES=1`
-only when deliberately opting into global caches. Existing `MANGAEASY_*`
+redirected below the application data directory. Set `MEDIACONDUCTOR_SHARE_CACHES=1`
+only when deliberately opting into global caches. Existing `MEDIACONDUCTOR_*`
 environment names and `.mangaeasy` data directories remain stable in 2.x so
 multi-gigabyte installs are never silently moved.
 
@@ -271,9 +271,9 @@ audit can have uploads forced to private regardless of the requested setting.
 - `2`: invalid CLI usage.
 - `3`: artifact created, but human/agent QA approval is required.
 - `--json` commands print one JSON report.
-- Generation commands finish with `MANGAEASY_RESULT {...}` for 2.x
+- Generation commands finish with `MEDIACONDUCTOR_RESULT {...}` for 2.x
   compatibility.
-- Progress lines use `MANGAEASY_PROGRESS current/total label`.
+- Progress lines use `MEDIACONDUCTOR_PROGRESS current/total label`.
 
 Use `mediaconductor commands --mode <mode> --json --full` instead of scraping
 help text.
@@ -283,7 +283,7 @@ help text.
 ```bash
 uv sync
 uv run ruff check .
-uv run python -m compileall -q mangaeasy
+uv run python -m compileall -q mediaconductor
 uv run pytest
 ```
 

@@ -2,7 +2,7 @@ from argparse import Namespace
 
 import pytest
 
-from mangaeasy.video_pipeline.normalize_long_audio import (
+from mediaconductor.video_pipeline.normalize_long_audio import (
     DEFAULT_CODEC_PEAK_MARGIN_DB,
     filter_target_tp,
     loudnorm_base,

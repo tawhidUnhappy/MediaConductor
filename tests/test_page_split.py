@@ -1,7 +1,7 @@
 """Unit tests for the deterministic parts of `page-split` (no MAGI/GPU needed)."""
 
-from mangaeasy.panels.ai import _manga_reading_order
-from mangaeasy.panels.page import FULL_PAGE_AREA_FRAC, boxes_for_page
+from mediaconductor.panels.ai import _manga_reading_order
+from mediaconductor.panels.page import FULL_PAGE_AREA_FRAC, boxes_for_page
 
 
 def test_boxes_for_page_uses_detection_panels():

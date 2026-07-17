@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from mangaeasy.path_safety import (
+from mediaconductor.path_safety import (
     UnsafePathComponentError,
     portable_prefix_template_arg,
     validate_portable_segment,
     validate_relative_subpath,
 )
-from mangaeasy.video_pipeline.common import project_name
+from mediaconductor.video_pipeline.common import project_name
 
 
 def test_portable_segment_preserves_unicode_and_internal_spaces() -> None:
@@ -66,8 +66,8 @@ def test_panel_prefix_rejects_unknown_format_fields_and_traversal(value: str) ->
 
 
 def test_configured_media_subdirectories_cannot_escape_roots(tmp_path: Path, monkeypatch) -> None:
-    import mangaeasy.paths as configured_paths
-    from mangaeasy.library_scan import library_dir
+    import mediaconductor.paths as configured_paths
+    from mediaconductor.library_scan import library_dir
 
     monkeypatch.setattr(configured_paths, "_path_cfg", lambda: {"library_subdir": "../escape"})
     with pytest.raises(UnsafePathComponentError):
@@ -99,7 +99,7 @@ def test_configured_media_subdirectories_cannot_escape_roots(tmp_path: Path, mon
 )
 def test_direct_cli_folder_arguments_fail_cleanly(command: str, arguments: list[str]) -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "mangaeasy.cli", command, *arguments],
+        [sys.executable, "-m", "mediaconductor.cli", command, *arguments],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -115,7 +115,7 @@ def test_project_name_join_failure_is_a_clean_cli_error(tmp_path: Path) -> None:
         [
             sys.executable,
             "-m",
-            "mangaeasy.cli",
+            "mediaconductor.cli",
             "audio-takes-list",
             "--project-root",
             str(tmp_path),

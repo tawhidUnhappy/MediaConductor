@@ -4,7 +4,7 @@ FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    MANGAEASY_ROOT=/data
+    MEDIACONDUCTOR_ROOT=/data
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg git git-lfs ca-certificates \

@@ -8,7 +8,7 @@ prints the curated help instead of starting a second process or a GUI.
 import multiprocessing
 import sys
 
-from mangaeasy.cli import main
+from mediaconductor.cli import main
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()

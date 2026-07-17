@@ -6,7 +6,7 @@ import zipfile
 
 import pytest
 
-from mangaeasy.tools import vendored
+from mediaconductor.tools import vendored
 
 
 class _Response:

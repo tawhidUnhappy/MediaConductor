@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from mangaeasy.tools import install
-from mangaeasy.assets.tools.generate_ace_step import _require_initialized
+from mediaconductor.tools import install
+from mediaconductor.assets.tools.generate_ace_step import _require_initialized
 
 
 def test_song_toolchain_is_immutably_pinned():

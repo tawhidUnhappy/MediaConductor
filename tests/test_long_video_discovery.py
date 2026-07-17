@@ -9,8 +9,8 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - exercised by the Python 3.10 CI job
     import tomli as tomllib
 
-import mangaeasy
-from mangaeasy.video_pipeline.common import find_latest_long_video
+import mediaconductor
+from mediaconductor.video_pipeline.common import find_latest_long_video
 
 
 def test_picks_newest_plain_join(tmp_path):
@@ -48,7 +48,7 @@ def test_version_is_in_sync_with_pyproject():
     pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
     with pyproject.open("rb") as f:
         version = tomllib.load(f)["project"]["version"]
-    assert mangaeasy.__version__ == version
+    assert mediaconductor.__version__ == version
 
 
 def test_never_picks_a_before_normalize_backup(tmp_path):

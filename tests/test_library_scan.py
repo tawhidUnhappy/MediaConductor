@@ -2,7 +2,7 @@
 
 import json
 
-from mangaeasy.library_scan import scan_library
+from mediaconductor.library_scan import scan_library
 
 
 def make_project(root, layout: str):

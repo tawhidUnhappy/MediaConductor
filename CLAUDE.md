@@ -5,7 +5,7 @@ continuity-checked AI story videos, and generated or imported song lyric
 videos. Heavy AI tools live in isolated `uv` projects. **There is no GUI** (the
 old Electron/Flask surfaces were removed; see
 `docs/history/legacy-inventory.md`). The Python package and compatibility
-command remain `mangaeasy` during the 2.x migration.
+command remain `mediaconductor` during the 2.x migration.
 
 This file is for **changing MediaConductor itself**. For *using* it, begin with
 [docs/ai-guide.md](docs/ai-guide.md), select one mode, and load only that
@@ -27,7 +27,7 @@ mode's skill.
 | External AI tool envs, installs, YouTube, releases | [docs/external-tools.md](docs/external-tools.md), [docs/install-tools.md](docs/install-tools.md), [docs/youtube.md](docs/youtube.md), [docs/publishing.md](docs/publishing.md) |
 | Why a guard/invariant exists (incident stories) | [docs/history/incidents.md](docs/history/incidents.md) |
 
-## Code map — `mangaeasy/`
+## Code map — `mediaconductor/`
 
 Each package has its own README.md with entry points and gotchas.
 
@@ -48,24 +48,24 @@ Each package has its own README.md with entry points and gotchas.
 ## Architecture (what calls what)
 
 - **One CLI.** Everything dispatches from the `COMMANDS` dict in
-  `mangaeasy/cli.py` (`name -> (module, function, group, help)`); modules are
+  `mediaconductor/cli.py` (`name -> (module, function, group, help)`); modules are
   imported **lazily** so `--help` never pulls in torch/opencv. To add a
   command: write a module with a `main()` doing its own argparse, add one
   line to `COMMANDS`. Pipeline code shells out to other subcommands via
-  `mangaeasy.runtime.cli_command(...)` (works frozen and unfrozen).
-- **One schema table.** `mangaeasy/command_spec.py` declares each
+  `mediaconductor.runtime.cli_command(...)` (works frozen and unfrozen).
+- **One schema table.** `mediaconductor/command_spec.py` declares each
   agent-facing command's arguments once; the MCP server serves them as tool
   schemas and `commands --json --full` publishes them to shell agents. **If
   you add/change a subcommand flag, update command_spec.py in the same
   change** — it is what agents see.
-- **MCP server** (`mangaeasy/mcp_server.py`): stdlib-only JSON-RPC over
+- **MCP server** (`mediaconductor/mcp_server.py`): stdlib-only JSON-RPC over
   stdio; every tool shells out to the CLI. Long-running work must go through
   the `job_start`/`job_status` tools, never a blocking call. Public startup
   always applies `--allow-root` (the current directory by default) to direct,
   nested-job, configured-default, and manifest-linked filesystem paths.
-- **Background jobs** (`mangaeasy/jobs.py`): `job-start <command> [args…]`
+- **Background jobs** (`mediaconductor/jobs.py`): `job-start <command> [args…]`
   spawns a detached supervisor that logs to `<work>/jobs/<id>.log` and
-  records exit code + `MANGAEASY_RESULT` into `<id>.json`; `job-status` /
+  records exit code + `MEDIACONDUCTOR_RESULT` into `<id>.json`; `job-status` /
   `jobs` read it back, detecting orphaned (dead-supervisor) jobs.
 - **The item pipeline** (`video-*`): `video` = audio (`video-audio` Kokoro /
   `video-audio-indextts`; `--tts auto` prefers IndexTTS when GPU + model +
@@ -80,7 +80,7 @@ Each package has its own README.md with entry points and gotchas.
   live in isolated uv envs under `<install>/.mangaeasy/tools/<tool>/`
   (`install-tool`, resolved by `tools/external.resolve_tool_dir()`).
   `tool_env()` **force-pins** HF/torch/uv caches under `<data>/.mangaeasy/`
-  (opt-out: `MANGAEASY_SHARE_CACHES=1`). `ensure_vendored_path()` at the top
+  (opt-out: `MEDIACONDUCTOR_SHARE_CACHES=1`). `ensure_vendored_path()` at the top
   of cli.py makes bare `"ffmpeg"`-style calls resolve to vendored binaries.
   Z-Image facts that must not be "optimized" away: guidance_scale 0.0,
   bf16/fp32 only (fp16 = black frames), NF4 for 8–12 GB GPUs.
@@ -96,18 +96,18 @@ output/<project>/             item videos + <project>_full.mp4
 work/                         scratch incl. jobs/ — video-clean-work clears it
 ```
 
-Roots default from env (`MANGAEASY_ITEMS_ROOT`/`MANGAEASY_AUDIO_ROOT`/
-`MANGAEASY_OUTPUT_ROOT`/`MANGAEASY_WORK_DIR`; bare legacy names still
+Roots default from env (`MEDIACONDUCTOR_ITEMS_ROOT`/`MEDIACONDUCTOR_AUDIO_ROOT`/
+`MEDIACONDUCTOR_OUTPUT_ROOT`/`MEDIACONDUCTOR_WORK_DIR`; bare legacy names still
 honoured) but agents pass explicit `--project-root library/<P>` etc.
 Config: `config.json` (per-project) + `config.system.json` (machine defaults)
-via `mangaeasy/config.py` — its loaders raise `ConfigError` (the CLI
+via `mediaconductor/config.py` — its loaders raise `ConfigError` (the CLI
 dispatcher renders it; never `sys.exit` from library code). Note
 `config.PROJECT_ROOT` is the *workspace* root, not the `--project-root` flag.
 
 ## Invariants (each earned by a shipped failure — stories in [docs/history/incidents.md](docs/history/incidents.md))
 
 - **Archive, never overwrite, generated output**: use
-  `archive_before_overwrite()` / `archive_into_run()` from `mangaeasy/utils`
+  `archive_before_overwrite()` / `archive_into_run()` from `mediaconductor/utils`
   (`old/run_NNNN/`). `audio-takes-list/-restore` browse the archives.
   `video-clean-*` are the only sanctioned deleters and never touch `library/`.
 - **`load_narration()` (`video_pipeline/item_assets.py`) is the only
@@ -143,7 +143,7 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - **UTF-8 stdio forcing in cli.py stays** (Windows pipes are cp1252).
 - **Machine contract stays stable**: exit 0/1/2/3 (3 = artifact created but review required); `--json` commands print
   exactly one JSON object on stdout; generation commands end with
-  `MANGAEASY_RESULT {...}` (`utils.emit_result()`); `MANGAEASY_PROGRESS n/m`
+  `MEDIACONDUCTOR_RESULT {...}` (`utils.emit_result()`); `MEDIACONDUCTOR_PROGRESS n/m`
   ticks. Pipeline commands never prompt on stdin. Live YouTube operations may
   open the explicit OAuth browser flow unless `--no-auto-auth` is set; browser
   progress must remain on stderr so JSON stdout stays parseable.

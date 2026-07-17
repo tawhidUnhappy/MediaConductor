@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import json
 
-from mangaeasy.story import workflow
-from mangaeasy.story.workflow import (
+from mediaconductor.story import workflow
+from mediaconductor.story.workflow import (
     expand_scene_prompt,
     materialize,
     new_manifest,
     validate_manifest,
     video_preflight_problems,
 )
-from mangaeasy.story.workflow import reference_contract_digest, scene_contract_digest
+from mediaconductor.story.workflow import reference_contract_digest, scene_contract_digest
 
 
 def complete_story():

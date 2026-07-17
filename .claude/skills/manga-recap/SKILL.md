@@ -1,7 +1,7 @@
 ---
 name: manga-recap
 description: >
-  Produce narrated manga/webtoon recap videos for YouTube with the mangaeasy
+  Produce narrated manga/webtoon recap videos for YouTube with the mediaconductor
   CLI: download a series from a MangaDex URL, crop panels (webtoon or paged),
   verify crops, write and verify narration, generate TTS audio, render and
   join videos, mix background music, generate a thumbnail, and upload — in
@@ -12,12 +12,12 @@ description: >
 
 # Manga recap production (mangaEasy)
 
-You drive the whole pipeline through the `mangaeasy` CLI (or its MCP tools —
+You drive the whole pipeline through the `mediaconductor` CLI (or its MCP tools —
 same engine). Full reference: `docs/manga-video-guide.md`; discover any command's
-flags with `mangaeasy commands --json --full` (schemas + `long_running`
+flags with `mediaconductor commands --json --full` (schemas + `long_running`
 markers — no per-command `--help` needed). Machine contract: every `--json`
 command prints one JSON object; generation commands end with a
-`MANGAEASY_RESULT {...}` line; exit 0 = ok, 1 = failure, 2 = usage error;
+`MEDIACONDUCTOR_RESULT {...}` line; exit 0 = ok, 1 = failure, 2 = usage error;
 nothing ever prompts for input.
 
 **Hard safety rules** — never delete/rename anything inside `library/`
@@ -30,8 +30,8 @@ generated output only with `video-clean-*` (everything else auto-archives to
 `zimage`, and `youtube-upload` each run for minutes to tens of minutes. Launch
 each as a background job and stop; let the harness's completion notification
 wake you instead of sleeping or re-checking in a loop. No harness backgrounding
-(e.g. MCP-only)? Use the built-in runner: `mangaeasy job-start <command>
-[args…]` returns a job id instantly; poll `mangaeasy job-status <id> --json`
+(e.g. MCP-only)? Use the built-in runner: `mediaconductor job-start <command>
+[args…]` returns a job id instantly; poll `mediaconductor job-status <id> --json`
 (status/progress/result; reports `orphaned` if the machine slept). GPU tools
 (MAGI, DeepSeek-OCR, IndexTTS, Z-Image) block-buffer stdout, so their logs look
 empty until the end — judge health from filesystem signals (growing
@@ -41,22 +41,22 @@ the log. Only foreground the quick `--json`/validation commands.
 ## 0. Orient (every session)
 
 ```bash
-mangaeasy where --json      # install paths + version
-mangaeasy doctor --json     # ffmpeg/GPU/tool readiness
-mangaeasy work-status --project-root library/<Project> --json   # resuming? exact per-item stage
+mediaconductor where --json      # install paths + version
+mediaconductor doctor --json     # ffmpeg/GPU/tool readiness
+mediaconductor work-status --project-root library/<Project> --json   # resuming? exact per-item stage
 ```
 
 Resuming a project, or working alongside other agents? Follow
 `docs/multi-agent.md`: `work-status --next` names the unclaimed actionable
 tasks, `work-claim` leases an item+stage (and `--resource gpu` serializes the
 GPU model tools), `work-note` shares character names/speaker conventions
-between narrators, and `mangaeasy work-qa` is the fix-until-clean gate — loop
+between narrators, and `mediaconductor work-qa` is the fix-until-clean gate — loop
 `work-qa → apply the listed fix → work-qa` until exit 0. `work-artifacts`
 lists what already exists for reuse before you regenerate anything.
 
 Fresh clone/machine? Follow the agent runbook in `docs/setup.md`:
-`uv sync` → `mangaeasy setup` (GPU-aware; `--all` / `--minimal` /
-`--skip <tool>`; re-run to resume) → verify `doctor --json` → `mangaeasy
+`uv sync` → `mediaconductor setup` (GPU-aware; `--all` / `--minimal` /
+`--skip <tool>`; re-run to resume) → verify `doctor --json` → `mediaconductor
 smoke-test` (renders and checks a tiny real video; `SMOKE TEST PASS` = the
 machine can produce videos). Working dir for a production run should be the
 install root — projects live in `library/`, generated output in `audio/`,
@@ -65,7 +65,7 @@ install root — projects live in `library/`, generated output in `audio/`,
 ## 1. Download the series (user gives a MangaDex URL)
 
 ```bash
-mangaeasy download --url "<mangadex title url>" --all
+mediaconductor download --url "<mangadex title url>" --all
 ```
 
 Polite by design (rate spacing, backoff, jitter) — never parallelize
@@ -79,7 +79,7 @@ chapters are skipped. The result line gives the project path
 Videos ship 12 chapters at a time (01–12, then 13–24, …):
 
 ```bash
-mangaeasy series-plan --project-root library/<Project> --json
+mediaconductor series-plan --project-root library/<Project> --json
 ```
 
 Work on `next_batch` only. If it's partial, the series may have ended
@@ -88,7 +88,7 @@ Work on `next_batch` only. If it's partial, the series may have ended
 ## 3. Decide the crop tool, then crop and VERIFY
 
 ```bash
-mangaeasy style-detect --project-root library/<Project> --json
+mediaconductor style-detect --project-root library/<Project> --json
 ```
 
 Open 2–3 of the returned `sample_images` and confirm the verdict yourself:
@@ -101,7 +101,7 @@ and override with `--reading-direction rtl|ltr` if the source metadata is
 wrong. Then crop the batch, e.g.:
 
 ```bash
-mangaeasy webtoon-split --project-root library/<Project> --item-range 01-12
+mediaconductor webtoon-split --project-root library/<Project> --item-range 01-12
 ```
 
 **The crop double-verify loop** (details: `docs/operate/crop-verify-narrate.md`):
@@ -110,7 +110,7 @@ the result lists per-item `suspects` / `content_drops` and the exact
 crops on downscaled sheets alone has shipped sliced bubbles before:
 
 ```bash
-mangaeasy webtoon-cutcheck --project-root library/<Project> --item-range 01-12
+mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-12
 ```
 
 Read EVERY sheet it writes; FIX any cut through a figure/speech bubble and
@@ -118,7 +118,7 @@ any bubble/SFX-fragment short panel by adding the fix with `webtoon-override`
 (never compute merge indices by hand — it resolves them from the manifest):
 
 ```bash
-mangaeasy webtoon-override --file work/overrides.json \
+mediaconductor webtoon-override --file work/overrides.json \
     --project-root library/<Project> --item 07 --merge-at-cut 23140
 # fuse sheet panels #4..#5:            --item 12 --merge-panels 4,5
 # reposition a bad cut:                --merge-at-cut 42186 --split-at 42394
@@ -129,24 +129,24 @@ banners. Re-run the split with `--overrides work/overrides.json`, then
 re-run cutcheck to confirm. Do not proceed to narration with unresolved
 suspects.
 
-**Re-cropping after narration exists?** Never re-narrate: `mangaeasy
+**Re-cropping after narration exists?** Never re-narrate: `mediaconductor
 panels-remap --project-root library/<Project> --item-range 01-12` (dry run,
 then `--apply`) carries narration texts and WAVs to the new numbering, then
 review its `shift`/`merge` list with `narration-review-sheets
---only-images ...` and rebuild with `mangaeasy video --overwrite-video`.
+--only-images ...` and rebuild with `mediaconductor video --overwrite-video`.
 
 ## 4. Write narration grounded in transcripts, then verify it
 
 First OCR every panel (needs `install-tool deepseek-ocr2`):
 
 ```bash
-mangaeasy panel-transcript --project-root library/<Project> --item-range 01-12
+mediaconductor panel-transcript --project-root library/<Project> --item-range 01-12
 ```
 
 Then write `library/<Project>/<item>/narration.json`
 (`[{"image": "<panel file>", "narration": "..."}]`) from **panel image +
 transcript together** — style rules in
-`mangaeasy/assets/prompts/narration.md`. Optional `intro.json` (same shape)
+`mediaconductor/assets/prompts/narration.md`. Optional `intro.json` (same shape)
 gives chapter 01 a cold-open hook reel — it is **prepended** before that
 chapter's `narration.json`, so its panels must be ones the chapter's
 `narration.json` does **not** also use, or they play twice (the cold-open
@@ -166,12 +166,12 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
 - **optional `"emotion"` field** on the few lines that earn it (reveals,
   battle cries, tearful goodbyes): a 1–3 word phrase like `"tense"` or
   `"cold, menacing"` that IndexTTS2 blends into the voice — vocabulary and
-  rules in `mangaeasy/assets/prompts/narration.md`; most lines stay neutral
+  rules in `mediaconductor/assets/prompts/narration.md`; most lines stay neutral
   (no field).
 
 Verify in two passes:
 
-1. **Structural** — `mangaeasy narration-check --project-root
+1. **Structural** — `mediaconductor narration-check --project-root
    library/<Project> --item-range 01-12 --json` must pass (`ok:true`): no
    dangling images, no empty text, no intro/narration overlap. Panels with no
    narration entry are reported as **warnings**, not failures — deliberately
@@ -179,11 +179,11 @@ Verify in two passes:
    duplicate reaction beats is correct (the renderer builds the video **only**
    from narrated panels). Confirm the uncovered list is exactly those skips,
    not a story beat you forgot.
-2. **Semantic** — `mangaeasy narration-review-sheets --project-root
+2. **Semantic** — `mediaconductor narration-review-sheets --project-root
    library/<Project> --item-range 01-12`, then Read EVERY sheet (panel +
    narration + OCR side by side) and check the grounding rules above.
    Fix each bad line with one command (stale WAV pruned automatically):
-   `mangaeasy narration-edit --project-root library/<Project> --item 01
+   `mediaconductor narration-edit --project-root library/<Project> --item 01
    --set <image> "<new line>" --prune-audio`. Use `--delete <image>`,
    `--list`, `--intro`, or `--set-json '[...]'` for bulk edits — no
    hand-editing of narration.json needed.
@@ -191,7 +191,7 @@ Verify in two passes:
 ## 5. Audio → render → join → music
 
 ```bash
-mangaeasy video --project-root library/<Project> --audio-root audio \
+mediaconductor video --project-root library/<Project> --audio-root audio \
     --output-root output --item-range 01-12 --tts auto \
     --build-long-video --normalize-audio \
     --background-music "<music file>"
@@ -212,7 +212,7 @@ still reads continuously; bridge the gap in the narration of the following
 chapter's first line. (Don't reach for it to paper over a *failed render* —
 re-render that chapter instead.)
 After the run:
-`mangaeasy video-validate --project-root library/<Project> ... --json` —
+`mediaconductor video-validate --project-root library/<Project> ... --json` —
 `warnings` (unnarrated panels, orphan audio) are informational; anything in
 `errors` blocks upload.
 Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
@@ -222,12 +222,12 @@ Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
 1. Generate key art (style rules and the platform-safe prompt shape are in
    `docs/thumbnail.md` — visibly adult, fully clothed, suggestive-ceiling,
    no text in the image):
-   `mangaeasy zimage --prompt-file thumb_prompt.txt --output thumb.png
+   `mediaconductor zimage --prompt-file thumb_prompt.txt --output thumb.png
    --width 1280 --height 720 --count 4`
 2. Open all variants, pick the best (faces and hands intact).
 3. Add text furniture — 1–3 blocks, 3–5 punchy words each, highlighting one
    shocking fact from the batch:
-   `mangaeasy thumbnail-compose --base thumb_03.png --output final_thumb.png
+   `mediaconductor thumbnail-compose --base thumb_03.png --output final_thumb.png
    --text "HE ATE A GOD?!" --text "CH 1-12"`
    (full control via `--spec` JSON: blocks/arrows/border). Make the markup
    read hand-placed: tilt the big hook block (`"rotate": -3…-5`), use the
@@ -273,7 +273,7 @@ when the channel's API project supports it, and verify the JSON result says the
 privacy you asked for. Then record the batch so the plan advances:
 
 ```bash
-mangaeasy series-mark-published --project-root library/<Project> \
+mediaconductor series-mark-published --project-root library/<Project> \
     --items 01-12 --video-id <id from upload> --title "..."
 ```
 

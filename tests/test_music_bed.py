@@ -1,4 +1,4 @@
-"""Pure-logic tests for automatic BGM QC (mangaeasy.video_pipeline.music_bed).
+"""Pure-logic tests for automatic BGM QC (mediaconductor.video_pipeline.music_bed).
 
 Envelope arrays are synthesized directly (one value per 20 ms window), so no
 audio files or ffmpeg are involved. The scenarios mirror the production
@@ -8,7 +8,7 @@ must not be mistaken for defects.
 
 import numpy as np
 
-from mangaeasy.video_pipeline.music_bed import (
+from mediaconductor.video_pipeline.music_bed import (
     MAX_LOUDNORM_GAIN_DB,
     WIN_S,
     find_holes,
@@ -170,7 +170,7 @@ def test_pregain_clamps_and_handles_missing():
 # bed conditioning filter
 # ---------------------------------------------------------------------------
 
-from mangaeasy.video_pipeline.music_bed import build_condition_filter  # noqa: E402
+from mediaconductor.video_pipeline.music_bed import build_condition_filter  # noqa: E402
 
 
 def test_condition_filter_compress_and_eq():
@@ -190,8 +190,8 @@ def test_condition_filter_stages_toggle_independently():
 # mix filter (regression guards for the two load-bearing amix/limiter bugs)
 # ---------------------------------------------------------------------------
 
-from mangaeasy.video_pipeline.add_long_video_bgm import build_mix_filter  # noqa: E402
-from mangaeasy.video_pipeline.add_long_video_bgm import (  # noqa: E402
+from mediaconductor.video_pipeline.add_long_video_bgm import build_mix_filter  # noqa: E402
+from mediaconductor.video_pipeline.add_long_video_bgm import (  # noqa: E402
     DEFAULT_EXISTING_VIDEO_NARRATION_VOLUME,
 )
 

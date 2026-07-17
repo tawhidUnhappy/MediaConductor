@@ -1,18 +1,18 @@
 """The machine-readable CLI contract agents rely on: `commands --json`,
-`where --json`, exit codes, and the MANGAEASY_RESULT marker helper."""
+`where --json`, exit codes, and the MEDIACONDUCTOR_RESULT marker helper."""
 
 import json
 import subprocess
 import sys
 
-from mangaeasy import __version__
-from mangaeasy.cli import COMMANDS, main
-from mangaeasy.utils import emit_result
+from mediaconductor import __version__
+from mediaconductor.cli import COMMANDS, main
+from mediaconductor.utils import emit_result
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-m", "mangaeasy.cli", *args],
+        [sys.executable, "-m", "mediaconductor.cli", *args],
         capture_output=True, text=True, encoding="utf-8",
     )
 
@@ -65,8 +65,8 @@ def test_tools_json(capsys):
 def test_emit_result_line_is_parseable(capsys):
     emit_result(outputs=["a/b.mp4"], extra=1)
     line = capsys.readouterr().out.strip()
-    assert line.startswith("MANGAEASY_RESULT ")
-    payload = json.loads(line[len("MANGAEASY_RESULT "):])
+    assert line.startswith("MEDIACONDUCTOR_RESULT ")
+    payload = json.loads(line[len("MEDIACONDUCTOR_RESULT "):])
     assert payload == {"outputs": ["a/b.mp4"], "extra": 1}
 
 

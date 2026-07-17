@@ -1,7 +1,7 @@
 """Archive-before-overwrite: generated output is moved into old/run_NNNN/,
 never silently destroyed."""
 
-from mangaeasy.utils import LazyArchiveRunDir, archive_before_overwrite, archive_into_run, next_archive_run_dir
+from mediaconductor.utils import LazyArchiveRunDir, archive_before_overwrite, archive_into_run, next_archive_run_dir
 
 
 def test_archive_before_overwrite_moves_into_run_dir(tmp_path):

@@ -6,11 +6,11 @@ import sys
 
 import pytest
 
-from mangaeasy.cli import COMMANDS
-from mangaeasy.command_spec import TOOLS
-from mangaeasy.mcp_server import _run_tool, _tools_list
-from mangaeasy.modes import COMMON_TOOLS, MODES, resolve_skill_path
-from mangaeasy.tools.install import TOOLS as EXTERNAL_TOOLS
+from mediaconductor.cli import COMMANDS
+from mediaconductor.command_spec import TOOLS
+from mediaconductor.mcp_server import _run_tool, _tools_list
+from mediaconductor.modes import COMMON_TOOLS, MODES, resolve_skill_path
+from mediaconductor.tools.install import TOOLS as EXTERNAL_TOOLS
 
 
 def test_mode_registries_reference_real_surfaces():
@@ -45,7 +45,7 @@ def test_mode_rejects_hidden_tools_and_job_escape():
 
 def test_mcp_help_does_not_start_server():
     proc = subprocess.run(
-        [sys.executable, "-m", "mangaeasy.cli", "mcp", "--help"],
+        [sys.executable, "-m", "mediaconductor.cli", "mcp", "--help"],
         capture_output=True, text=True, encoding="utf-8", timeout=30,
     )
     assert proc.returncode == 0
@@ -55,10 +55,10 @@ def test_mcp_help_does_not_start_server():
 
 def test_mode_setup_dry_run_is_exact():
     proc = subprocess.run(
-        [sys.executable, "-m", "mangaeasy.cli", "setup", "--mode", "song-video", "--dry-run"],
+        [sys.executable, "-m", "mediaconductor.cli", "setup", "--mode", "song-video", "--dry-run"],
         capture_output=True, text=True, encoding="utf-8", timeout=30,
     )
     assert proc.returncode == 0
-    marker = next(line for line in proc.stdout.splitlines() if line.startswith("MANGAEASY_RESULT "))
+    marker = next(line for line in proc.stdout.splitlines() if line.startswith("MEDIACONDUCTOR_RESULT "))
     payload = json.loads(marker.partition(" ")[2])
     assert payload["tools"] == ["ace-step", "demucs", "whisperx", "z-image-turbo"]

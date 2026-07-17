@@ -56,7 +56,7 @@ jobs:
           set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
           pyproject=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          package=$(python -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('mangaeasy/__init__.py', encoding='utf-8').read()).group(1))")
+          package=$(python -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('mediaconductor/__init__.py', encoding='utf-8').read()).group(1))")
           echo "tag=$tag pyproject=$pyproject package=$package"
           if [ "$tag" != "$pyproject" ] || [ "$tag" != "$package" ]; then
             echo "::error::Version mismatch. Run scripts/release.py before tagging."
@@ -69,7 +69,7 @@ jobs:
       - name: Lint, compile, and test
         run: |
           uv run --no-sync ruff check .
-          uv run --no-sync python -m compileall -q mangaeasy scripts
+          uv run --no-sync python -m compileall -q mediaconductor scripts
           uv run --no-sync pytest
 
       - name: Verify Python distributions

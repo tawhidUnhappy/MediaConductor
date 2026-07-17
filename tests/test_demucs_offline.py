@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from mangaeasy import command_spec
-from mangaeasy.tools import demucs, install
+from mediaconductor import command_spec
+from mediaconductor.tools import demucs, install
 
 
 def _load_adapter():
@@ -99,7 +99,7 @@ def test_demucs_wrapper_invokes_offline_adapter_and_keeps_output_contract(tmp_pa
     monkeypatch.setattr(demucs, "resolve_tool_dir", lambda *_args, **_kwargs: tool_dir)
     monkeypatch.setattr(demucs, "python_command", lambda _path: ["python"])
     monkeypatch.setattr(demucs, "tool_env", lambda: {})
-    monkeypatch.setattr(demucs.subprocess, "run", fake_run)
+    monkeypatch.setattr(demucs.runtime, "run", fake_run)
     monkeypatch.setattr(demucs, "emit_result", lambda **payload: seen.update(result=payload))
     monkeypatch.setattr(
         "sys.argv",

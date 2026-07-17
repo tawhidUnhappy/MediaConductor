@@ -23,6 +23,7 @@ config.system.json
 
 # This install's self-contained data: AI tool envs, app state, HF/torch/uv caches
 /.mangaeasy/
+/.mediaconductor/
 
 # Generated runtime output
 /tmp/

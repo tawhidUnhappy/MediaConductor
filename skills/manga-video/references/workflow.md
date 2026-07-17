@@ -2,7 +2,7 @@
 
 The examples use the `<mc>` invocation selected by the parent skill and the
 user-owned media workspace `D:/MediaProjects`. Run from the media workspace or
-set `MANGAEASY_PROJECT_ROOT` to it for workspace-relative commands such as
+set `MEDIACONDUCTOR_PROJECT_ROOT` to it for workspace-relative commands such as
 `download`.
 
 ## Project layout

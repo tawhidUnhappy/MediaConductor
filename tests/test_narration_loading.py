@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from mangaeasy.video_pipeline.item_assets import frame_aligned_duration, load_narration
+from mediaconductor.video_pipeline.item_assets import frame_aligned_duration, load_narration
 
 
 def write_json(path, data):

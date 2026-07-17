@@ -7,12 +7,12 @@ import sys
 import time
 from pathlib import Path
 
-from mangaeasy.jobs import _effective_status, _save_state
+from mediaconductor.jobs import _effective_status, _save_state
 
 
 def run_cli(*args: str, cwd=None) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-m", "mangaeasy.cli", *args],
+        [sys.executable, "-m", "mediaconductor.cli", *args],
         capture_output=True, text=True, encoding="utf-8", timeout=120, cwd=cwd,
     )
 
@@ -116,7 +116,7 @@ def test_job_status_uses_id_but_rejects_even_contained_state_path(tmp_path):
     job_id = "20260715-120000-video-deadbeef"
     state_file = jobs_dir / f"{job_id}.json"
     outside_log = tmp_path / "must-not-be-read.txt"
-    outside_log.write_text('MANGAEASY_RESULT {"secret":"do-not-read"}\n', encoding="utf-8")
+    outside_log.write_text('MEDIACONDUCTOR_RESULT {"secret":"do-not-read"}\n', encoding="utf-8")
     state_file.write_text(json.dumps({
         "id": job_id,
         "command": "video",
@@ -156,8 +156,8 @@ def test_state_save_retries_transient_windows_replace_race(tmp_path, monkeypatch
             raise PermissionError("destination is briefly open by job-status")
         return real_replace(source, destination)
 
-    monkeypatch.setattr("mangaeasy.jobs.os.replace", flaky_replace)
-    monkeypatch.setattr("mangaeasy.jobs.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("mediaconductor.jobs.os.replace", flaky_replace)
+    monkeypatch.setattr("mediaconductor.jobs.time.sleep", lambda _seconds: None)
 
     _save_state(state_file, {"status": "succeeded", "exit_code": 0})
 

@@ -5,7 +5,7 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-from mangaeasy.assets.tools.generate_zimage import load_pipeline, normalize_batch_entries
+from mediaconductor.assets.tools.generate_zimage import load_pipeline, normalize_batch_entries
 
 
 def _args():

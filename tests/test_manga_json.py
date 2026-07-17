@@ -1,18 +1,18 @@
 """library/<name>/manga.json — the manga's source-link record.
 
-Written by `mangaeasy download`, surfaced by `library-list`; answers
+Written by `mediaconductor download`, surfaced by `library-list`; answers
 "where did this manga come from?" without re-reading config.json history.
 """
 
 import json
 
-from mangaeasy.download.mangadex import (
+from mediaconductor.download.mangadex import (
     load_manga_json,
     manga_url,
     merge_manga_record,
     update_manga_json,
 )
-from mangaeasy.library_scan import scan_library
+from mediaconductor.library_scan import scan_library
 
 UUID = "2d63ef8c-eae6-44b4-a300-595b7de11516"
 SLUG_URL = f"https://mangadex.org/title/{UUID}/kanojo-wo-dere-saseru"

@@ -1,8 +1,34 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 — 2026-07-17
+
+### Fixed
+
+- **Blank console windows no longer pop up on Windows.** Every child process
+  (ffmpeg, uv, git, external tool envs) now spawns through
+  `mediaconductor.runtime.run/popen`, which applies `CREATE_NO_WINDOW`
+  whenever the parent has no visible console — detached background jobs and
+  MCP servers started by an editor were the common triggers. Linux/macOS are
+  unaffected (the wrappers add nothing there). A repository-hygiene test now
+  forbids raw `subprocess.run/Popen` calls outside `runtime.py`.
+- `mediaconductor index-tts` pointed at `audio/tts.py`, a script deleted with
+  the GUI in 2.0 — the command always failed. It now launches the real batch
+  pipeline (`audio/tts_pipeline.py`) and documents the pass-through flags.
 
 ### Changed
+
+- **The Python package is now `mediaconductor`** (was `mangaeasy`), finishing
+  the 2.0 rename. Entry points, env vars, and stdout markers follow:
+  - Env vars are `MEDIACONDUCTOR_*`; legacy `MANGAEASY_*` values are mirrored
+    at startup and keep working.
+  - Machine markers are `MEDIACONDUCTOR_RESULT` / `MEDIACONDUCTOR_PROGRESS`;
+    scanners still accept the legacy spellings (tool scripts copied into
+    existing external envs print them).
+  - The data dir is `<app_root>/.mediaconductor` for fresh installs; existing
+    `.mangaeasy` dirs (tool envs, models) are detected and kept — nothing is
+    re-downloaded. `where --json` reports `data_home` (new) alongside
+    `mangaeasy_home` (legacy key, same value).
+  - The `mangaeasy` command remains a compatibility alias.
 
 - Manga-video production now defaults to separate `audio_faded` per-panel
   derivatives with symmetric 8 ms edge fades; raw TTS WAVs remain untouched.

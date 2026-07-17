@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 PYPROJECT = ROOT / "pyproject.toml"
-INIT = ROOT / "mangaeasy" / "__init__.py"
+INIT = ROOT / "mediaconductor" / "__init__.py"
 
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$")
 
@@ -31,7 +31,7 @@ def read_versions() -> dict[str, str]:
     pyproject = re.search(r'^version = "(.+?)"', PYPROJECT.read_text(encoding="utf-8"), re.M)
     init = re.search(r'^__version__ = "(.+?)"', INIT.read_text(encoding="utf-8"), re.M)
     assert pyproject and init, "version fields not found"
-    return {"pyproject.toml": pyproject.group(1), "mangaeasy/__init__.py": init.group(1)}
+    return {"pyproject.toml": pyproject.group(1), "mediaconductor/__init__.py": init.group(1)}
 
 
 def set_versions(version: str) -> None:

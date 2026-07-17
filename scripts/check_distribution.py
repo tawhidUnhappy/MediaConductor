@@ -10,15 +10,15 @@ import zipfile
 
 MEDIA_SUFFIXES = {".avi", ".flac", ".m4a", ".mkv", ".mov", ".mp3", ".mp4", ".wav", ".webm"}
 WHEEL_REQUIRED = {
-    "mangaeasy/agent_skills/ai-story/SKILL.md",
-    "mangaeasy/agent_skills/manga-video/SKILL.md",
-    "mangaeasy/agent_skills/media-conductor/SKILL.md",
-    "mangaeasy/agent_skills/song-video/SKILL.md",
-    "mangaeasy/assets/fonts/edosz.ttf",
-    "mangaeasy/assets/tools/generate_ace_step.py",
-    "mangaeasy/assets/tools/generate_zimage.py",
-    "mangaeasy/assets/tools/separate_demucs.py",
-    "mangaeasy/assets/tools/transcribe_whisperx.py",
+    "mediaconductor/agent_skills/ai-story/SKILL.md",
+    "mediaconductor/agent_skills/manga-video/SKILL.md",
+    "mediaconductor/agent_skills/media-conductor/SKILL.md",
+    "mediaconductor/agent_skills/song-video/SKILL.md",
+    "mediaconductor/assets/fonts/edosz.ttf",
+    "mediaconductor/assets/tools/generate_ace_step.py",
+    "mediaconductor/assets/tools/generate_zimage.py",
+    "mediaconductor/assets/tools/separate_demucs.py",
+    "mediaconductor/assets/tools/transcribe_whisperx.py",
 }
 SDIST_REQUIRED_SUFFIXES = {
     "/AGENTS.md",
@@ -67,8 +67,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     if missing_sdist:
         raise SystemExit(f"source archive is missing required files: {missing_sdist}")
-    if not any(name.endswith("/mangaeasy/assets/fonts/edosz.ttf") for name in sdist_names):
-        raise SystemExit("source archive is missing mangaeasy/assets/fonts/edosz.ttf")
+    if not any(name.endswith("/mediaconductor/assets/fonts/edosz.ttf") for name in sdist_names):
+        raise SystemExit("source archive is missing mediaconductor/assets/fonts/edosz.ttf")
     _reject_media(sdist_names, sdist)
 
     print(f"Distribution payload passed: {wheel.name}, {sdist.name}")
