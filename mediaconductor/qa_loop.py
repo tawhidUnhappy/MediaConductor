@@ -55,7 +55,7 @@ def _stage_fix(stage: str, project_root: str, item: str) -> str:
         "download": f"{CLI_NAME} download --url <mangadex url> --name {Path(project_root).name} --chapters {item}",
         "crop": f"{CLI_NAME} page-split --project-root {project_root} --items {item}   (webtoon-split for vertical strips; then READ the verify sheets)",
         "transcribe": f"{CLI_NAME} panel-transcript --project-root {project_root} --items {item}",
-        "narrate": f"write {project_root}/{item}/narration.json grounded in {item}/transcript.json (see mediaconductor/assets/prompts/narration.md), then re-run work-qa",
+        "narrate": f"write {project_root}/{item}/narration.json grounded in the panel images ({item}/transcript.json is optional OCR cross-evidence when present; see mediaconductor/assets/prompts/narration.md), then re-run work-qa",
         "audio": f"{CLI_NAME} video --project-root {project_root} --items {item} --tts auto",
         "render": f"{CLI_NAME} video --project-root {project_root} --items {item} --skip-audio --overwrite-video",
     }[stage]
@@ -81,7 +81,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
         detail = {
             "download": "no source pages downloaded",
             "crop": "no panels cropped yet",
-            "transcribe": f"OCR transcript incomplete ({status['transcript']['filled']}/{status['transcript']['total']})",
+            "transcribe": f"panel-transcript run started but incomplete ({status['transcript']['filled']}/{status['transcript']['total']}) — finish or delete transcript.json (OCR itself is optional)",
         }[stage]
         add("error", f"stage:{stage}", detail, _stage_fix(stage, root_arg, item))
         return problems  # later checks are meaningless before these exist

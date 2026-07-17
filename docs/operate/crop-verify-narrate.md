@@ -236,20 +236,24 @@ beats; you can't hook a viewer on a story you skimmed. While reading, note:
 
 ---
 
-## Step 3.5 — Transcribe the bubbles first (`panel-transcript`)
+## Step 3.5 — Optionally transcribe the bubbles (`panel-transcript`)
 
 ```bash
 mediaconductor install-tool deepseek-ocr2   # one-time
 mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07
 ```
 
-This OCRs every panel into `<item>/transcript.json`. Write narration **from
-panel image + transcript together** — it is the difference between narration
-that lands and narration that reads wrong. Real viewer feedback on a shipped
-recap: speakers misattributed, lines that summarized several panels smeared
-over one, paraphrases that drifted from what the character actually said.
-All three are symptoms of narrating from memory of a 500-panel read-through
-instead of from the panel's actual text.
+This OCRs every panel into `<item>/transcript.json`, which the review sheets
+then show beside each narration line. **Optional — the narrating agent
+chooses.** A vision agent writing each line with the panel open in front of it
+already reads the bubble text; for that workflow the transcript is a second
+opinion (useful for tiny/dense text or pinning name spellings), not a
+requirement, and every downstream gate works without it. What is NOT optional
+is the discipline the transcript used to backstop: write each line **from the
+panel itself, one beat per panel**, never from memory of a 500-panel
+read-through. Real viewer feedback on a shipped recap that narrated from
+memory: speakers misattributed, several panels summarized over one image,
+paraphrases that drifted from what the character actually said.
 
 ---
 

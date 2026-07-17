@@ -53,6 +53,13 @@ def test_stage_derivation_walks_the_pipeline(tmp_path):
 
     (item / "panels").mkdir()
     (item / "panels" / "01_000_01.png").write_bytes(PNG)
+    # OCR is optional: with panels cropped and no transcript started, the next
+    # stage is narration (a vision agent reads the bubbles from the panels).
+    assert item_status(item, *args)["next_stage"] == "narrate"
+
+    # But a transcript that was seeded/started and left unfinished is an
+    # interrupted panel-transcript run — surface it so it gets completed.
+    (item / "transcript.json").write_text(json.dumps([{"image": "01_000_01.png"}]), encoding="utf-8")
     assert item_status(item, *args)["next_stage"] == "transcribe"
 
     (item / "transcript.json").write_text(json.dumps([{"image": "01_000_01.png", "ocr": "HI"}]), encoding="utf-8")

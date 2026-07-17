@@ -17,9 +17,10 @@ mediaconductor work-status --project-root library/<Project> --json   # where is 
 mediaconductor work-status --project-root library/<Project> --next   # what should I grab?
 ```
 
-`work-status` derives each item's stage (`download → crop → transcribe →
-narrate → audio → render`) purely from files on disk, so it is correct even
-if the previous agent died mid-run. It also shows live claims and the latest
+`work-status` derives each item's stage (`download → crop → narrate →
+audio → render`, with `transcribe` surfacing only when a panel-transcript
+run was started and left unfinished — OCR itself is optional) purely from
+files on disk, so it is correct even if the previous agent died mid-run. It also shows live claims and the latest
 shared notes. `--next` lists only the unclaimed, actionable tasks.
 
 Then loop:

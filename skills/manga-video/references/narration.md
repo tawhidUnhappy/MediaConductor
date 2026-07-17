@@ -1,6 +1,7 @@
 # Grounded manga narration
 
-Read this reference after crop approval and `panel-transcript`, before TTS.
+Read this reference after crop approval, before TTS. (`panel-transcript` OCR
+is optional — see the workflow reference.)
 
 ## File contract
 
@@ -48,11 +49,12 @@ machine-generated `transcript.json` with narration.
 
 ## Authoring and review
 
-For each panel, read the panel image and its matching `transcript.json` entry.
-Describe only visible action and story context supported by the source. Keep
-names, pronouns, relationships, abilities, locations, and speaker attribution
-consistent across adjacent panels and chapters. Treat OCR as evidence, not as
-infallible text: compare it with the bubble before quoting or paraphrasing.
+For each panel, read the panel image (and its `transcript.json` entry when a
+panel-transcript run exists). Describe only visible action and story context
+supported by the source. Keep names, pronouns, relationships, abilities,
+locations, and speaker attribution consistent across adjacent panels and
+chapters. Treat OCR as evidence, not as infallible text: compare it with the
+bubble before quoting or paraphrasing.
 
 Write natural spoken prose. Avoid inventing dialogue, motives, off-panel
 events, or visual details. Avoid narrating credits, scanlator notices, and

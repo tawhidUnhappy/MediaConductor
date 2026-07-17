@@ -121,7 +121,7 @@ D:/MediaProjects/library/<project-name>/   <- --project-root
   01/
     download/            source pages: 001.jpg, 002.webp, ...
     panels/              panel images (.png/.jpg/.webp), one per narration entry
-    transcript.json      OCR grounding generated before narration
+    transcript.json      OPTIONAL OCR cross-evidence (panel-transcript)
     narration.json       [{"image": "chapter1_001.png", "narration": "text..."}, ...]
     intro.json           OPTIONAL, same shape — prepended at load time (cold open)
   02/ ...
@@ -275,7 +275,9 @@ series start to end — politely, resumably — `--chapter N` / `--chapters
 several scanlations share a number), `style-detect` (webtoon vs paged
 verdict + sample pages to eyeball), `webtoon-split` (vertical strips),
 `page-split` (paged manga, MAGI v3), `gutter-split` (low-level engine),
-`panel-transcript` (OCR grounding), `narration-check` (structural validation),
+`panel-transcript` (optional OCR cross-evidence — the narrating agent may
+read bubbles directly from panels instead), `narration-check` (structural
+validation),
 and `narration-review-sheets` (panel/text/OCR semantic review). The
 crop → verify → narrate loop is documented in
 [operate/crop-verify-narrate.md](operate/crop-verify-narrate.md).

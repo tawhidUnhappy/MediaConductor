@@ -305,19 +305,28 @@ you skimmed. While reading, note:
   risqué imagery, and the credits/scanlator page. List them; they are
   excluded in Phase 5, and they must never appear in the thumbnail.
 
-## Phase 4.5 — OCR the bubbles (`panel-transcript`)
+## Phase 4.5 — OCR the bubbles (`panel-transcript`) — OPTIONAL
 
 ```bash
 mediaconductor install-tool deepseek-ocr2   # one-time
 mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07
 ```
 
-Writes `<item>/transcript.json` — every panel's bubble/caption text. Write
-narration from **panel image + transcript together**. Viewer feedback on a
-shipped recap that skipped this: wrong speaker attribution, lines that
-summarized several panels while one panel was on screen, paraphrases that
-drifted from what the character actually said. The transcript is also what
-`narration-review-sheets` shows next to each line in the verification pass.
+Writes `<item>/transcript.json` — every panel's bubble/caption text, shown as
+a cross-check column on `narration-review-sheets`. **This step is optional and
+the narrating agent decides.** Honest cost/benefit from production use: a
+vision agent reads the bubbles directly off the panel crops while writing each
+line, so the transcript adds no new information most of the time, costs a long
+GPU run, and its output on stylized SFX/calligraphy is noisy enough that
+disagreements usually resolve in favor of the panel. Run it when bubble text
+is small/dense/blurry, when character-name spellings need pinning down, or
+when whoever writes narration cannot see images; skip it otherwise. The
+narration-quality incidents this phase historically fixed (wrong speakers,
+multi-panel summaries, paraphrase drift) were actually fixed by the **per-panel
+writing discipline + review-sheet pass** in Phases 4–5 — not by the OCR file
+itself. All later gates (work-status/work-qa, review sheets, video build) work
+with or without `transcript.json`; only a transcript that exists but is
+half-filled is flagged, as an interrupted run to finish or delete.
 
 ## Phase 5 — Write `narration.json`
 

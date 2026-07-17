@@ -135,17 +135,25 @@ then `--apply`) carries narration texts and WAVs to the new numbering, then
 review its `shift`/`merge` list with `narration-review-sheets
 --only-images ...` and rebuild with `mediaconductor video --overwrite-video`.
 
-## 4. Write narration grounded in transcripts, then verify it
+## 4. Write narration grounded in the panels, then verify it
 
-First OCR every panel (needs `install-tool deepseek-ocr2`):
+Narration is written by YOU, from the panel images — Read every panel of the
+chapter and take the bubble text from what you see. OCR is **optional**: if
+you want a second, independent reading (small/dense text, doubtful names, or
+a non-vision agent doing the narrating), run panel-transcript first (needs
+`install-tool deepseek-ocr2`) and its text appears as a cross-check column on
+the review sheets:
 
 ```bash
 mediaconductor panel-transcript --project-root library/<Project> --item-range 01-12
 ```
 
-Then write `library/<Project>/<item>/narration.json`
-(`[{"image": "<panel file>", "narration": "..."}]`) from **panel image +
-transcript together** — style rules in
+Skipping it skips nothing else — every gate below works with or without
+`transcript.json` (a *half-finished* transcript is flagged by work-qa as an
+interrupted run: finish it or delete it). Write
+`library/<Project>/<item>/narration.json`
+(`[{"image": "<panel file>", "narration": "..."}]`) from the **panel image**
+(+ transcript when present) — style rules in
 `mediaconductor/assets/prompts/narration.md`. Optional `intro.json` (same shape)
 gives chapter 01 a cold-open hook reel — it is **prepended** before that
 chapter's `narration.json`, so its panels must be ones the chapter's
@@ -157,8 +165,9 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
 
 - **one beat per panel** — the line describes THAT panel, never a summary of
   several panels smeared over one image;
-- **paraphrase anchored to the transcript** — reword freely, but the meaning
-  must match the panel's actual bubble text;
+- **paraphrase anchored to the bubble text** — reword freely, but the meaning
+  must match what the panel actually says (use the OCR transcript as
+  cross-evidence when it exists);
 - **speakers attributed from the panel** (who is on-panel, whose bubble
   tail) — if unsure, narrate without naming;
 - **no punctuation-only lines** (`"?!"` → near-empty TTS audio; video-check

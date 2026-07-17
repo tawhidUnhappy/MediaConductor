@@ -172,7 +172,10 @@ def item_status(item_dir: Path, name: str, audio_root: Path, output_root: Path) 
         next_stage = "download"
     elif panels == 0:
         next_stage = "crop"
-    elif ocr_total == 0 or ocr_filled < ocr_total:
+    elif ocr_total and ocr_filled < ocr_total:
+        # OCR is optional (a vision agent narrates from the panels themselves);
+        # but a transcript that was STARTED and left half-done means an
+        # interrupted panel-transcript run — finish it before narrating.
         next_stage = "transcribe"
     elif not narration:
         next_stage = "narrate"

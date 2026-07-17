@@ -61,8 +61,14 @@ and `webtoon-cutcheck`. The default is `download`.
    Apply `webtoon-override` fixes and repeat the split until every crop is
    approved. Never infer approval only from a command's exit code.
 
-5. OCR every panel before writing narration. Because this is long-running,
-   use the typed detached wrapper and poll the returned id:
+5. Optionally OCR the panels before writing narration. The narrating agent
+   reads bubble text from the panel images themselves; `panel-transcript` adds
+   an independent OCR reading that shows up as a cross-check column on the
+   review sheets. Run it when text is small/dense, names are uncertain, or the
+   narrator cannot see images — skip it freely otherwise (every later gate
+   works without `transcript.json`; only a half-finished transcript is flagged
+   as an interrupted run). Because it is long-running, use the typed detached
+   wrapper and poll the returned id:
 
    ```bash
    <mc> job-start --tool panel_transcript --arguments-json '{"project_root":"D:/MediaProjects/library/example","items":["01"],"device":"auto"}'
