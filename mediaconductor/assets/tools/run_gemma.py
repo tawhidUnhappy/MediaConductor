@@ -39,6 +39,11 @@ from pathlib import Path
 
 DEFAULT_MAX_TOKENS = 900
 DEFAULT_TEMPERATURE = 0.4
+# With thinking disabled (--reasoning-budget 0) Gemma still tends to narrate
+# its deliberation in plain content unless told not to; requests that bring
+# their own system prompt (all pipeline callers) override this entirely.
+DEFAULT_SYSTEM = ("Answer directly and concisely. Never narrate your reasoning "
+                  "process or restate the task; give only the answer.")
 # Panels keep their aspect ratio; width drives text legibility, the height cap
 # keeps very tall webtoon panels from exploding the vision token budget.
 IMAGE_MAX_WIDTH = 768
@@ -105,7 +110,7 @@ def _build_body(request: dict, base_dir: Path, args: argparse.Namespace) -> dict
     prompt = _read_text_field(request, "prompt", base_dir)
     if not prompt:
         raise ValueError("request has no prompt/prompt_file")
-    system = _read_text_field(request, "system", base_dir)
+    system = _read_text_field(request, "system", base_dir) or DEFAULT_SYSTEM
     images = [Path(base_dir / str(p)) for p in request.get("images") or []]
 
     if images:
@@ -126,7 +131,16 @@ def _build_body(request: dict, base_dir: Path, args: argparse.Namespace) -> dict
     }
     schema = request.get("json_schema")
     if schema:
-        body["response_format"] = {"type": "json_object", "schema": schema}
+        # Send both accepted spellings: the OpenAI-style response_format and
+        # llama-server's native top-level json_schema body field. Builds that
+        # understand either will grammar-constrain the output; unknown fields
+        # are ignored. (An unconstrained run let the model spend the whole
+        # token budget thinking and return empty content — real failure.)
+        body["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {"name": "result", "strict": True, "schema": schema},
+        }
+        body["json_schema"] = schema
     return body
 
 
@@ -139,6 +153,9 @@ def main() -> int:
     parser.add_argument("--ctx-size", type=int, default=8192)
     parser.add_argument("--gpu-layers", type=int, default=99,
                         help="Layers to offload (ignored by CPU-only builds).")
+    parser.add_argument("--reasoning-budget", type=int, default=0,
+                        help="Thinking-token budget (0 disables thinking, -1 unlimited; "
+                             "default 0 so small max_tokens budgets return content).")
     parser.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
     parser.add_argument("--temperature", type=float, default=DEFAULT_TEMPERATURE)
     parser.add_argument("--load-timeout", type=float, default=900.0)
@@ -193,6 +210,10 @@ def main() -> int:
         "--host", "127.0.0.1", "--port", str(port),
         "--ctx-size", str(args.ctx_size), "-ngl", str(args.gpu_layers),
         "--jinja",
+        # Gemma 4 is a thinking model; unbounded reasoning silently consumed
+        # the whole max_tokens budget and returned EMPTY content on real
+        # panels. Pipeline callers need answers, not deliberation.
+        "--reasoning-budget", str(args.reasoning_budget),
     ]
     if needs_vision:
         command += ["--mmproj", str(args.mmproj)]
