@@ -131,6 +131,18 @@ Vision is enabled (clients can send images), thinking is disabled by default
 string works as the API key. Every OpenAI-compatible client can use it:
 Cline, Roo Code, Continue, LM Studio's chat, Open WebUI, curl.
 
+Want Gemma's full thinking mode for agent/chat use?
+
+```bash
+mediaconductor llm --serve --reasoning-budget -1
+```
+
+The server separates deliberation into the response's `reasoning_content`
+field, so clients like Cline render it as a collapsible "Thinking" block
+while the final answer stays clean (verified). Thinking improves multi-step
+agent reliability at the cost of slower replies; the pipeline's own assist
+commands always run with thinking off regardless of the serve flag.
+
 ## Driving MediaConductor from VS Code with Cline (local + free)
 
 [Cline](https://github.com/cline/cline) is an open-source agent extension —
@@ -189,7 +201,13 @@ API Configuration:
 ```
 
 (For a global/wheel install, `"command": "mediaconductor"` with just the
-`mcp ...` args works. Adjust the workspace path to yours.)
+`mcp ...` args works; a source checkout can also point `command` straight at
+`<checkout>\.venv\Scripts\mediaconductor.exe`. Adjust the workspace path to
+yours. The same JSON can be written directly to Cline's settings file at
+`%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`;
+add read-only tools such as `work_status`, `job_status`, `library_list`,
+`style_detect`, `narration_check`, `work_qa` to `"autoApprove"` so status
+polling doesn't require a click per call.)
 
 **6. Drive it.** A good first message to the Cline agent:
 
