@@ -183,31 +183,8 @@ API Configuration:
 | Model ID | `gemma-4` |
 | Supports images | enabled (the endpoint serves vision) |
 
-**5. Give it the MediaConductor tools (MCP)**: Cline tab → MCP Servers icon
-→ *Configure MCP Servers*, and add:
-
-```json
-{
-  "mcpServers": {
-    "media-conductor-manga": {
-      "command": "uv",
-      "args": ["--project", "D:/MediaConductor", "run", "mediaconductor",
-               "mcp", "--mode", "manga-video",
-               "--allow-root", "D:/MediaConductor"],
-      "disabled": false
-    }
-  }
-}
-```
-
-(For a global/wheel install, `"command": "mediaconductor"` with just the
-`mcp ...` args works; a source checkout can also point `command` straight at
-`<checkout>\.venv\Scripts\mediaconductor.exe`. Adjust the workspace path to
-yours. The same JSON can be written directly to Cline's settings file at
-`%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`;
-add read-only tools such as `work_status`, `job_status`, `library_list`,
-`style_detect`, `narration_check`, `work_qa` to `"autoApprove"` so status
-polling doesn't require a click per call.)
+**5. Give it the MediaConductor tools (MCP)** — see the next section for the
+complete copy-paste configuration and what every field means.
 
 **6. Drive it.** A good first message to the Cline agent:
 
@@ -225,3 +202,92 @@ bridge) pointed at the same `--serve` URL.
 Whatever the driver, keep it on the rails: `commands --mode manga-video --json
 --full` for discovery, background jobs for anything long-running, and treat
 exit 3 as "look at the listed artifacts before continuing".
+
+## Setting up the MCP server in Cline (complete walkthrough)
+
+MCP is how the model gets MediaConductor's typed tools instead of guessing at
+shell commands. Cline reads one JSON file; that file describes programs Cline
+should launch and talk to over stdio.
+
+**Open the config file** — Cline tab → **MCP Servers** icon (the server/stack
+icon in Cline's top bar) → **Installed** → **Configure MCP Servers**. That
+button opens the file, which lives at:
+
+```
+%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json
+```
+
+**Paste this** (a source checkout at `D:\MediaConductor` — adjust the four
+paths to your install; in JSON every backslash is doubled):
+
+```json
+{
+  "mcpServers": {
+    "media-conductor-manga": {
+      "type": "stdio",
+      "command": "D:\\MediaConductor\\.venv\\Scripts\\mediaconductor.exe",
+      "args": [
+        "mcp",
+        "--mode",
+        "manga-video",
+        "--allow-root",
+        "D:\\MediaConductor"
+      ],
+      "env": {
+        "MEDIACONDUCTOR_PROJECT_ROOT": "D:\\MediaConductor"
+      },
+      "cwd": "D:\\MediaConductor",
+      "disabled": false,
+      "timeout": 120,
+      "autoApprove": [
+        "modes",
+        "where",
+        "doctor",
+        "library_list",
+        "series_plan",
+        "work_status",
+        "work_artifacts",
+        "job_status",
+        "job_list",
+        "style_detect",
+        "video_check",
+        "narration_check",
+        "video_validate",
+        "work_qa"
+      ]
+    }
+  }
+}
+```
+
+For a global/wheel install, use `"command": "mediaconductor"`; on
+Linux/macOS point `command` at `<checkout>/.venv/bin/mediaconductor`.
+
+**What each field means:**
+
+| Field | Meaning |
+|---|---|
+| `"media-conductor-manga"` | Display name only — call it anything. |
+| `type: "stdio"` | Cline launches the program itself and talks over stdin/stdout (the alternative is a remote HTTP/SSE server). |
+| `command` + `args` | The exact program: MediaConductor's `mcp` subcommand. `--mode manga-video` exposes only the ~40 manga tools (small model context); `--allow-root` is a safety boundary — the server refuses any file path outside that folder. |
+| `env`, `cwd` | Pin the workspace so downloads/outputs always land under it, no matter how Cline launches the server. |
+| `timeout` | Seconds Cline waits for one tool call. Long stages don't need more: the catalog's `job_start`/`job_status` pattern returns immediately and polls. |
+| `autoApprove` | Tools Cline may call without asking per call. Only list **read-only** tools (status, validators, listings) — anything that downloads, renders, deletes, or publishes should keep asking. |
+
+**Verify:** save the file; the MCP Servers → Installed list shows the server
+with a green dot, and expanding it lists the tools (`manga_auto`, `crop_qa`,
+`narrate_auto`, `job_start`, …). Then test from chat:
+
+> Using the media-conductor-manga tools, call `where` and `library_list` and
+> tell me the workspace root and which projects exist.
+
+**Troubleshooting:** a red dot almost always means a typo in `command`'s path
+(single backslashes are the classic). Fix, then *Restart Server* on the
+server's row. To prove the server works outside Cline, run the same command
+in a terminal — `D:\MediaConductor\.venv\Scripts\mediaconductor.exe mcp
+--mode manga-video --allow-root D:\MediaConductor` — it should sit silently
+waiting on stdin (Ctrl+C to leave), not print an error.
+
+This skill transfers: every MCP server for any tool (GitHub, databases,
+browsers) is this same file shape — a name, a `command` that starts a
+program, and its `args`.
