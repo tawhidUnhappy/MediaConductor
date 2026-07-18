@@ -143,6 +143,15 @@ while the final answer stays clean (verified). Thinking improves multi-step
 agent reliability at the cost of slower replies; the pipeline's own assist
 commands always run with thinking off regardless of the serve flag.
 
+### What needs starting, when
+
+| Piece | Do you start it? |
+|---|---|
+| MCP server (`media-conductor-manga`) | **Never.** Cline launches the `stdio` program itself whenever a tool is needed and stops it itself. |
+| Cline with a cloud model (e.g. a free Usage-Billing model) | **Nothing to start** — open Cline and go. |
+| Cline with your local Gemma (provider = OpenAI Compatible → `http://127.0.0.1:8080/v1`) | **Yes** — the endpoint must be running first: `<install>\.venv\Scripts\mediaconductor.exe llm --serve` (any terminal, leave it open; Ctrl+C stops it). If it's down, Cline's requests simply error until you start it. |
+| The assist commands (`crop-qa`, `narrate-auto`, `characters --auto-draft`, `manga-auto`) | **Nothing** — each run boots its own private model server and always tears it down, independent of `--serve`. |
+
 ## Driving MediaConductor from VS Code with Cline (local + free)
 
 [Cline](https://github.com/cline/cline) is an open-source agent extension —
@@ -202,6 +211,38 @@ bridge) pointed at the same `--serve` URL.
 Whatever the driver, keep it on the rails: `commands --mode manga-video --json
 --full` for discovery, background jobs for anything long-running, and treat
 exit 3 as "look at the listed artifacts before continuing".
+
+## Using Ollama as Cline's model instead
+
+[Ollama](https://ollama.com) is a fine alternative driver brain: it runs as a
+background service on 127.0.0.1:11434, auto-starts with Windows, and makes
+switching between local models trivial (`ollama pull` from a large catalog —
+Gemma, DeepSeek-R1 distills, Qwen, Llama, …). Cline has a **native Ollama
+provider**:
+
+1. Install Ollama, then pull a model sized for your GPU, e.g.:
+
+   ```bash
+   ollama pull gemma3:12b        # or another model that fits your VRAM
+   ```
+
+2. Cline → Settings → API Provider = **Ollama**. Base URL stays the default
+   (`http://localhost:11434`); pick the pulled model from the dropdown.
+3. Nothing to start manually — the Ollama service is always on.
+
+Trade-offs vs `mediaconductor llm --serve`: Ollama stores its own copies of
+model weights (a second multi-GB download per model, under `~\.ollama`),
+while `--serve` reuses the exact pinned weights the pipeline installed. You
+can avoid the duplicate for the pipeline's model by importing the existing
+GGUF into Ollama with a two-line Modelfile
+(`FROM <install>\.mangaeasy\tools\gemma-4\model\gemma-4-E4B-it-Q4_0.gguf`,
+then `ollama create gemma4-local -f Modelfile`) — text works; vision via an
+imported projector is not reliable across Ollama versions, so prefer
+catalog-pulled vision models when the driver needs to see images.
+
+Either way this only changes the **driver** model in Cline. The pipeline's
+own assist commands (`crop-qa`, `narrate-auto`, …) always run on the
+installed gemma-4 tool env and are unaffected by the Ollama choice.
 
 ## Setting up the MCP server in Cline (complete walkthrough)
 
