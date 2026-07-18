@@ -175,12 +175,18 @@ def parse_args() -> argparse.Namespace:
         description="Run the local Gemma 4 LLM (text + images) inside its isolated env. "
                     f"Install first with: {CLI_NAME} install-tool gemma-4",
     )
-    mode = parser.add_mutually_exclusive_group(required=True)
+    mode = parser.add_mutually_exclusive_group(required=False)
     mode.add_argument("--prompt", help="User prompt text.")
     mode.add_argument("--prompt-file", type=Path, help="Read the user prompt from a UTF-8 file.")
     mode.add_argument("--batch-manifest", type=Path,
                       help="JSON array of {prompt|prompt_file, system?, images?, json_schema?, "
                            "output}; loads the model once for all requests.")
+    mode.add_argument("--serve", action="store_true",
+                      help="Run a persistent local OpenAI-compatible endpoint "
+                           "(http://127.0.0.1:<port>/v1) with vision enabled, for chat UIs "
+                           "and agent extensions (Cline/Roo/Continue). Ctrl+C stops it.")
+    parser.add_argument("--port", type=int, default=8080,
+                        help="Port for --serve (default 8080).")
     parser.add_argument("--system", help="Optional system prompt.")
     parser.add_argument("--system-file", type=Path)
     parser.add_argument("--image", action="append", default=[], type=Path,
@@ -191,7 +197,39 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ctx-size", type=int, default=8192)
     parser.add_argument("--max-tokens", type=int, default=900)
     parser.add_argument("--temperature", type=float, default=0.4)
-    return parser.parse_args()
+    parser.add_argument("--reasoning-budget", type=int, default=0,
+                        help="Thinking-token budget (0 disables thinking — the default, "
+                             "so replies never come back empty; -1 = unlimited).")
+    args = parser.parse_args()
+    if not (args.serve or args.prompt is not None or args.prompt_file or args.batch_manifest):
+        parser.error("one of --prompt / --prompt-file / --batch-manifest / --serve is required")
+    return args
+
+
+def serve(resolved: dict, args) -> int:
+    """Foreground llama-server on the installed Gemma — a free local endpoint.
+
+    This is what lets a VS Code agent extension (Cline/Roo/Continue) or any
+    OpenAI-compatible chat UI use the SAME weights and GPU runtime the
+    pipeline uses, with no second model download and no API cost. Vision
+    (--mmproj) is always enabled so clients can send images.
+    """
+    command = [
+        str(resolved["server"]), "-m", str(resolved["model"]),
+        "--host", "127.0.0.1", "--port", str(args.port),
+        "--ctx-size", str(args.ctx_size), "-ngl", "99",
+        "--jinja", "--reasoning-budget", str(args.reasoning_budget),
+    ]
+    if resolved["mmproj"] is not None:
+        command += ["--mmproj", str(resolved["mmproj"])]
+    print(f"[llm] serving {MODEL_FILE} at http://127.0.0.1:{args.port}/v1  (Ctrl+C stops)")
+    print("[llm] client settings: provider = OpenAI-compatible, "
+          f"base URL = http://127.0.0.1:{args.port}/v1, model = gemma-4, "
+          "API key = any non-empty string")
+    try:
+        return runtime.run(command, cwd=resolved["server"].parent).returncode
+    except KeyboardInterrupt:
+        return 0
 
 
 def main() -> int:
@@ -202,8 +240,12 @@ def main() -> int:
         print(f"[error] {exc}", flush=True)
         return 1
 
+    if args.serve:
+        return serve(resolved, args)
+
     command = _adapter_command(resolved, ctx_size=args.ctx_size,
                                max_tokens=args.max_tokens, temperature=args.temperature)
+    command += ["--reasoning-budget", str(args.reasoning_budget)]
     if args.batch_manifest is not None:
         command += ["--batch-manifest", str(args.batch_manifest.resolve())]
     else:

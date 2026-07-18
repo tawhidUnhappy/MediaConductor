@@ -115,27 +115,94 @@ These run regardless of whether Gemma is installed:
   creating a second `library/` tree. `download` prints its destination before
   any network work, and `where --json` reports `workspace_root`.
 
-## Driving MediaConductor with a local LLM as the agent
+## The local endpoint: `llm --serve`
 
-The assist commands intentionally reduce what the *driver* needs: it only has
-to run CLI commands (or MCP tools) and react to exit codes 0/1/2/3. Workable
-drivers, in order of least friction:
+The gemma-4 install doubles as a **free local OpenAI-compatible server** —
+the same weights and GPU runtime the pipeline uses, no second download, no
+API key, no cloud:
 
-1. **Cline or Roo Code (VS Code extensions)** — both are agentic (terminal
-   execution + MCP client) and both support local models via Ollama/OpenAI-
-   compatible endpoints. Point them at a local Gemma 4 (e.g. `ollama run
-   gemma4`) and register the MCP server:
-   `mediaconductor mcp --mode manga-video --allow-root <workspace>`.
-2. **Continue (VS Code/JetBrains)** — good local-model support; agent mode is
-   lighter than Cline's, fine for the `manga-auto` happy path.
-3. **Any OpenAI-compatible chat UI with MCP support** (LM Studio ≥ 0.3.17,
-   Open WebUI with an MCP bridge) — expose the mode-scoped MCP server and let
-   the model call typed tools; the `job_start`/`job_status` pattern keeps
-   long stages out of request timeouts.
-4. **llama-server directly** — MediaConductor's own gemma-4 install doubles as
-   a general local endpoint: run `gemma-4/llama/.../llama-server -m
-   gemma-4/model/gemma-4-E4B-it-Q4_0.gguf --jinja --port 8080` and point any
-   OpenAI-compatible client at it.
+```bash
+mediaconductor llm --serve            # http://127.0.0.1:8080/v1  (Ctrl+C stops)
+mediaconductor llm --serve --port 9090
+```
+
+Vision is enabled (clients can send images), thinking is disabled by default
+(`--reasoning-budget 0`) so replies never come back empty, and any non-empty
+string works as the API key. Every OpenAI-compatible client can use it:
+Cline, Roo Code, Continue, LM Studio's chat, Open WebUI, curl.
+
+## Driving MediaConductor from VS Code with Cline (local + free)
+
+[Cline](https://github.com/cline/cline) is an open-source agent extension —
+it runs terminal commands and speaks MCP, like the Claude Code/Codex panels,
+but works with any model endpoint. Paired with `llm --serve`, the whole
+stack is local and free.
+
+**1. Install the extension** (either way):
+
+```bash
+code --install-extension saoudrizwan.claude-dev
+```
+
+or Extensions view (`Ctrl+Shift+X`) → search "Cline" → Install.
+(Alternatives with the same setup shape: Roo Code
+`RooVeterinaryInc.roo-cline`, Continue `Continue.continue`.)
+
+**2. Put it next to Claude Code / Codex**: Cline appears as an icon in the
+left Activity Bar. Drag that icon into the right-hand Secondary Side Bar
+(or right-click the icon → *Move To* → *Secondary Side Bar*). It docks as
+another tab beside the other agent panels.
+
+**3. Start the local model** (keep this terminal open, or run it as a
+background job):
+
+```bash
+mediaconductor llm --serve
+```
+
+**4. Connect Cline to it**: open the Cline tab → gear icon (Settings) →
+API Configuration:
+
+| Setting | Value |
+|---|---|
+| API Provider | **OpenAI Compatible** |
+| Base URL | `http://127.0.0.1:8080/v1` |
+| API Key | anything non-empty, e.g. `local` |
+| Model ID | `gemma-4` |
+| Supports images | enabled (the endpoint serves vision) |
+
+**5. Give it the MediaConductor tools (MCP)**: Cline tab → MCP Servers icon
+→ *Configure MCP Servers*, and add:
+
+```json
+{
+  "mcpServers": {
+    "media-conductor-manga": {
+      "command": "uv",
+      "args": ["--project", "D:/MediaConductor", "run", "mediaconductor",
+               "mcp", "--mode", "manga-video",
+               "--allow-root", "D:/MediaConductor"],
+      "disabled": false
+    }
+  }
+}
+```
+
+(For a global/wheel install, `"command": "mediaconductor"` with just the
+`mcp ...` args works. Adjust the workspace path to yours.)
+
+**6. Drive it.** A good first message to the Cline agent:
+
+> Run `mediaconductor manga-auto --url "<MangaDex URL>" --name <project>`
+> as a background job, watch job-status, and stop at any exit-3 gate to
+> show me the review checklist.
+
+Expectation management: a 4B-effective local model is a capable *operator*
+of these rails (run commands, read exit codes, relay checklists) but not a
+strong *reviewer* — the exit-3 gates and your own eyes stay in the loop.
+Other workable drivers: Roo Code / Continue (same endpoint settings), or
+any MCP-capable chat UI (LM Studio ≥ 0.3.17, Open WebUI with an MCP
+bridge) pointed at the same `--serve` URL.
 
 Whatever the driver, keep it on the rails: `commands --mode manga-video --json
 --full` for discovery, background jobs for anything long-running, and treat
