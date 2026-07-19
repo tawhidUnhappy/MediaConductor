@@ -171,7 +171,12 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
 - **speakers attributed from the panel** (who is on-panel, whose bubble
   tail) — if unsure, narrate without naming;
 - **no punctuation-only lines** (`"?!"` → near-empty TTS audio; video-check
-  flags these as unspeakable);
+  flags these as unspeakable); avoid a bare trailing em dash/hyphen with no
+  closing word (`"...Ah—"`) — TTS handles a genuine trail-off more
+  predictably with an ellipsis. Note: an occasional TTS tail-click is a
+  generation-random model artifact seen across ordinary, well-formed lines
+  too — `video-fade-audio`'s adaptive declick (see CLAUDE.md) is the actual
+  fix, not narration wording;
 - **optional `"emotion"` field** on the few lines that earn it (reveals,
   battle cries, tearful goodbyes): a 1–3 word phrase like `"tense"` or
   `"cold, menacing"` that IndexTTS2 blends into the voice — vocabulary and
@@ -209,7 +214,7 @@ mediaconductor video --project-root library/<Project> --audio-root audio \
 `--tts auto` uses IndexTTS (voice cloning) when an NVIDIA GPU + model +
 speaker WAV are available, otherwise Kokoro. Music is mixed low under the
 narration by design — conditioned, loudness-aligned, side-chain ducked at
-`--music-volume-db` −28 dB default, tuned to stay comfortable over a long
+`--music-volume-db` −30 dB default, tuned to stay comfortable over a long
 watch (keep within −20…−32; narration is
 normalized to −14 LUFS first). **Rebuilding after any panel/narration/audio
 change: pass `--overwrite-video`** (stale item videos are also mtime-detected

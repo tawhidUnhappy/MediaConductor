@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from mediaconductor.defaults import default_music_volume_db
 from mediaconductor.utils import archive_before_overwrite
 from mediaconductor.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem, load_narration
 from mediaconductor.video_pipeline.common import item_dirs, item_number, item_value, merge_item_selection, project_name
@@ -42,7 +43,7 @@ class LongVideoConfig:
     audio_root: Path | None = None
     narration_dir: Path | None = None
     background_music: Path | None = None
-    music_volume_db: float = -28.0
+    music_volume_db: float = default_music_volume_db()
     narration_volume: float = 1.0
     # Off by default: a missing item video is normally a failed render and
     # must stop the build. Turn on only when a chapter genuinely does not

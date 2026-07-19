@@ -3,6 +3,9 @@ from __future__ import annotations
 import argparse
 import shlex
 import subprocess
+import wave
+
+import numpy as np
 
 from mediaconductor import runtime
 from pathlib import Path
@@ -32,6 +35,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--items", nargs="*", help="Item names or ranges, for example: 01 02 05-08.")
     parser.add_argument("--item-range", help="Convenience range, for example: 01-12.")
     parser.add_argument("--fade-ms", type=float, default=8.0, help="Fade-in and fade-out length in milliseconds.")
+    parser.add_argument(
+        "--no-declick",
+        action="store_true",
+        help="Disable adaptive fade-out extension for trailing TTS click artifacts "
+             "(use the fixed --fade-ms fade-out for every file).",
+    )
     parser.add_argument("--sample-rate", type=int, default=48000)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -63,6 +72,74 @@ def audio_duration(path: Path) -> float:
         print_command=False,
     )
     return float(result.stdout.strip())
+
+
+# IndexTTS occasionally leaves a spurious click/pop transient a few milliseconds
+# before the true end of a clip -- the real speech decays to near-silence, then a
+# short burst appears with no further decay before the file just stops. A fixed
+# 8 ms fade-out lands mid-artifact and only partially attenuates it (still audible
+# as a click). Detect that quiet-then-blip tail shape and extend the fade-out to
+# start before the blip instead of at a fixed offset; ordinary clips (blip-free,
+# or ending naturally within the floor window) are unaffected.
+_DECLICK_HOP_MS = 2.0
+_DECLICK_QUIET_FRAC = 0.06
+_DECLICK_MIN_QUIET_MS = 20.0
+_DECLICK_MAX_EXTEND_MS = 150.0
+
+
+def read_wav_mono_float(path: Path) -> tuple[np.ndarray, int]:
+    with wave.open(str(path), "rb") as handle:
+        sr = handle.getframerate()
+        channels = handle.getnchannels()
+        width = handle.getsampwidth()
+        raw = handle.readframes(handle.getnframes())
+    if width != 2:
+        # Only 16-bit PCM (the pipeline's own format) is supported; anything else
+        # skips adaptive detection and falls back to the floor fade.
+        return np.array([], dtype=np.float32), sr
+    samples = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    if channels > 1:
+        samples = samples.reshape(-1, channels).mean(axis=1)
+    return samples, sr
+
+
+def compute_adaptive_fade_out_ms(samples: np.ndarray, sr: int, floor_ms: float) -> float:
+    """Return the fade-out duration (>= floor_ms) needed to cover a trailing click."""
+    if samples.size == 0 or sr <= 0:
+        return floor_ms
+    peak = float(np.max(np.abs(samples)))
+    if peak <= 0:
+        return floor_ms
+    hop = max(1, int(sr * _DECLICK_HOP_MS / 1000))
+    n_hops = samples.size // hop
+    if n_hops < 3:
+        return floor_ms
+    envelope = np.array(
+        [np.max(np.abs(samples[i * hop:(i + 1) * hop])) / peak for i in range(n_hops)]
+    )
+    loud = envelope > _DECLICK_QUIET_FRAC
+
+    if not loud[n_hops - 1]:
+        return floor_ms  # clip already ends quiet -- nothing to fix
+
+    # Walk back over the trailing loud run (the tail artifact may itself span
+    # several hops, e.g. a short burst) to find where it starts.
+    idx = n_hops - 1
+    while idx >= 0 and loud[idx]:
+        idx -= 1
+    run_start = idx + 1
+
+    # Now measure the quiet gap immediately before that trailing run.
+    quiet_run = 0
+    while idx >= 0 and not loud[idx]:
+        quiet_run += 1
+        idx -= 1
+    if quiet_run * _DECLICK_HOP_MS < _DECLICK_MIN_QUIET_MS:
+        return floor_ms  # trailing loud run isn't preceded by a real gap --
+        # it's just natural speech running to the end, not an isolated artifact.
+
+    extend_ms = (n_hops - run_start) * _DECLICK_HOP_MS
+    return float(min(max(extend_ms, floor_ms), _DECLICK_MAX_EXTEND_MS))
 
 
 def source_audio_dir(args: argparse.Namespace, chapter_dir: Path) -> Path:
@@ -106,12 +183,13 @@ def panel_audio_files(chapter_dir: Path, args: argparse.Namespace) -> list[tuple
     return result
 
 
-def fade_filter(duration: float, fade_seconds: float) -> str:
-    fade = max(0.001, min(fade_seconds, duration / 4))
-    out_start = max(0.0, duration - fade)
+def fade_filter(duration: float, fade_in_seconds: float, fade_out_seconds: float) -> str:
+    fade_in = max(0.001, min(fade_in_seconds, duration / 4))
+    fade_out = max(0.001, min(fade_out_seconds, duration / 4))
+    out_start = max(0.0, duration - fade_out)
     return (
-        f"afade=t=in:st=0:d={fade:.6f},"
-        f"afade=t=out:st={out_start:.6f}:d={fade:.6f},"
+        f"afade=t=in:st=0:d={fade_in:.6f},"
+        f"afade=t=out:st={out_start:.6f}:d={fade_out:.6f},"
         "asetpts=N/SR/TB"
     )
 
@@ -121,12 +199,17 @@ def process_audio(source: Path, target: Path, args: argparse.Namespace) -> bool:
         print(f"  skip exists: {target.name}", flush=True)
         return False
     duration = audio_duration(source)
+    floor_ms = args.fade_ms
+    fade_out_ms = floor_ms
+    if not args.no_declick:
+        samples, sr = read_wav_mono_float(source)
+        fade_out_ms = compute_adaptive_fade_out_ms(samples, sr, floor_ms)
     target.parent.mkdir(parents=True, exist_ok=True)
     command = [
         "ffmpeg", "-hide_banner", "-loglevel", "error",
         "-y" if args.overwrite else "-n",
         "-i", str(source),
-        "-af", fade_filter(duration, args.fade_ms / 1000),
+        "-af", fade_filter(duration, floor_ms / 1000, fade_out_ms / 1000),
         "-ar", str(args.sample_rate),
         "-ac", "1",
         "-c:a", "pcm_s16le",
@@ -135,7 +218,8 @@ def process_audio(source: Path, target: Path, args: argparse.Namespace) -> bool:
     if args.dry_run:
         print(" ".join(shlex.quote(part) for part in command), flush=True)
         return False
-    print(f"  write: {target.name}", flush=True)
+    note = f" (declicked, fade-out {fade_out_ms:.1f}ms)" if fade_out_ms > floor_ms else ""
+    print(f"  write: {target.name}{note}", flush=True)
     run(command)
     return True
 

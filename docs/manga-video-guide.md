@@ -167,8 +167,9 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   last gain affects voice and music together and preserves their separation.
   Any BGM change invalidates final normalization. For narration-driven
   recap videos (dense, wall-to-wall narration) the tuned value is
-  **−28 (the default)** — chosen so the bed stays comfortable over a full
-  long-form watch instead of fatiguing the listener; a punchier or sparser
+  **−30 (the default)** — chosen so the bed stays comfortable over a full
+  long-form watch instead of fatiguing the listener (lowered from −26, then
+  −28, both still too present per viewer feedback); a punchier or sparser
   edit can sit at −26 to −22; below −32 the bed risks becoming inaudible on
   phone speakers, above −15 it masks the voice. `video-add-bgm` also, by
   default, compresses the bed's own dynamic

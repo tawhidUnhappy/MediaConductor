@@ -117,6 +117,17 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - **Production manga renders use faded derivatives, not raw clip edges**:
   `audio_faded/` contains symmetric 8 ms fade-in/fade-out copies and `audio/`
   remains the recoverable TTS source. Keep `--audio-source raw` opt-in.
+- **Adaptive tail declick in `video-fade-audio`**: IndexTTS occasionally leaves
+  a spurious click/pop burst a few ms before a clip's true end — real speech
+  decays to near-silence, then a short loud burst appears with no further
+  decay before the file just stops. A fixed 8 ms fade-out lands mid-artifact
+  and only partially attenuates it (still audible). `compute_adaptive_fade_out_ms()`
+  in `preprocess_audio_fades.py` detects that quiet-then-burst tail shape (a
+  trailing loud run preceded by ≥20 ms of real silence) and extends the
+  fade-out to start before the burst; ordinary clips are untouched. This is a
+  generation-random artifact, not reliably tied to narration wording — don't
+  try to "write around" it in narration text; the pipeline is the fix. `--no-declick`
+  opts out for diagnostics only.
 - **Mix BGM before one final whole-mix normalize** to −14 LUFS / −1.5 dBTP.
   Never normalize narration, add music, and call the result final; every BGM
   change requires another final two-pass normalization pass. Keep the
@@ -129,10 +140,11 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - **`amix=…:normalize=0` and `alimiter=level=disabled`** in
   `build_mix_filter()` — each silently undid the −14 LUFS target once;
   test-guarded in `test_music_bed.py`.
-- **dB-native volume flags only** (`--music-volume-db`, default −28 — a true
+- **dB-native volume flags only** (`--music-volume-db`, default −30 — a true
   LU separation now that the bed is loudness-aligned to the measured
-  narration first; −28 keeps the bed comfortable over a long watch instead of
-  fatiguing the listener, keep new defaults within −20…−32). Never a linear
+  narration first; −30 keeps the bed comfortable over a long watch instead of
+  fatiguing the listener (was −26, then −28, both still read as too present
+  per viewer feedback; keep new defaults within −20…−32). Never a linear
   multiplier.
 - **`cudnn.benchmark` stays False** in `kokoro_batch_worker.py`;
   `--gpu-workers` is clamped to 4 by `clamp_gpu_workers()`.

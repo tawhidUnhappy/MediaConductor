@@ -9,7 +9,11 @@ from mediaconductor.panels.overrides_tool import (
     resolve_merge_at_cut,
     resolve_merge_panels,
 )
-from mediaconductor.video_pipeline.narration_edit import sorted_insert_position, upsert
+from mediaconductor.video_pipeline.narration_edit import (
+    sorted_insert_position,
+    upsert,
+    upsert_entry,
+)
 
 
 def _panels(*spans):
@@ -73,3 +77,28 @@ def test_upsert_inserts_in_name_sorted_reading_order():
         "ch01_000_hook1.jpg", "ch01_001.jpg", "ch01_002.jpg", "ch01_003.jpg"]
     # CTA copies (page 999) always land last.
     assert sorted_insert_position(entries, "ch01_999_cta.jpg") == len(entries)
+
+
+def test_upsert_entry_sets_and_changes_emotion():
+    # Regression: --set-json/--batch used to drop every field except
+    # "narration", so an entry's "emotion" (e.g. a rejected "screaming")
+    # could never be fixed or cleared through the documented interface.
+    entries = [{"image": "ch01_001.jpg", "narration": "old", "emotion": "screaming"}]
+    entries, previous = upsert_entry(
+        entries, {"image": "ch01_001.jpg", "narration": "old", "emotion": "startled"})
+    assert previous == {"image": "ch01_001.jpg", "narration": "old", "emotion": "screaming"}
+    assert entries[0] == {"image": "ch01_001.jpg", "narration": "old", "emotion": "startled"}
+
+
+def test_upsert_entry_omitted_emotion_clears_it():
+    entries = [{"image": "ch01_001.jpg", "narration": "old", "emotion": "boisterous"}]
+    entries, _ = upsert_entry(entries, {"image": "ch01_001.jpg", "narration": "new"})
+    assert entries[0] == {"image": "ch01_001.jpg", "narration": "new"}
+
+
+def test_upsert_entry_inserts_new_entry_in_reading_order():
+    entries = [{"image": "ch01_001.jpg", "narration": "a"}]
+    entries, previous = upsert_entry(
+        entries, {"image": "ch01_002.jpg", "narration": "b", "emotion": "tense"})
+    assert previous is None
+    assert [e["image"] for e in entries] == ["ch01_001.jpg", "ch01_002.jpg"]

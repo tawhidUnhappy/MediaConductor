@@ -44,7 +44,8 @@ def sorted_insert_position(entries: list[dict], image: str) -> int:
 
 
 def upsert(entries: list[dict], image: str, text: str) -> tuple[list[dict], str | None]:
-    """Set image's narration; returns (entries, previous_text or None)."""
+    """Set image's narration only, preserving any other fields; returns
+    (entries, previous_text or None). Used by --set (text-only edits)."""
     for entry in entries:
         if entry.get("image") == image:
             previous = entry.get("narration", "")
@@ -52,6 +53,21 @@ def upsert(entries: list[dict], image: str, text: str) -> tuple[list[dict], str 
             return entries, previous
     entries.insert(sorted_insert_position(entries, image),
                    {"image": image, "narration": text})
+    return entries, None
+
+
+def upsert_entry(entries: list[dict], new_entry: dict) -> tuple[list[dict], dict | None]:
+    """Replace image's whole entry with new_entry (add or full replace);
+    returns (entries, previous_entry or None). Used by --batch/--set-json so
+    optional fields like "emotion" can be set, changed, or dropped by simply
+    omitting them from new_entry — the object passed IS the new entry."""
+    image = new_entry["image"]
+    for i, entry in enumerate(entries):
+        if entry.get("image") == image:
+            previous = entry
+            entries[i] = dict(new_entry)
+            return entries, previous
+    entries.insert(sorted_insert_position(entries, image), dict(new_entry))
     return entries, None
 
 
@@ -106,23 +122,30 @@ def main() -> int:
     if target.is_file():
         entries = json.loads(target.read_text(encoding="utf-8-sig"))
 
-    batch: list[tuple[str, str]] = [(image, text) for image, text in args.set]
+    text_batch: list[tuple[str, str]] = [(image, text) for image, text in args.set]
+    entry_batch: list[dict] = []
     if args.batch is not None:
-        for entry in json.loads(args.batch.read_text(encoding="utf-8-sig")):
-            batch.append((entry["image"], entry["narration"]))
+        entry_batch.extend(json.loads(args.batch.read_text(encoding="utf-8-sig")))
     if args.set_json is not None:
-        for entry in json.loads(args.set_json):
-            batch.append((entry["image"], entry["narration"]))
+        entry_batch.extend(json.loads(args.set_json))
 
     stale_stems: list[str] = []
     added = replaced = removed = 0
-    for image, text in batch:
+    for image, text in text_batch:
         entries, previous = upsert(entries, image, text)
         if previous is None:
             added += 1
         elif previous != text:
             replaced += 1
             stale_stems.append(Path(image).stem)
+    for new_entry in entry_batch:
+        entries, previous = upsert_entry(entries, new_entry)
+        if previous is None:
+            added += 1
+            stale_stems.append(Path(new_entry["image"]).stem)
+        elif previous != new_entry:
+            replaced += 1
+            stale_stems.append(Path(new_entry["image"]).stem)
     for image in args.delete:
         before = len(entries)
         entries = [e for e in entries if e.get("image") != image]
@@ -132,7 +155,7 @@ def main() -> int:
             removed += 1
             stale_stems.append(Path(image).stem)
 
-    changed = bool(batch or args.delete)
+    changed = bool(text_batch or entry_batch or args.delete)
     if changed:
         archived = archive_before_overwrite(target)
         if archived:

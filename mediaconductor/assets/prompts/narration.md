@@ -52,6 +52,11 @@ Your task is to create narration completely from scratch for the provided manga 
 - Build tension during fights, emotional scenes, reveals, and cliffhangers.
 - Do not spoil future events.
 - Do not summarize entire chapters at once; narrate panel by panel.
+- Never write a punctuation-only line (e.g. `"?!"`) — it produces near-empty,
+  unspeakable TTS audio.
+- Avoid ending a line on a bare trailing em dash or hyphen with no closing
+  word (e.g. `"...Ah—"`); use an ellipsis instead for a genuine trail-off,
+  which TTS renders more predictably.
 
 ---
 

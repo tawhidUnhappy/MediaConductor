@@ -443,9 +443,9 @@ mediaconductor video --project-root library/<Project> --items 01 \
   and fade-out before rendering. Raw IndexTTS/Kokoro WAVs in `audio/` stay
   untouched. `--audio-source raw` is for an intentional diagnostic comparison,
   not a normal production render.
-- `--music-volume-db -28` (the default) is the tuned recap-channel value
+- `--music-volume-db -30` (the default) is the tuned recap-channel value
   for this mixing chain: with the bed conditioned, EQ-carved, and ducked
-  (all default-on) plus the 1.2 narration lift, −28 keeps the bed felt but
+  (all default-on) plus the 1.2 narration lift, −30 keeps the bed felt but
   never competing, and stays comfortable over a full long-form watch instead
   of fatiguing the listener (−15 is the masking boundary on phone speakers,
   −32 the inaudibility boundary under this chain). A punchier or sparser edit
@@ -457,7 +457,8 @@ mediaconductor video --project-root library/<Project> --items 01 \
   restores the old raw-offset behavior. An earlier production used −17
   before the loudnorm existed — with a hot-mastered YouTube-rip bed that
   was effectively ~−16 LU, slightly hot; a later production found even −26
-  fatiguing over a full-length watch and moved the default down to −28.
+  fatiguing over a full-length watch and moved the default down to −28, then
+  to −30 when −28 still read as too present.
 - **The bed is conditioned + ducked automatically (all default-on).** Beyond
   the loudness offset, `video-add-bgm` now (a) compresses the music's own
   dynamic range so it sits at a *constant* level instead of swelling and
