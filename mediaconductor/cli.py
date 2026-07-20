@@ -84,7 +84,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "work-artifacts":       ("mediaconductor.qa_loop",                              "artifacts_main", "Multi-agent",   "Inventory of reusable generated artifacts (renders, audio takes, transcripts, sheets, music beds) with reuse hints."),
 
     # ── General item-based video pipeline (the recommended workflow) ──────────
-    "video":                ("mediaconductor.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: audio (IndexTTS on GPU, Kokoro otherwise), render, join."),
+    "video":                ("mediaconductor.video_pipeline.run_pipeline",          "main",        "Video pipeline",   "Full pipeline: audio (IndexTTS on GPU, Kokoro otherwise), render, join, validate."),
     "video-audio":          ("mediaconductor.video_pipeline.generate_audio",        "main",        "Video pipeline",   "Generate per-item narration audio with Kokoro TTS."),
     "video-audio-indextts": ("mediaconductor.video_pipeline.generate_audio_indextts","main",       "Video pipeline",   "Generate per-item audio with IndexTTS (external env)."),
     "video-render":         ("mediaconductor.video_pipeline.make_videos",           "main",        "Video pipeline",   "Render one video per item from panels + audio."),
@@ -95,6 +95,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "narration-review-sheets": ("mediaconductor.video_pipeline.narration_sheets",   "main",        "Video pipeline",   "Render panel + narration + OCR sheets for semantic and speaker verification."),
     "narration-edit":       ("mediaconductor.video_pipeline.narration_edit",        "main",        "Video pipeline",   "Upsert/delete/list narration entries from the CLI (optionally pruning stale WAVs)."),
     "video-validate":       ("mediaconductor.video_pipeline.validate_generation",   "main",        "Video pipeline",   "Check generated audio/videos against the inputs."),
+    "video-chapters":       ("mediaconductor.video_pipeline.chapter_timestamps",    "main",        "Video pipeline",   "Generate ready-to-paste YouTube chapter timestamps from rendered item videos (--json)."),
     "video-audio-audit":    ("mediaconductor.video_pipeline.audio_audit",          "main",        "Video pipeline",   "Verify every panel has valid, readable audio (catches corrupt/empty files) before rendering; --fix deletes bad ones for regeneration."),
     "video-fade-audio":     ("mediaconductor.video_pipeline.preprocess_audio_fades","main",        "Video pipeline",   "Apply fade in/out to item narration audio."),
     "video-normalize-audio":("mediaconductor.video_pipeline.normalize_long_audio",  "main",        "Video pipeline",   "Loudness-normalize the joined long-video audio."),

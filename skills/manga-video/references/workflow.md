@@ -66,6 +66,18 @@ and `webtoon-cutcheck`. The default is `download`.
    Apply `webtoon-override` fixes and repeat the split until every crop is
    approved. Never infer approval only from a command's exit code.
 
+   If a split is repeated after `transcript.json` exists, immediately sync the
+   affected transcript skeleton before reviewing or writing narration:
+
+   ```bash
+   <mc> panel-transcript --project-root D:/MediaProjects/library/example --items 01 --seed-only
+   ```
+
+   This keeps OCR already attached to surviving panel names and drops rows for
+   panels the re-crop removed, without loading the OCR model. Then re-run the
+   narration checks and review sheets; changed panel/narration inputs require
+   regenerated audio and an overwritten render.
+
    A crop must fully contain its panel — never a partial edge, and never the
    whole page standing in when the panel has its own border. Frame for the
    16:9 landscape video frame the crop will be composited into: a squarish
@@ -144,6 +156,11 @@ and `webtoon-cutcheck`. The default is `download`.
    → one final two-pass whole-mix normalize to −14 LUFS / −1.5 dBTP. Any music
    change invalidates final normalization.
 
+   The all-in-one command emits one parent-level progress marker per enabled
+   stage, so poll `job-status` instead of inferring progress from file counts.
+   It also runs the structural `video-validate` gate at the end by default;
+   reserve `--no-validate` for an intentional diagnostic build.
+
 9. Loop QA until clean, then validate the joined video:
 
    ```bash
@@ -156,6 +173,13 @@ and `webtoon-cutcheck`. The default is `download`.
    check narration-to-panel timing, audit faded WAV boundaries for edge clicks,
    and measure the final complete mix at approximately −14 LUFS with true peak
    no higher than −1.5 dBTP.
+
+   Generate exact, ready-to-paste YouTube item timestamps from the rendered
+   videos rather than adding durations manually:
+
+   ```bash
+   <mc> video-chapters --project-root D:/MediaProjects/library/example --output-root D:/MediaProjects/output --items 01-12
+   ```
 
 10. Create and visually inspect a thumbnail. Confirm source, music, voice, and
    upload rights. Only on an explicit publish request, list profiles, verify

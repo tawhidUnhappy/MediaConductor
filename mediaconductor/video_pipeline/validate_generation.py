@@ -263,7 +263,14 @@ def main() -> int:
         if path.name not in selected_names and path.name not in legacy_selected_names
     )
     if extra_videos:
-        errors.append("Unexpected extra item videos: " + ", ".join(extra_videos[:20]))
+        message = "Item videos outside the selected batch: " + ", ".join(extra_videos[:20])
+        if args.items or args.item_range:
+            # A shared output root legitimately accumulates renders from other
+            # batches. They are irrelevant when the caller explicitly scoped
+            # this validation run, but still surface them as useful context.
+            warnings.append(message)
+        else:
+            errors.append("Unexpected extra item videos: " + ", ".join(extra_videos[:20]))
 
     if args.require_long:
         default_long = find_latest_long_video(args.output_root, name)

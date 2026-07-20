@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -8,7 +9,7 @@ from pathlib import Path
 from mediaconductor.defaults import default_music_volume_db
 from mediaconductor.utils import archive_before_overwrite
 from mediaconductor.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem, load_narration
-from mediaconductor.video_pipeline.common import item_dirs, item_number, item_value, merge_item_selection, project_name
+from mediaconductor.video_pipeline.common import item_dirs, item_value, merge_item_selection, project_name
 from mediaconductor.video_pipeline.ffmpeg_tools import (
     choose_h264_encoder,
     h264_encoder_args,
@@ -93,16 +94,18 @@ def discover_chapters(folder: Path) -> dict[str, Path]:
     return chapters
 
 
-def selected_range(config: LongVideoConfig, chapters: dict[str, Path]) -> tuple[int, int]:
+def selected_range(config: LongVideoConfig, chapters: dict[str, Path]) -> tuple[float, float]:
     selected = merge_item_selection(config.items, config.item_range)
     if selected:
-        return min(item_number(chapter) for chapter in selected), max(item_number(chapter) for chapter in selected)
+        return min(item_value(chapter) for chapter in selected), max(item_value(chapter) for chapter in selected)
     if config.end:
-        return item_number(config.start), item_number(config.end)
-    return item_number(config.start), int(max(item_value(name) for name in chapters))
+        return item_value(config.start), item_value(config.end)
+    return item_value(config.start), max(item_value(name) for name in chapters)
 
 
-def included_chapters(chapters: dict[str, Path], start: int, end: int, allow_gaps: bool) -> tuple[list[str], list[int]]:
+def included_chapters(
+    chapters: dict[str, Path], start: float, end: float, allow_gaps: bool
+) -> tuple[list[str], list[int]]:
     """Item names to join across ``[start, end]``, plus the integer gaps.
 
     Every item video whose numeric VALUE falls inside the range is included,
@@ -112,10 +115,16 @@ def included_chapters(chapters: dict[str, Path], start: int, end: int, allow_gap
     genuine source gap (``allow_gaps`` skips it with a warning)."""
     values = {name: item_value(name) for name in chapters}
     covered = {int(v) for v in values.values() if v == int(v)}
-    gaps = [n for n in range(start, end + 1) if n not in covered]
+    first_integer = math.ceil(start)
+    last_integer = math.floor(end)
+    gaps = [n for n in range(first_integer, last_integer + 1) if n not in covered]
     included = sorted((name for name, v in values.items() if start <= v <= end),
                       key=lambda name: (values[name], name))
     return included, gaps
+
+
+def format_range_bound(value: float) -> str:
+    return f"{int(value):02d}" if value.is_integer() else f"{value:g}"
 
 
 def chapter_narration_files(narration_dir: Path, names: list[str]) -> list[Path]:
@@ -324,7 +333,11 @@ def build_long_video(config: LongVideoConfig) -> Path:
 
     video_inputs = video_only_chapter_files(selected, work_dir) if full_narration is not None else selected
     concat_path = write_concat_file(video_inputs, work_dir / f"{out_path.stem}.ffconcat")
-    print(f"Joining {len(selected)} item video(s): {start:02d} through {end:02d}", flush=True)
+    print(
+        f"Joining {len(selected)} item video(s): "
+        f"{format_range_bound(start)} through {format_range_bound(end)}",
+        flush=True,
+    )
     inputs = ["-fflags", "+genpts", "-f", "concat", "-safe", "0", "-i", str(concat_path)]
 
     if config.background_music is not None and full_narration is not None:

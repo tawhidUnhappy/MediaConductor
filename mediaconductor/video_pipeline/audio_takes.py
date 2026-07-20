@@ -146,6 +146,24 @@ def restore_main() -> int:
             shutil.copy2(source_file, active_file)
             restored_files += 1
 
+        # A targeted cleanup archives the cheap derived item narration WAV
+        # beside the expensive panel WAVs under run_N/_items. Restore that
+        # matching derivative too; otherwise a newer active combined file can
+        # survive a targeted restore and no longer represent the restored take.
+        if args.items and item != "_items":
+            combined_dir = run_dir / "_items"
+            combined_source = combined_dir / f"item_{item}_narration.wav"
+            if not combined_source.is_file():
+                legacy = combined_dir / f"chapter_{item}_narration.wav"
+                combined_source = legacy if legacy.is_file() else combined_source
+            if combined_source.is_file():
+                active_combined = manga_audio / "_items" / combined_source.name
+                active_combined.parent.mkdir(parents=True, exist_ok=True)
+                if active_combined.exists():
+                    archive_into_run(active_combined, archive_run_dir.dir, subdir="_items")
+                shutil.copy2(combined_source, active_combined)
+                restored_files += 1
+
     if archive_run_dir.allocated is not None:
         print(f"Archived the audio that was active before this restore to: {archive_run_dir.allocated}")
     print(f"Restored {restored_files} file(s) from {args.run} into {manga_audio} for: {', '.join(wanted_items)}")

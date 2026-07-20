@@ -33,6 +33,7 @@ config.system.json
 /audio/
 /audio_faded/
 /output/
+/output_final/
 /work/
 /projects/
 /audio_preprocessed/

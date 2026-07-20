@@ -67,7 +67,7 @@ def resolve_tts_engine(choice: str, speaker_wav: Path | None) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate narration audio (IndexTTS when your machine is ready for it, Kokoro otherwise), "
-                     "then build videos."
+                     "build videos, and validate the result."
     )
     parser.add_argument("--tts", choices=("auto", "kokoro", "indextts"), default=default_tts_engine(),
                         help="TTS engine. Defaults to config.system.json -> tts.engine, else auto. "
@@ -118,6 +118,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--normalize-audio", action="store_true",
                         help="After the long video is built, loudness-normalize it in place "
                              "for YouTube (-14 LUFS integrated, two-pass).")
+    parser.add_argument(
+        "--validate",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run final structural audio/video validation (on by default; use --no-validate to skip).",
+    )
     parser.add_argument("--background-style", choices=("blur", "black", "image"), default="blur")
     parser.add_argument("--background-image", type=Path, default=None)
     parser.add_argument("--blur-sigma", type=float, default=28.0)
@@ -178,6 +184,41 @@ def run(command: list[str], cwd: Path) -> None:
     runtime.run(command, cwd=cwd, check=True)
 
 
+def _pipeline_stage_labels(args: argparse.Namespace, background_music: Path | None) -> list[str]:
+    """Return the major stages this invocation will actually execute."""
+    stages: list[str] = []
+    if not args.skip_audio:
+        stages.append("Generate narration audio")
+    if args.audio_source == "faded":
+        stages.append("Apply narration fades")
+    stages.append("Render item videos")
+    if args.build_long_video:
+        stages.append("Join long video")
+        if background_music is not None:
+            stages.append("Mix background music")
+        if args.normalize_audio:
+            stages.append("Normalize final audio")
+    if args.validate:
+        stages.append("Validate generated video")
+    return stages
+
+
+class _PipelineProgress:
+    """Keep job-status useful while the all-in-one command runs child tools."""
+
+    def __init__(self, labels: list[str]) -> None:
+        self.labels = labels
+        self.completed = 0
+
+    def run(self, command: list[str], cwd: Path) -> None:
+        label = self.labels[self.completed]
+        total = len(self.labels)
+        print(f"MEDIACONDUCTOR_PROGRESS {self.completed}/{total} Starting {label}", flush=True)
+        run(command, cwd)
+        self.completed += 1
+        print(f"MEDIACONDUCTOR_PROGRESS {self.completed}/{total} Completed {label}", flush=True)
+
+
 def main() -> int:
     args = parse_args()
     if args.audio_fade_ms <= 0:
@@ -195,6 +236,7 @@ def main() -> int:
         print("[bgm] no configured/default background music found; keeping the long video narration-only.", flush=True)
     elif args.build_long_video and args.background_music is None and background_music is not None:
         print(f"[bgm] using default background music: {background_music}", flush=True)
+    progress = _PipelineProgress(_pipeline_stage_labels(args, background_music))
 
     engine = resolve_tts_engine(args.tts, args.speaker_wav)
     if engine == "indextts":
@@ -281,10 +323,10 @@ def main() -> int:
     if args.skip_audio:
         print("\n[skip-audio] Reusing existing narration audio; not regenerating it.", flush=True)
     else:
-        run(audio_cmd, cwd)
+        progress.run(audio_cmd, cwd)
     if fade_cmd is not None:
-        run(fade_cmd, cwd)
-    run(video_cmd, cwd)
+        progress.run(fade_cmd, cwd)
+    progress.run(video_cmd, cwd)
     if args.build_long_video:
         name = project_name(args.project_root, args.project_name)
         # Join narration first. If music is requested it is mixed next; one
@@ -310,7 +352,7 @@ def main() -> int:
             long_cmd += ["--items", *selected_items]
         if args.allow_gaps:
             long_cmd.append("--allow-gaps")
-        run(long_cmd, cwd)
+        progress.run(long_cmd, cwd)
 
         long_video = find_latest_long_video(args.output_root, name)
         if long_video is None:
@@ -345,7 +387,7 @@ def main() -> int:
                 bgm_cmd += ["--no-duck"]
             if args.project_name:
                 bgm_cmd += ["--project-name", args.project_name]
-            run(bgm_cmd, cwd)
+            progress.run(bgm_cmd, cwd)
 
         if args.normalize_audio:
             norm_cmd = cli_command(
@@ -358,7 +400,23 @@ def main() -> int:
             )
             if args.project_name:
                 norm_cmd += ["--project-name", args.project_name]
-            run(norm_cmd, cwd)
+            progress.run(norm_cmd, cwd)
+
+    if args.validate:
+        validate_cmd = cli_command(
+            "video-validate",
+            "--project-root", str(args.project_root),
+            "--audio-root", str(effective_audio_root),
+            "--output-root", str(args.output_root),
+            "--fps", str(args.fps),
+        )
+        if args.project_name:
+            validate_cmd += ["--project-name", args.project_name]
+        if selected_items:
+            validate_cmd += ["--items", *selected_items]
+        if not args.build_long_video:
+            validate_cmd.append("--no-require-long")
+        progress.run(validate_cmd, cwd)
 
     # Machine-parsable summary of what this run produced: the sub-commands
     # each emit their own MEDIACONDUCTOR_RESULT, but agents driving the all-in-one

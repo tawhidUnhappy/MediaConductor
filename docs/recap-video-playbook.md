@@ -328,6 +328,17 @@ itself. All later gates (work-status/work-qa, review sheets, video build) work
 with or without `transcript.json`; only a transcript that exists but is
 half-filled is flagged, as an interrupted run to finish or delete.
 
+**After any re-crop, sync existing transcripts before narration review.** The
+cheap seed-only pass preserves OCR for panel filenames that survived and
+drops entries for panels that no longer exist; it does not load DeepSeek:
+
+```bash
+mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07 --seed-only
+```
+
+Skipping this step leaves plausible-looking stale rows in `transcript.json`,
+which makes panel-count audits and dialogue cross-checks unreliable.
+
 ## Phase 5 — Write `narration.json`
 
 Format (`library/<Project>/<item>/narration.json`):
@@ -512,6 +523,11 @@ mediaconductor video --project-root library/<Project> --items 01 \
   sit in a poll loop). If audio state is ever in doubt:
   `mediaconductor video-audio-audit --project-root library/<Project> --json`.
 
+The all-in-one command reports each enabled parent stage through
+`MEDIACONDUCTOR_PROGRESS`, so `job-status` remains useful during quiet TTS
+workers. It runs `video-validate` automatically as the final stage; use
+`--no-validate` only for a deliberate diagnostic build.
+
 ## Phase 7 — Verify the build (measure, don't assume)
 
 ```bash
@@ -544,6 +560,26 @@ Then verify the actual MP4:
 Each panel is on screen for `ceil(wav_seconds × fps) / fps` (fps = 15,
 `frame_aligned_duration()` in `mediaconductor/video_pipeline/item_assets.py`),
 with no gaps. So cumulative WAV durations give frame-exact chapter marks:
+
+For a multi-item recap, prefer probing the MP4s that were actually joined and
+let the CLI add their durations in source order. Human output is ready to
+paste (`00:00 Chapter 01`, and so on); JSON is available for publishing
+scripts:
+
+```bash
+mediaconductor video-chapters --project-root library/<Project> \
+  --output-root output --item-range 01-24
+mediaconductor video-chapters --project-root library/<Project> \
+  --output-root output --item-range 01-24 --json
+```
+
+The command mirrors `video-join` range selection (including rendered decimal
+items inside the range) and uses each MP4's video-stream duration. The joiner
+strips item AAC before concatenation, so container duration would accumulate
+audio padding and make later visual chapter marks drift late. If the same join
+used `--allow-gaps`, pass it here too.
+
+For timestamps inside one item, the frame-aligned manual calculation remains:
 
 ```python
 import json, math, wave

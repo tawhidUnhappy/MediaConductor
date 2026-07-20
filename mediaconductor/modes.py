@@ -51,7 +51,7 @@ MANGA_COMMANDS = frozenset({
     "video-audio", "video-audio-indextts", "video-render", "video-join",
     "video-add-bgm", "video-check", "narration-check",
     "narration-review-sheets", "narration-edit", "video-validate",
-    "video-audio-audit", "video-fade-audio", "video-normalize-audio",
+    "video-chapters", "video-audio-audit", "video-fade-audio", "video-normalize-audio",
     "video-clean-audio", "video-clean-video", "video-clean-work",
     "video-clean-all", "audio-takes-list", "audio-takes-restore",
     "index-tts", "deepseek-ocr2", "zimage", "download", "style-detect",
@@ -68,7 +68,7 @@ MANGA_TOOLS = frozenset({
     "series_mark_published", "video_check", "narration_check",
     "generate_audio", "render_videos", "build_long_video", "add_bgm",
     "run_full_pipeline",
-    "video_validate", "work_status", "work_claim", "work_note", "work_qa",
+    "video_validate", "video_chapters", "work_status", "work_claim", "work_note", "work_qa",
     "work_artifacts", "generate_image",
     "crop_qa", "characters", "narrate_auto", "manga_auto",
 })

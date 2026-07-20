@@ -39,6 +39,11 @@ def test_full_catalog_describes_typed_job_wrapper_and_source_layout(capsys):
 
     assert commands["style-detect"]["args"]["source_subdir"]["flag"] == "--source-subdir"
     assert commands["panel-transcript"]["args"]["seed_only"]["flag"] == "--seed-only"
+    chapters = commands["video-chapters"]["args"]
+    assert chapters["output_root"]["flag"] == "--output-root"
+    assert chapters["item_range"]["flag"] == "--item-range"
+    assert chapters["allow_gaps"]["flag"] == "--allow-gaps"
+    assert commands["video"]["args"]["validate"]["flag"] == "--no-validate"
     sheets = commands["narration-review-sheets"]["args"]
     assert sheets["output_root"]["flag"] == "--output-root"
 

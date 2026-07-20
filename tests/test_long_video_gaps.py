@@ -7,7 +7,12 @@ strict mode treats an integer hole as a failed render; --allow-gaps skips it.
 
 from pathlib import Path
 
-from mediaconductor.video_pipeline.long_video_builder import ITEM_VIDEO_RE, included_chapters
+from mediaconductor.video_pipeline.long_video_builder import (
+    ITEM_VIDEO_RE,
+    LongVideoConfig,
+    included_chapters,
+    selected_range,
+)
 
 
 def _chapters(*names: str) -> dict[str, Path]:
@@ -43,6 +48,39 @@ def test_decimal_chapters_join_in_value_order():
     # 9.5 must ride between 09 and 10 — it used to vanish from the join.
     names, gaps = included_chapters(_chapters("09", "9.5", "10"), 9, 10, allow_gaps=False)
     assert names == ["09", "9.5", "10"]
+    assert gaps == []
+
+
+def test_exact_decimal_selection_does_not_collapse_to_its_integer_sibling():
+    chapters = _chapters("09", "9.5", "10")
+    config = LongVideoConfig(
+        project_root=Path("."),
+        output_root=Path("."),
+        work_dir=Path("."),
+        items=["9.5"],
+    )
+
+    start, end = selected_range(config, chapters)
+    names, gaps = included_chapters(chapters, start, end, allow_gaps=False)
+
+    assert (start, end) == (9.5, 9.5)
+    assert names == ["9.5"]
+    assert gaps == []
+
+
+def test_default_range_keeps_a_trailing_decimal_item():
+    chapters = _chapters("01", "02", "2.1")
+    config = LongVideoConfig(
+        project_root=Path("."),
+        output_root=Path("."),
+        work_dir=Path("."),
+    )
+
+    start, end = selected_range(config, chapters)
+    names, gaps = included_chapters(chapters, start, end, allow_gaps=False)
+
+    assert (start, end) == (1.0, 2.1)
+    assert names == ["01", "02", "2.1"]
     assert gaps == []
 
 

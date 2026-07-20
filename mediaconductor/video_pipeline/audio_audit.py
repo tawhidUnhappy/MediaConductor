@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 
 from mediaconductor import runtime
 from pathlib import Path
@@ -122,8 +123,13 @@ def main() -> int:
     bad_audio: list[tuple[str, str, Path]] = []
     not_ready: list[str] = []
     total_checked = 0
-    for item_dir in selected:
+    for index, item_dir in enumerate(selected, start=1):
         total_checked += audit_item(item_dir, audio_root, name, missing_panels, bad_audio, not_ready)
+        print(
+            f"MEDIACONDUCTOR_PROGRESS {index}/{len(selected)} Audited {item_dir.name}",
+            file=sys.stderr if args.as_json else sys.stdout,
+            flush=True,
+        )
 
     checked_items = len(selected) - len(not_ready)
     ok = not missing_panels and not bad_audio

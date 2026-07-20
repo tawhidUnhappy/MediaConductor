@@ -267,7 +267,7 @@ the generated files; needs `install-tool z-image-turbo` once).
 `video` (all-in-one: audio → render → optional join/normalize/BGM),
 `video-audio` (Kokoro TTS), `video-audio-indextts` (IndexTTS, GPU),
 `video-render`, `video-join`, `video-normalize-audio`, `video-add-bgm`,
-`video-check`, `video-validate`, `video-audio-audit [--fix]`,
+`video-check`, `video-validate`, `video-chapters`, `video-audio-audit [--fix]`,
 `video-fade-audio`, `video-clean-audio|video|work|all`,
 `audio-takes-list`, `audio-takes-restore`.
 
@@ -348,6 +348,8 @@ uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" -
     --work-dir "$WORK" --item-range 01-12 --tts indextts \
     --build-long-video --normalize-audio \
     --background-music /abs/path/music.mp3 --music-volume-db -28
+uv --project D:/MediaConductor run mediaconductor video-chapters --project-root "$PROJ" \
+    --output-root "$OUT" --item-range 01-12
 ```
 
 ### Re-mix only the background music (cheap — no re-render/re-join)

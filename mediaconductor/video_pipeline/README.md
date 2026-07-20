@@ -35,6 +35,15 @@ build by shelling out to the narrower commands, in this order:
    −14 LUFS / −1.5 dBTP. Any BGM change invalidates normalization; normalize
    the whole mix again after every standalone re-mix.
 
+5. **Validate** -- the all-in-one command runs
+   [`validate_generation.py`](validate_generation.py) after every successful
+   build by default. `--no-validate` exists for deliberate diagnostics, not
+   production delivery.
+
+Every enabled stage emits a parent-owned `MEDIACONDUCTOR_PROGRESS` marker, so
+detached `job-status` output remains useful even when an external TTS worker is
+quiet.
+
 ## Key shared modules
 
 - [`common.py`](common.py) — roots/defaults, `item_dirs()`,
@@ -55,6 +64,12 @@ before audio: coverage, dangling images, empty text), `video-validate`
 streams, and duration only), `video-audio-audit`
 ([audio_audit.py](audio_audit.py)), and the `video-clean-*` family (never touch
 `library/` sources; generated output is archived, not deleted).
+
+`video-chapters` ([chapter_timestamps.py](chapter_timestamps.py)) mirrors the
+joiner's item selection, probes video-stream durations, and prints cumulative
+YouTube timestamps without accumulating AAC container padding. After any re-crop,
+run `panel-transcript --seed-only` for those items before narration review; it
+removes stale transcript rows while preserving OCR for unchanged panel names.
 
 `video-validate` is necessary but does not certify a production upload.
 Separately inspect representative frames, confirm narration/panel timing,

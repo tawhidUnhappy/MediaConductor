@@ -427,6 +427,18 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "output_root": ("--output-root", "value"), "project_name": ("--project-name", "value"),
          "items": ("--items", "list"), "require_long": ("--no-require-long", "no-flag")},
     ),
+    "video_chapters": (
+        "video-chapters",
+        "Probe rendered item videos and print cumulative, ready-to-paste YouTube chapter timestamps.",
+        {"project_root": _PROJECT_ROOT, "output_root": _STR,
+         "project_name": _STR, "items": _ITEMS,
+         "item_range": {**_STR, "description": "Convenience integer range, e.g. 01-24."},
+         "allow_gaps": {**_BOOL, "description": "Skip genuinely absent integer items, matching video-join."}},
+        ["project_root", "output_root"],
+        {"project_root": ("--project-root", "value"), "output_root": ("--output-root", "value"),
+         "project_name": ("--project-name", "value"), "items": ("--items", "list"),
+         "item_range": ("--item-range", "value"), "allow_gaps": ("--allow-gaps", "flag")},
+    ),
     "audio_audit": (
         "video-audio-audit",
         "ffprobe every expected narration audio file; report missing panels vs missing/corrupt audio. "
@@ -489,7 +501,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "run_full_pipeline": (
         "video",
-        "The all-in-one pipeline: audio -> fade -> render -> optional join/BGM/final normalize. VERY "
+        "The all-in-one pipeline: audio -> fade -> render -> optional join/BGM/final normalize -> validate. VERY "
         "LONG-RUNNING — prefer job_start. Prefer the single-step tools when iterating.",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR, "items": _ITEMS,
          "tts": {"type": "string", "enum": ["auto", "kokoro", "indextts"]},
@@ -509,6 +521,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
                         "when joining instead of failing."},
          "normalize_audio": {**_BOOL, "description": "Two-pass loudness-normalize the complete "
                              "long-video mix for YouTube (-14 LUFS) after background music is added."},
+         "validate": {**_BOOL, "default": True,
+                      "description": "Run structural audio/video validation as the final stage (default true)."},
          "overwrite_audio": {**_BOOL, "description": "Regenerate narration WAVs that already exist."},
          "overwrite_video": {**_BOOL, "description": "Re-render item videos that already exist — "
                              "REQUIRED after any panel/narration/audio change."},
@@ -528,6 +542,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "build_long_video": ("--build-long-video", "flag"),
          "allow_gaps": ("--allow-gaps", "flag"),
          "normalize_audio": ("--normalize-audio", "flag"),
+         "validate": ("--no-validate", "no-flag"),
          "overwrite_audio": ("--overwrite-audio", "flag"),
          "overwrite_video": ("--overwrite-video", "flag"),
          "emo_alpha": ("--emo-alpha", "value"),
@@ -870,7 +885,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 }
 
 # Commands whose --json flag should be appended automatically by the MCP server.
-JSON_COMMANDS = {"modes", "doctor", "where", "library-list", "video-check", "video-validate",
+JSON_COMMANDS = {"modes", "doctor", "where", "library-list", "video-check", "video-validate", "video-chapters",
                  "video-audio-audit", "youtube-profiles", "youtube-status", "youtube-upload",
                  "style-detect", "narration-check", "series-plan", "crop-qa", "characters",
                  "work-status", "work-claim", "work-note", "work-qa", "work-artifacts",
