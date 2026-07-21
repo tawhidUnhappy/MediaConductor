@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.2.3 — 2026-07-21
+
+### Added
+
+- **`work-todo` — shared session todo list for cross-model handoff.** The
+  scenario it's built for: one LLM runs out of budget/context mid-batch and a
+  different one (different vendor, no shared chat memory) needs to resume as
+  if it were the same worker. `work-status`, `work-claim`, and `work-note`
+  already made the filesystem and a shared notebook the source of truth
+  instead of any one agent's memory; `work-todo` adds the missing piece —
+  plan-level next steps that aren't derivable from disk (batch scope, redo
+  requests, things to confirm before publishing). Storage is an append-only
+  event log (`todo.jsonl`, same durability model as `notes.jsonl`): add /
+  start / done / reopen / remove, ids never reused. Open todos now also
+  surface directly in `work-status`'s report (capped at 10) so the existing
+  "run this first" resume command already shows them. Exposed as the
+  `work_todo` MCP tool alongside the other four `work_*` tools. See
+  `docs/multi-agent.md`'s new "Switching LLM providers mid-project" section
+  for the full handoff recipe (set `MEDIACONDUCTOR_AGENT` per model, leave a
+  `handoff`-topic note before a session ends).
+
 ## 2.2.2 — 2026-07-18
 
 ### Changed

@@ -46,13 +46,20 @@ mediaconductor doctor --json     # ffmpeg/GPU/tool readiness
 mediaconductor work-status --project-root library/<Project> --json   # resuming? exact per-item stage
 ```
 
-Resuming a project, or working alongside other agents? Follow
-`docs/multi-agent.md`: `work-status --next` names the unclaimed actionable
-tasks, `work-claim` leases an item+stage (and `--resource gpu` serializes the
-GPU model tools), `work-note` shares character names/speaker conventions
-between narrators, and `mediaconductor work-qa` is the fix-until-clean gate — loop
-`work-qa → apply the listed fix → work-qa` until exit 0. `work-artifacts`
-lists what already exists for reuse before you regenerate anything.
+Resuming a project — including picking it back up on a **different LLM**
+after another one ran out of budget or context mid-batch — or working
+alongside other agents? Follow `docs/multi-agent.md`: `work-status --next`
+names the unclaimed actionable tasks, `work-claim` leases an item+stage (and
+`--resource gpu` serializes the GPU model tools), `work-note` shares
+character names/speaker conventions between narrators, `work-todo` is the
+shared plan-level checklist (batch scope, redo requests, things to confirm)
+that outlives any one context window, and `mediaconductor work-qa` is the
+fix-until-clean gate — loop `work-qa → apply the listed fix → work-qa` until
+exit 0. `work-artifacts` lists what already exists for reuse before you
+regenerate anything. All of it is plain files under
+`library/<Project>/.workboard/`, not chat state, so any agent on any model
+reads the exact same picture. Set `MEDIACONDUCTOR_AGENT` (e.g. `claude-fable`,
+`gpt-5.6`) so claims/notes/todos show which model did what.
 
 Fresh clone/machine? Follow the agent runbook in `docs/setup.md`:
 `uv sync` → `mediaconductor setup` (GPU-aware; `--all` / `--minimal` /
@@ -297,3 +304,12 @@ mediaconductor series-mark-published --project-root library/<Project> \
 Re-run `series-plan` — it now names the next window (13–24, …). Repeat from
 step 3 (chapters are already downloaded). When all batches are published,
 report the uploaded video URLs and stop.
+
+**Stopping mid-batch (context/budget ran out, or handing off to a different
+LLM)?** Before you go: `work-note --topic handoff --add "<exactly what you
+were mid-step on, e.g. item 07 render was running, verify job-status before
+re-launching>"`, and `work-todo --add "<next concrete step>"` for anything
+not yet visible on disk (a redo request, a decision still pending). The next
+agent's step 0 (`work-status --json`, which surfaces both) picks this up
+automatically — same continuity whether that agent is you again or a
+completely different model.

@@ -23,7 +23,7 @@ mode's skill.
 | Manga CLI/MCP reference | [docs/manga-video-guide.md](docs/manga-video-guide.md) |
 | Crop → verify → narrate loop details | [docs/operate/crop-verify-narrate.md](docs/operate/crop-verify-narrate.md) |
 | Full production recipe + troubleshooting | [docs/recap-video-playbook.md](docs/recap-video-playbook.md) |
-| Several agents on one project / resuming | [docs/multi-agent.md](docs/multi-agent.md) |
+| Several agents on one project / resuming / switching LLM mid-project | [docs/multi-agent.md](docs/multi-agent.md) |
 | Local Gemma 4 LLM + assist commands (`manga-auto`, `crop-qa`, `characters`, `narrate-auto`) | [docs/local-llm.md](docs/local-llm.md) |
 | External AI tool envs, installs, YouTube, releases | [docs/external-tools.md](docs/external-tools.md), [docs/install-tools.md](docs/install-tools.md), [docs/youtube.md](docs/youtube.md), [docs/publishing.md](docs/publishing.md) |
 | Why a guard/invariant exists (incident stories) | [docs/history/incidents.md](docs/history/incidents.md) |
@@ -155,6 +155,12 @@ dispatcher renders it; never `sys.exit` from library code). Note
   is only for genuine source gaps.
 - **Item selection compares `item_value()`** (handles "2.1"), not
   `item_number()`.
+- **Workboard state (`notes.jsonl`, `todo.jsonl`) is append-only, never
+  read-modify-write**: each mutation is one small `O_APPEND` write, so two
+  agents (or two different LLMs, mid-handoff) writing at once can't tear a
+  record; current state is a fold over the log, not a stored snapshot. Don't
+  "simplify" `work-todo`/`work-note` into rewriting the file in place — that
+  reintroduces the race the log format exists to avoid.
 - **UTF-8 stdio forcing in cli.py stays** (Windows pipes are cp1252).
 - **Machine contract stays stable**: exit 0/1/2/3 (3 = artifact created but review required); `--json` commands print
   exactly one JSON object on stdout; generation commands end with

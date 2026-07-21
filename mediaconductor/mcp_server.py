@@ -108,6 +108,7 @@ _PATH_ARGUMENTS: dict[str, frozenset[str]] = {
     "work_status": frozenset({"project_root"}),
     "work_claim": frozenset({"project_root"}),
     "work_note": frozenset({"project_root"}),
+    "work_todo": frozenset({"project_root"}),
     "work_qa": frozenset({"project_root"}),
     "work_artifacts": frozenset({"project_root"}),
     "generate_image": frozenset({"output"}),

@@ -699,6 +699,29 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "topic": ("--topic", "value"), "agent": ("--agent", "value"),
          "limit": ("--limit", "value")},
     ),
+    "work_todo": (
+        "work-todo",
+        "Shared session todo list for agent handoff: plan-level next steps and decisions the "
+        "filesystem can't derive on its own (batch scope, redo requests, things to confirm before "
+        "publishing) — complements work_status, which only knows per-item pipeline stage. Survives "
+        "a switch to a different LLM/vendor mid-project since it's a file, not chat state. Pass "
+        "exactly one of add/start/done/reopen/remove to mutate; otherwise reads the list.",
+        {"project_root": _PROJECT_ROOT,
+         "add": {**_STR, "description": "Add a new pending todo with this text."},
+         "topic": {**_STR, "description": "Topic tag for 'add', e.g. handoff/characters/publishing "
+                                          "(default general)."},
+         "start": {**_INT, "description": "Mark this todo id in_progress."},
+         "done": {**_INT, "description": "Mark this todo id done."},
+         "reopen": {**_INT, "description": "Reopen a done todo id back to pending."},
+         "remove": {**_INT, "description": "Delete a todo id that is no longer relevant."},
+         "agent": _STR,
+         "pending_only": {**_BOOL, "description": "When reading: hide done todos."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "add": ("--add", "value"),
+         "topic": ("--topic", "value"), "start": ("--start", "value"), "done": ("--done", "value"),
+         "reopen": ("--reopen", "value"), "remove": ("--remove", "value"),
+         "agent": ("--agent", "value"), "pending_only": ("--pending-only", "flag")},
+    ),
     "work_qa": (
         "work-qa",
         "Aggregated machine-checkable QA gate over generated crops/narration/audio/renders. "
@@ -888,7 +911,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 JSON_COMMANDS = {"modes", "doctor", "where", "library-list", "video-check", "video-validate", "video-chapters",
                  "video-audio-audit", "youtube-profiles", "youtube-status", "youtube-upload",
                  "style-detect", "narration-check", "series-plan", "crop-qa", "characters",
-                 "work-status", "work-claim", "work-note", "work-qa", "work-artifacts",
+                 "work-status", "work-claim", "work-note", "work-todo", "work-qa", "work-artifacts",
                  "youtube-list", "youtube-delete", "youtube-thumbnail",
                  "story-init", "story-check", "song-init", "song-check",
                  "job-status", "jobs"}

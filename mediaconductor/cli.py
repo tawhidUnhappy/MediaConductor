@@ -80,6 +80,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "work-status":          ("mediaconductor.workboard",                            "status_main", "Multi-agent",      "Per-item pipeline stage from the filesystem + claims + notes; --next lists unclaimed actionable tasks (the resume command)."),
     "work-claim":           ("mediaconductor.workboard",                            "claim_main",  "Multi-agent",      "Atomically claim an item+stage or a shared --resource (e.g. gpu) with a TTL lease so agents never collide."),
     "work-note":            ("mediaconductor.workboard",                            "note_main",   "Multi-agent",      "Append/read the project's shared notebook (characters, speakers, tone, decisions) for agent handoff."),
+    "work-todo":            ("mediaconductor.workboard",                            "todo_main",   "Multi-agent",      "Shared session todo list (batch scope, redo requests, things to confirm) that survives a switch to a different LLM/vendor mid-project."),
     "work-qa":              ("mediaconductor.qa_loop",                              "qa_main",     "Multi-agent",      "Aggregated QA gate over crops/narration/audio/renders; every problem carries its fix command — loop until exit 0."),
     "work-artifacts":       ("mediaconductor.qa_loop",                              "artifacts_main", "Multi-agent",   "Inventory of reusable generated artifacts (renders, audio takes, transcripts, sheets, music beds) with reuse hints."),
 

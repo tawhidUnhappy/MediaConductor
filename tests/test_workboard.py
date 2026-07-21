@@ -12,9 +12,13 @@ from mediaconductor.workboard import (
     acquire_claim,
     active_claims,
     add_note,
+    add_todo,
     item_status,
+    list_todos,
     next_tasks,
     release_claim,
+    remove_todo,
+    set_todo_status,
 )
 
 PNG = b"\x89PNG\r\n\x1a\n"  # suffix check only — content is never decoded
@@ -197,6 +201,52 @@ def test_emotion_field_contract():
     assert indextts_kwargs(None) == {}
     kwargs = indextts_kwargs("cold, menacing", 0.5)
     assert kwargs == {"emo_text": "cold, menacing", "use_emo_text": True, "emo_alpha": 0.5}
+
+
+def test_todo_lifecycle_add_start_done_reopen(tmp_path):
+    root = tmp_path / "proj"
+    root.mkdir()
+    entry = add_todo(root, agent="alice", text="Redo ch07 thumbnail text", topic="publishing")
+    assert entry == {
+        "id": 1, "text": "Redo ch07 thumbnail text", "topic": "publishing",
+        "status": "pending", "created_by": "alice", "created_at": entry["created_at"],
+        "updated_at": entry["created_at"], "updated_by": "alice",
+    }
+
+    second = add_todo(root, agent="bob", text="Confirm speaker names ch08")
+    assert second["id"] == 2 and second["topic"] == "general"
+
+    todos = list_todos(root)
+    assert [t["id"] for t in todos] == [1, 2]
+
+    ok, updated = set_todo_status(root, agent="bob", todo_id=1, op="start")
+    assert ok and updated["status"] == "in_progress" and updated["updated_by"] == "bob"
+
+    ok, updated = set_todo_status(root, agent="bob", todo_id=1, op="done")
+    assert ok and updated["status"] == "done"
+    assert list_todos(root, pending_only=True) == [
+        t for t in list_todos(root) if t["id"] == 2
+    ]
+
+    ok, updated = set_todo_status(root, agent="alice", todo_id=1, op="reopen")
+    assert ok and updated["status"] == "pending"
+
+    ok, _ = set_todo_status(root, agent="alice", todo_id=999, op="start")
+    assert not ok
+
+    assert remove_todo(root, agent="alice", todo_id=1)
+    assert [t["id"] for t in list_todos(root)] == [2]
+    assert not remove_todo(root, agent="alice", todo_id=1)  # already gone
+
+
+def test_todo_ids_are_never_reused_after_removal(tmp_path):
+    root = tmp_path / "proj"
+    root.mkdir()
+    first = add_todo(root, agent="alice", text="one")
+    remove_todo(root, agent="alice", todo_id=first["id"])
+    again = add_todo(root, agent="alice", text="two")
+    assert again["id"] == first["id"] + 1
+    assert [t["text"] for t in list_todos(root)] == ["two"]
 
 
 def test_respect_claims_gate_blocks_only_live_foreign_claims(tmp_path):

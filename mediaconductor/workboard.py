@@ -1,26 +1,42 @@
 """mediaconductor.workboard — multi-agent coordination for one project.
 
-Three commands let several agents (or one agent across several sessions)
-produce the same video without stepping on each other, and resume instantly
-after any interruption. All state lives in ``library/<project>/.workboard/``
-so it travels with the project — including over a network share — and the
-dot-prefix keeps it invisible to item scanning:
+Four commands let several agents (or one agent across several sessions —
+**including a session that resumes on an entirely different LLM/vendor**,
+e.g. Claude runs out of budget mid-batch and GPT or another model picks the
+same project back up) produce the same video without stepping on each other,
+and resume instantly after any interruption. All state is plain JSON/JSONL
+under ``library/<project>/.workboard/`` — no vendor-specific format, no state
+tied to one chat session — so it travels with the project (including over a
+network share) and the dot-prefix keeps it invisible to item scanning:
 
 - ``mediaconductor work-status`` — the resume command. Derives every item's
   pipeline stage (download → crop → transcribe → narrate → audio → render)
   from the **filesystem as ground truth**, so it is always accurate even if
   a previous agent died mid-run and left no record. ``--next`` emits a
   prioritized list of unclaimed, actionable tasks; ``--json`` for machines.
+  It also surfaces the latest shared notes and open todos, so one command
+  gives a fresh agent everything it needs to pick up exactly where the last
+  one (on any model) left off.
 - ``mediaconductor work-claim`` — atomic TTL-leased claims on an ``(item, stage)``
   pair or a named ``--resource`` (e.g. ``gpu``: MAGI/DeepSeek/IndexTTS/
   Z-Image cannot share a consumer card). Acquire is an O_CREAT|O_EXCL file
   create — safe across processes and network filesystems. Leases expire, so
-  a crashed agent never wedges the board; a live agent must ``--renew``.
+  a crashed (or simply cut-off) agent never wedges the board; a live agent
+  must ``--renew``.
 - ``mediaconductor work-note`` — append-only shared notebook (``notes.jsonl``)
   for the facts that otherwise die with an agent's context window:
   character names and speaker conventions, tone decisions, per-chapter
   warnings. Topic-tagged; ``work-status`` surfaces the latest entries so
-  every fresh agent discovers the notebook exists.
+  every fresh agent discovers the notebook exists. The ``handoff`` topic is
+  the conventional place to leave a short "here's exactly what I was mid-step
+  on" note before a session ends, planned or not.
+- ``mediaconductor work-todo`` — shared, ordered session todo list
+  (``todo.jsonl``) for plan-level next steps that the filesystem can't derive
+  on its own: batch scope ("stop at chapter 24"), redo requests, things to
+  confirm before publishing. This is the same working-memory role Claude
+  Code's own todo list plays inside one session, except it is a file on disk
+  instead of in-memory state, so it survives a model switch. Any agent, on
+  any LLM, reads and writes the same list.
 
 Concurrency model: claims are advisory (commands do not enforce them — an
 agent that skips claiming can still collide), best-effort atomic, and leased.
@@ -90,6 +106,10 @@ def claims_dir(project_root: Path) -> Path:
 
 def notes_path(project_root: Path) -> Path:
     return workboard_dir(project_root) / "notes.jsonl"
+
+
+def todo_path(project_root: Path) -> Path:
+    return workboard_dir(project_root) / "todo.jsonl"
 
 
 def default_agent() -> str:
@@ -290,12 +310,15 @@ def status_main() -> int:
                 for d in item_dirs(root, selection)]
     claims = active_claims(root)
     tasks = next_tasks(statuses, claims)
+    open_todos = list_todos(root, pending_only=True)
     report = {
         "project": name,
         "items": statuses,
         "claims": claims,
         "next_tasks": tasks,
         "recent_notes": _recent_notes(root, limit=3),
+        "open_todos": open_todos[:10],
+        "open_todos_total": len(open_todos),
     }
 
     if args.as_json:
@@ -327,6 +350,13 @@ def status_main() -> int:
             print(f"  {_claim_label(c)} — {c['agent']} until {c['expires_at']}")
     for n in report["recent_notes"]:
         print(f"note [{n.get('topic', 'general')}] {n.get('agent', '?')}: {n.get('note', '')}")
+    if report["open_todos"]:
+        print("Open todos:")
+        marker = {"pending": "[ ]", "in_progress": "[~]"}
+        for t in report["open_todos"]:
+            print(f"  {marker.get(t['status'], '[ ]')} #{t['id']} [{t['topic']}] {t['text']}")
+        if report["open_todos_total"] > len(report["open_todos"]):
+            print(f"  ... {report['open_todos_total'] - len(report['open_todos'])} more — see work-todo --list")
     return 0
 
 
@@ -588,4 +618,195 @@ def note_main() -> int:
     else:
         for n in notes:
             print(f"[{n.get('topic', 'general')}] {n.get('agent', '?')} {n.get('ts', '')}: {n.get('note', '')}")
+    return 0
+
+
+# ── work-todo: shared session todo list ──────────────────────────────────────
+#
+# An append-only event log (`todo.jsonl`), same durability story as notes.jsonl
+# and the same reasoning as the claims dir: every mutation is one small
+# O_APPEND write, so two agents writing at once never tear a record. Current
+# state is a fold over the events, not a stored snapshot — the log itself
+# never needs read-modify-write, so there is nothing to lock. This is the
+# same working-memory role Claude Code's built-in todo list plays inside a
+# single session, except it lives in the project directory instead of one
+# process's memory, so switching which LLM is driving does not lose it.
+
+TODO_OPS = ("add", "start", "done", "reopen", "remove")
+_TODO_STATUS_FOR_OP = {"start": "in_progress", "done": "done", "reopen": "pending"}
+
+
+def _todo_events(project_root: Path) -> list[dict]:
+    path = todo_path(project_root)
+    if not path.is_file():
+        return []
+    events = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            events.append(json.loads(line))
+        except Exception:  # noqa: BLE001 — skip torn/corrupt lines
+            continue
+    return events
+
+
+def _fold_todos(events: list[dict]) -> dict[int, dict]:
+    """Replay the event log into current-state-per-id, in file order.
+
+    An ``add`` seeds the record; ``start``/``done``/``reopen`` update its
+    status only if the id is still live; ``remove`` deletes it outright — a
+    later ``add`` may reuse a removed id's slot with a fresh record. Events
+    referencing an id that was never added (or already removed) are no-ops,
+    the same "malformed/stale input never wedges the board" stance the
+    claims code takes.
+    """
+    board: dict[int, dict] = {}
+    for e in events:
+        op, tid = e.get("op"), e.get("id")
+        if not isinstance(tid, int):
+            continue
+        if op == "add":
+            board[tid] = {
+                "id": tid,
+                "text": e.get("text", ""),
+                "topic": e.get("topic") or "general",
+                "status": "pending",
+                "created_by": e.get("agent"),
+                "created_at": e.get("ts"),
+                "updated_at": e.get("ts"),
+                "updated_by": e.get("agent"),
+            }
+        elif op in _TODO_STATUS_FOR_OP and tid in board:
+            board[tid]["status"] = _TODO_STATUS_FOR_OP[op]
+            board[tid]["updated_at"] = e.get("ts")
+            board[tid]["updated_by"] = e.get("agent")
+        elif op == "remove":
+            board.pop(tid, None)
+    return board
+
+
+def list_todos(project_root: Path, *, pending_only: bool = False) -> list[dict]:
+    board = _fold_todos(_todo_events(project_root))
+    items = sorted(board.values(), key=lambda t: t["id"])
+    if pending_only:
+        items = [t for t in items if t["status"] != "done"]
+    return items
+
+
+def _append_todo_event(project_root: Path, event: dict) -> None:
+    path = todo_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(event, ensure_ascii=False) + "\n"
+    fd = os.open(path, os.O_CREAT | os.O_APPEND | os.O_WRONLY)
+    try:
+        os.write(fd, line.encode("utf-8"))
+    finally:
+        os.close(fd)
+
+
+def add_todo(project_root: Path, *, agent: str, text: str, topic: str = "general") -> dict:
+    existing_ids = [e["id"] for e in _todo_events(project_root)
+                    if e.get("op") == "add" and isinstance(e.get("id"), int)]
+    new_id = (max(existing_ids) + 1) if existing_ids else 1
+    event = {"ts": _iso(_utcnow()), "agent": agent, "op": "add", "id": new_id,
+              "text": text, "topic": topic}
+    _append_todo_event(project_root, event)
+    return _fold_todos([event])[new_id]
+
+
+def set_todo_status(project_root: Path, *, agent: str, todo_id: int, op: str) -> tuple[bool, dict | None]:
+    """op is one of start/done/reopen. False + None when the id isn't live."""
+    board = _fold_todos(_todo_events(project_root))
+    if todo_id not in board:
+        return False, None
+    event = {"ts": _iso(_utcnow()), "agent": agent, "op": op, "id": todo_id}
+    _append_todo_event(project_root, event)
+    board[todo_id]["status"] = _TODO_STATUS_FOR_OP[op]
+    board[todo_id]["updated_at"] = event["ts"]
+    board[todo_id]["updated_by"] = agent
+    return True, board[todo_id]
+
+
+def remove_todo(project_root: Path, *, agent: str, todo_id: int) -> bool:
+    board = _fold_todos(_todo_events(project_root))
+    if todo_id not in board:
+        return False
+    _append_todo_event(project_root, {"ts": _iso(_utcnow()), "agent": agent, "op": "remove", "id": todo_id})
+    return True
+
+
+def todo_main() -> int:
+    parser = argparse.ArgumentParser(
+        prog=f"{CLI_NAME} work-todo",
+        description="Shared session todo list for agent handoff: plan-level next steps and "
+                    "decisions the filesystem can't derive on its own (batch scope, redo requests, "
+                    "things to confirm before publishing) — complements work-status, which only "
+                    "knows per-item pipeline stage. Survives a switch to a different LLM/vendor "
+                    "mid-project. Pass exactly one of --add/--start/--done/--reopen/--remove to "
+                    "mutate; otherwise prints the list.",
+    )
+    parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
+    parser.add_argument("--add", default=None, metavar="TEXT", help="Add a new pending todo.")
+    parser.add_argument("--topic", default=None,
+                        help="Topic tag for --add, e.g. handoff / characters / publishing "
+                             "(default 'general').")
+    parser.add_argument("--start", type=int, metavar="ID", help="Mark todo ID in_progress.")
+    parser.add_argument("--done", type=int, metavar="ID", help="Mark todo ID done.")
+    parser.add_argument("--reopen", type=int, metavar="ID", help="Reopen a done todo ID back to pending.")
+    parser.add_argument("--remove", type=int, metavar="ID", help="Delete a todo ID that is no longer relevant.")
+    parser.add_argument("--agent", default=None, help="Author (default: $MEDIACONDUCTOR_AGENT or user@host).")
+    parser.add_argument("--list", action="store_true", dest="list_todos",
+                        help="Print todos (default when no mutation flag is given).")
+    parser.add_argument("--pending-only", action="store_true", help="With listing: hide done todos.")
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    args = parser.parse_args()
+
+    root = args.project_root
+    if not root.is_dir():
+        print(f"[ERROR] project root not found: {root}", file=sys.stderr)
+        return 1
+    agent = args.agent or default_agent()
+
+    mutation_flags = {"add": args.add, "start": args.start, "done": args.done,
+                       "reopen": args.reopen, "remove": args.remove}
+    given = [name for name, value in mutation_flags.items() if value is not None]
+    if len(given) > 1:
+        parser.error("pass only one of --add/--start/--done/--reopen/--remove at a time")
+
+    if args.add is not None:
+        entry = add_todo(root, agent=agent, text=args.add, topic=args.topic or "general")
+        print(json.dumps({"added": entry}, ensure_ascii=False) if args.as_json
+              else f"todo #{entry['id']} added [{entry['topic']}]: {entry['text']}")
+        return 0
+
+    for op in ("start", "done", "reopen"):
+        todo_id = mutation_flags[op]
+        if todo_id is not None:
+            ok, entry = set_todo_status(root, agent=agent, todo_id=todo_id, op=op)
+            if args.as_json:
+                print(json.dumps({"updated": ok, "todo": entry}, ensure_ascii=False))
+            elif ok:
+                print(f"todo #{todo_id} -> {entry['status']}")
+            else:
+                print(f"no such todo: #{todo_id}")
+            return 0 if ok else 1
+
+    if args.remove is not None:
+        ok = remove_todo(root, agent=agent, todo_id=args.remove)
+        if args.as_json:
+            print(json.dumps({"removed": ok}, ensure_ascii=False))
+        elif ok:
+            print(f"todo #{args.remove} removed")
+        else:
+            print(f"no such todo: #{args.remove}")
+        return 0 if ok else 1
+
+    todos = list_todos(root, pending_only=args.pending_only)
+    if args.as_json:
+        print(json.dumps({"todos": todos}, ensure_ascii=False))
+    elif not todos:
+        print("No todos yet.")
+    else:
+        marker = {"pending": "[ ]", "in_progress": "[~]", "done": "[x]"}
+        for t in todos:
+            print(f"{marker.get(t['status'], '[ ]')} #{t['id']} [{t['topic']}] {t['text']}  (by {t['created_by']})")
     return 0

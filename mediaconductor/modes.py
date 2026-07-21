@@ -47,7 +47,7 @@ PUBLISH_TOOLS = frozenset({
 
 MANGA_COMMANDS = frozenset({
     "library-list", "series-plan", "series-mark-published", "work-status",
-    "work-claim", "work-note", "work-qa", "work-artifacts", "video",
+    "work-claim", "work-note", "work-todo", "work-qa", "work-artifacts", "video",
     "video-audio", "video-audio-indextts", "video-render", "video-join",
     "video-add-bgm", "video-check", "narration-check",
     "narration-review-sheets", "narration-edit", "video-validate",
@@ -68,7 +68,7 @@ MANGA_TOOLS = frozenset({
     "series_mark_published", "video_check", "narration_check",
     "generate_audio", "render_videos", "build_long_video", "add_bgm",
     "run_full_pipeline",
-    "video_validate", "video_chapters", "work_status", "work_claim", "work_note", "work_qa",
+    "video_validate", "video_chapters", "work_status", "work_claim", "work_note", "work_todo", "work_qa",
     "work_artifacts", "generate_image",
     "crop_qa", "characters", "narrate_auto", "manga_auto",
 })
