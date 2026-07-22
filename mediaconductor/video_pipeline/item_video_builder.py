@@ -233,10 +233,18 @@ def build_item_narration_wav(
         "".join(concat_inputs)
         + f"concat=n={len(assets)}:v=0:a=1,aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=mono[a]"
     )
+    # The graph is ~150 chars per panel, so a long chapter (160+ narrated
+    # panels) pushes the argv past the Windows 32,767-char command-line limit
+    # and ffmpeg never even starts (WinError 206). Hand the graph to ffmpeg as
+    # a file instead — argv then holds only the inputs, which stay well short
+    # of the limit. Real failure: DragonKnight chapter 31, 164 panels.
+    work_dir.mkdir(parents=True, exist_ok=True)
+    filter_script = work_dir / f"{output_path.stem}_narration.filter"
+    filter_script.write_text(";".join(filter_parts), encoding="utf-8")
     run(
         [
             "ffmpeg", "-hide_banner", "-y", *inputs,
-            "-filter_complex", ";".join(filter_parts),
+            "-filter_complex_script", str(filter_script),
             "-map", "[a]", "-c:a", "pcm_s16le", str(output_path),
         ]
     )
