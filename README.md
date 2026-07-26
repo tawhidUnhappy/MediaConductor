@@ -16,19 +16,19 @@ small core environment.
 ```text
 download / import            MangaDex or your own chapter files
 → crop                       webtoon strips or paged manga (MAGI)
-→ VERIFY BY EYE              every overlay and crop, recorded as a review
+→ VERIFY CROPS               every overlay and crop, recorded as a review
 → narrate                    from the panels; OCR is a cross-check, not a source
 → account for every panel    narrated, or a recorded omission decision
 → TTS                        Kokoro or IndexTTS, provenance-bound
 → render → join → BGM        one final whole-mix normalize
 → measure the encoded file   loudness, drift, black/frozen frames, silence
-→ WATCH AND LISTEN           recorded against the exact MP4 hash
+→ FINAL VIDEO REVIEW         recorded against the exact MP4 hash
 → rights check → upload      fails closed if permission is unresolved
 ```
 
 The parts a machine can check are checked automatically. The parts it cannot —
 is this crop readable, is this line attributed to the right speaker, does this
-video hold up for its whole runtime — are surfaced as review items pointing at
+video hold up — are surfaced as review items pointing at
 exact files, and are recorded as approvals bound to the bytes they cover.
 
 ## Start from a repository link

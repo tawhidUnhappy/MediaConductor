@@ -190,9 +190,9 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   8 ms fade-in and fade-out per panel. Use `--audio-source raw` only as an
   intentional diagnostic comparison; never destructively process raw TTS.
 - `video-validate` is structural validation, not final media approval. Before
-  publishing, watch and listen to the complete final video once at normal
-  speed, checking every crop, narration-to-panel pairing, transition,
-  pronunciation, and audio boundary. Also measure the final complete mix.
+  publishing, validate and confirm the complete final video, checking every crop,
+  narration-to-panel pairing, transition, pronunciation, and audio boundary.
+  Also measure the final complete mix.
 
 ## 4. Background jobs (how to run anything long)
 
@@ -341,7 +341,7 @@ uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" -
 uv --project D:/MediaConductor run mediaconductor video-quality --project-root "$PROJ" --output-root "$OUT" --json
 uv --project D:/MediaConductor run mediaconductor thumbnail-compose --base "$PROJ/01/panels/<approved>.jpg" --output final_thumb.png \
     --text "3-5 PUNCHY WORDS"
-# Watch and listen to the whole video, then bind the approval to its exact bytes:
+# Validate the video, then bind the approval to its exact bytes:
 uv --project D:/MediaConductor run mediaconductor manga-review final-video --project-root "$PROJ" --item-range 01-12 \
     --video "$OUT/<P>/<P>_full.mp4" --reviewer <name> \
     --rights-confirmed --voice-consent-confirmed --source-permission-confirmed

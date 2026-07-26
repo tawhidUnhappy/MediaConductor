@@ -386,7 +386,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "true peak, audio/video drift, black and frozen frames, long silence, and stale item "
         "renders. Extracts evenly spaced full-resolution frames for the crop-readability and "
         "face/bubble-clipping pass no detector can perform. Exit 3 means machine-clean with "
-        "review items outstanding. Passing is NOT a substitute for watching the whole video.",
+        "review items outstanding. Passing is NOT a substitute for full video review.",
         {"project_root": _PROJECT_ROOT, "output_root": _STR, "project_name": _STR,
          "video": {**_STR, "description": "Exact MP4 to measure (default: latest joined long video)."},
          "items": _ITEMS,

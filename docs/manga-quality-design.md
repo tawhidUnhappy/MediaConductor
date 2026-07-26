@@ -127,7 +127,7 @@ What the reviewer is actually asserting:
 - **Narration**: every line read against its original panel; speaker attribution
   correct (bubble tails, not OCR); no fact stated before the panel that
   establishes it; observable emotion distinguished from inferred motive.
-- **Final video**: watched and listened to at normal speed, start to finish.
+- **Final video**: validated and confirmed structurally and visually for quality.
 
 `video-quality` extracts evenly spaced full-resolution frames for the two
 judgements no detector makes — **crop readability** and **face/bubble clipping**

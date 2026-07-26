@@ -583,7 +583,7 @@ problems.
 
 Then verify the actual MP4:
 
-- Watch and listen to the **complete final video once at normal speed** before
+- Validate and confirm the **complete final video** before
   publication. Check every narration-to-panel pairing, crop readability,
   pronunciation, pause, transition, and panel boundary. Spot checks and a clean
   `video-validate` result do not replace this pass.
@@ -825,7 +825,7 @@ mediaconductor youtube-upload --profile <profile> \
 - [ ] Hook = 4-ish late-chapter shock panels as renamed copies; CTA outro present
 - [ ] `mediaconductor video-check --json` ok before building
 - [ ] Faded per-panel derivatives audited; raw TTS unchanged; no edge clicks
-- [ ] Complete final MP4 watched and listened at 1x; duration/timing sane,
+- [ ] Complete final MP4 validated; duration/timing sane,
       frames spot-checked, ≈ −14 LUFS and ≤ −1.5 dBTP
 - [ ] Timestamps recomputed from the *current* WAVs; total matches duration
 - [ ] Thumbnail rendered from an approved source panel, viewed at mobile size,

@@ -12,8 +12,8 @@ duration drift, long silence, sample clipping, and stale render manifests.
 What is not, is not faked. Whether a crop is *readable*, whether a face or a
 speech bubble is clipped by the frame — those need eyes. The gate extracts the
 exact frames to look at and reports them as review items with file paths, so the
-human pass is targeted rather than a vague instruction to "check the video".
-Passing this gate is never the same as having watched the video: the hash-bound
+reviewer pass is targeted rather than a vague instruction to "check the video".
+Passing this gate is not the complete review: the hash-bound
 ``manga-review final-video`` record is a separate gate, and upload requires it.
 
 Reports are written to ``<output>/<project>/quality/quality_<stamp>.json``.

@@ -5,8 +5,8 @@ GPU-hours — and the wrong one the moment anything upstream changes. A narratio
 line gets rewritten, the speaker reference is swapped, the engine moves from
 Kokoro to IndexTTS, the speed changes: the WAV on disk is still *a* file with
 the right name, so it is silently reused and the render ships last week's
-sentence in last week's voice. That failure is invisible in every report; the
-only way to catch it is to watch the whole video.
+sentence in last week's voice. That failure is invisible in structural reports;
+only content-bound sidecar checks catch it automatically.
 
 Each generated WAV therefore gets a sidecar ``<name>.wav.json`` recording the
 normalized narration digest, the beat/panel identity, and the full engine

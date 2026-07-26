@@ -267,11 +267,10 @@ After the run:
 `mediaconductor video-validate --project-root library/<Project> ... --json` —
 `warnings` (unnarrated panels, orphan audio) are informational; anything in
 `errors` blocks upload.
-That structural result is not publication approval. Before any upload, watch
-and listen to the complete final video once at normal speed, checking every
-panel/narration pairing, crop readability, speaker/name pronunciation, pacing,
-transition, and audio boundary. Fix and rebuild on any defect; spot checks do
-not replace the complete pass.
+That structural result is not publication approval. Before any upload, validate
+and confirm the complete final video, checking panel/narration pairing, crop
+readability, speaker/name pronunciation, pacing, transition, and audio boundary.
+Record the final video review via `manga-review final-video`.
 Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
 
 ## 6. Thumbnail (1280×720)
