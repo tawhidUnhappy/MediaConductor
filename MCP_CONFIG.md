@@ -22,6 +22,7 @@ Copy this into a JSON-based MCP client configuration:
         "--project",
         "D:/MediaConductor",
         "run",
+        "--no-sync",
         "mediaconductor",
         "mcp",
         "--mode",
@@ -34,6 +35,12 @@ Copy this into a JSON-based MCP client configuration:
 }
 ```
 
+`--no-sync` matters on Windows: without it every client launch re-checks and
+may reinstall the project, which rewrites `.venv/Scripts/mediaconductor.exe` —
+and Windows refuses to replace that file while any server started from it is
+still running. See [Startup fails with "Access is
+denied"](#startup-fails-with-access-is-denied).
+
 If the configuration file already has an `mcpServers` object, copy only this
 entry inside it:
 
@@ -44,6 +51,7 @@ entry inside it:
     "--project",
     "D:/MediaConductor",
     "run",
+    "--no-sync",
     "mediaconductor",
     "mcp",
     "--mode",
@@ -89,17 +97,96 @@ entry is:
 }
 ```
 
+## Checkout executable, no launcher
+
+The most robust entry for a checkout skips `uv` at launch entirely and runs the
+venv's own console script, so starting a server can never rebuild or reinstall
+anything:
+
+```json
+"media-conductor": {
+  "command": "D:/MediaConductor/.venv/Scripts/mediaconductor.exe",
+  "args": [
+    "mcp",
+    "--mode",
+    "manga-video",
+    "--allow-root",
+    "D:/MediaProjects"
+  ]
+}
+```
+
+On Linux and macOS the path is `D:/MediaConductor/.venv/bin/mediaconductor`.
+Run `uv sync --project D:/MediaConductor` yourself after pulling changes,
+rather than letting a client launch do it.
+
 ## Verify the server command
 
 Run the command outside the MCP client to confirm the catalog is available:
 
 ```powershell
-uv --project D:/MediaConductor run mediaconductor modes --mode manga-video --json
+uv --project D:/MediaConductor run --no-sync mediaconductor modes --mode manga-video --json
 ```
 
 The MCP server communicates over standard input/output, so it normally waits
 silently when started by hand. Long-running MCP operations should use the
 typed `job_start` tool and then poll with `job_status`.
+
+## Startup fails with "Access is denied"
+
+A client reporting `calling "initialize": EOF`, with uv logging a build just
+before it:
+
+```
+Building media-conductor @ file:///D:/MediaConductor
+   Built media-conductor @ file:///D:/MediaConductor
+error: failed to remove file
+  `D:\MediaConductor\.venv\Lib\site-packages\../../Scripts/mediaconductor.exe`:
+  Access is denied. (os error 5)
+```
+
+is not a permissions problem and not an MCP problem. `uv run` decided the
+project needed reinstalling, and reinstalling rewrites the console scripts —
+but Windows locks a running `.exe` against replacement, so any MediaConductor
+server already running from that venv blocks the new one from starting. uv
+aborts before the server ever speaks, and the client sees EOF.
+
+Fix it in either order:
+
+1. **Stop clients from syncing at launch** — add `--no-sync` to the `uv run`
+   entry, or use the venv executable directly as above. A client launch should
+   never mutate the environment it is launching from.
+2. **Remove the reason uv wants to reinstall.** The usual cause is installed
+   metadata that no longer matches `pyproject.toml` — an editable install still
+   registered under an older version number makes *every* `uv run` rebuild.
+   Compare them:
+
+   ```powershell
+   Select-String '^version' D:/MediaConductor/pyproject.toml
+   Select-String '^Version' D:/MediaConductor/.venv/Lib/site-packages/media_conductor-*.dist-info/METADATA
+   ```
+
+   If they differ, close every MediaConductor server and repair the venv once:
+
+   ```powershell
+   uv sync --project D:/MediaConductor --reinstall-package media-conductor
+   ```
+
+Because a checkout install is editable, stale metadata does not mean stale
+code — the running server is always the current source tree. Only the recorded
+version number drifts, which is why the symptom is a failed launch rather than
+wrong behaviour.
+
+To find what holds the lock:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='mediaconductor.exe'" |
+  Select-Object ProcessId, ParentProcessId, CommandLine
+```
+
+Editors that manage MCP servers keep them alive between sessions, so the
+blocking process is usually a server an editor started earlier, not a stray
+shell.
 
 ## Server handshake
 
