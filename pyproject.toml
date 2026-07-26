@@ -1,11 +1,11 @@
 [project]
 name = "media-conductor"
-version = "2.2.4"
-description = "Agent-native manga video, AI story, and song video production with isolated AI tools"
+version = "3.0.0"
+description = "Agent-native manga, manhwa, and webtoon recap video production with isolated AI tools"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-keywords = ["manga", "ai-story", "music", "lyrics", "video", "mcp", "agents", "ffmpeg"]
+keywords = ["manga", "manhwa", "webtoon", "recap", "video", "tts", "mcp", "agents", "ffmpeg"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",

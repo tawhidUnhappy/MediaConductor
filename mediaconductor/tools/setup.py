@@ -9,8 +9,8 @@
    ``.mangaeasy/tools/`` with model weights, GPU-aware by default:
 
    - always: ``kokoro-82m`` (CPU TTS — the universal fallback engine)
-   - with an NVIDIA GPU: also ``index-tts``, ``magi-v3``, ``deepseek-ocr2``,
-     ``z-image-turbo``
+   - with an NVIDIA GPU: also ``index-tts``, ``magi-v3``, and
+     ``deepseek-ocr2``
 
 4. A final ``doctor`` readiness report.
 
@@ -37,12 +37,10 @@ from mediaconductor.utils import emit_result
 # Installed on every machine — the pipeline always has a working TTS engine.
 BASE_TOOLS = ["kokoro-82m"]
 # Installed when an NVIDIA GPU is detected (or forced with --all).
-GPU_TOOLS = ["index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"]
+GPU_TOOLS = ["index-tts", "magi-v3", "deepseek-ocr2"]
 
 MODE_TOOLS = {
-    "manga-video": ["kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"],
-    "ai-story": ["kokoro-82m", "index-tts", "z-image-turbo"],
-    "song-video": ["ace-step", "demucs", "whisperx", "z-image-turbo"],
+    "manga-video": ["kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2"],
 }
 
 
@@ -68,13 +66,12 @@ def main() -> int:
     )
     profile_group = parser.add_mutually_exclusive_group()
     profile_group.add_argument("--all", action="store_true",
-                               help="Install every tool env regardless of hardware "
-                                    "(large: Z-Image alone downloads ~33 GB).")
+                               help="Install every manga tool env regardless of hardware.")
     profile_group.add_argument("--minimal", action="store_true",
                                help="Only the core binaries (ffmpeg/uv/git-lfs, ~100 MB); "
                                     "install AI tools later with install-tool.")
     profile_group.add_argument("--mode", choices=tuple(MODE_TOOLS),
-                               help="Install only one production mode's isolated dependencies.")
+                               help="Install the manga-video toolchain.")
     parser.add_argument("--skip", action="append", default=[], metavar="TOOL",
                         choices=sorted(TOOLS), help="Skip one tool (repeatable).")
     gpu_group = parser.add_mutually_exclusive_group()

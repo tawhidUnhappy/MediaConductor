@@ -58,8 +58,9 @@ _force_utf8_stdio()
 COMMANDS: dict[str, tuple[str, str, str, str]] = {
     # ── Setup ─────────────────────────────────────────────────────────────────
     "commands":             ("mediaconductor.cli",                                  "commands_main","Setup",           "List every command, or emit the full machine-readable catalog (--json)."),
-    "modes":                ("mediaconductor.modes",                                "main",        "Setup",           "List Manga Video, AI Story, and Song Video modes and their isolated dependencies (--json)."),
+    "modes":                ("mediaconductor.modes",                                "main",        "Setup",           "Show the manga-video production catalog and isolated dependencies (--json)."),
     "where":                ("mediaconductor.tools.external",                       "where_main",  "Setup",            "Show this install's resolved data/tool paths (--json). Run this first from scripts/AI agents."),
+    "workspace-layout":     ("mediaconductor.workspace",                            "main",        "Setup",            "Report every resolved persistent root and whether it stays inside the workspace (--json)."),
     "library-list":         ("mediaconductor.library_scan",                         "main",        "Setup",            "List projects and per-item readiness under a project root (--json)."),
     "series-plan":          ("mediaconductor.series_plan",                          "plan_main",   "Setup",            "Slice a project into fixed upload batches (default 12/video) and name the next one (--json)."),
     "series-mark-published":("mediaconductor.series_plan",                          "mark_main",   "Setup",            "Record an uploaded batch in publish.json so series-plan advances."),
@@ -67,11 +68,11 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "doctor":               ("mediaconductor.tools.install",                        "doctor_main", "Setup",            "Check prerequisites (git/uv/ffmpeg/GPU) and tool status."),
     "setup":                ("mediaconductor.tools.setup",                          "main",        "Setup",            "One-command provisioning: core binaries + AI tool envs + models, GPU-aware (--all / --minimal)."),
     "smoke-test":           ("mediaconductor.tools.smoke",                          "main",        "Setup",            "Prove the install works: build and verify a tiny real video (run after setup)."),
-    "install-tool":         ("mediaconductor.tools.install",                        "main",        "Setup",            "Install an external AI tool (index-tts, magi-v3, deepseek-ocr2, z-image-turbo, ...) from GitHub/Hugging Face."),
+    "install-tool":         ("mediaconductor.tools.install",                        "main",        "Setup",            "Install a manga-production AI tool (Kokoro, IndexTTS, MAGI, or DeepSeek OCR)."),
     "bootstrap-tools":      ("mediaconductor.tools.vendored",                       "bootstrap_main", "Setup",         "Download ffmpeg/uv/git-lfs into this install's own tools dir (the setup step runs this when they're missing)."),
 
     # ── Background jobs (the right way to run anything long) ─────────────────
-    "job-start":            ("mediaconductor.jobs",                                 "start_main",  "Jobs",             "Start a schema-validated long-running tool as a detached job (--tool/--arguments-json; positional CLI compatibility remains)."),
+    "job-start":            ("mediaconductor.jobs",                                 "start_main",  "Jobs",             "Start a schema-validated long-running tool as a detached job (--tool NAME --arguments-json OBJECT)."),
     "job-status":           ("mediaconductor.jobs",                                 "status_main", "Jobs",             "Status/progress/result/log-tail of one background job (--json)."),
     "jobs":                 ("mediaconductor.jobs",                                 "list_main",   "Jobs",             "List background jobs and their states (--json)."),
     "job-run":              ("mediaconductor.jobs",                                 "run_main",    "Jobs",             "(internal) Supervisor spawned by job-start; not for direct use."),
@@ -95,6 +96,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "narration-check":      ("mediaconductor.video_pipeline.narration_check",       "main",        "Video pipeline",   "Validate narration.json/intro.json structure: coverage, dangling images, empty text (--json)."),
     "narration-review-sheets": ("mediaconductor.video_pipeline.narration_sheets",   "main",        "Video pipeline",   "Render panel + narration + unverified-OCR sheets for mandatory visual review."),
     "narration-edit":       ("mediaconductor.video_pipeline.narration_edit",        "main",        "Video pipeline",   "Upsert/delete/list narration entries from the CLI (optionally pruning stale WAVs)."),
+    "video-quality":        ("mediaconductor.video_pipeline.quality_gate",          "main",        "Video pipeline",   "Measure the ENCODED output: loudness/true peak, dwell, cuts, black/frozen frames, A/V drift, silence (--json)."),
     "video-validate":       ("mediaconductor.video_pipeline.validate_generation",   "main",        "Video pipeline",   "Check generated audio/videos against the inputs."),
     "video-chapters":       ("mediaconductor.video_pipeline.chapter_timestamps",    "main",        "Video pipeline",   "Generate ready-to-paste YouTube chapter timestamps from rendered item videos (--json)."),
     "video-audio-audit":    ("mediaconductor.video_pipeline.audio_audit",          "main",        "Video pipeline",   "Verify every panel has valid, readable audio (catches corrupt/empty files) before rendering; --fix deletes bad ones for regeneration."),
@@ -117,25 +119,14 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "youtube-delete":       ("mediaconductor.youtube.delete",                       "main",        "YouTube",          "Delete a video through a selected profile (two-step: requires --confirm)."),
     "youtube-thumbnail":    ("mediaconductor.youtube.thumbnail",                    "main",        "YouTube",          "Set/replace a thumbnail through a selected profile (no re-upload needed)."),
 
+    # ── Review, rights, and panel accounting (the production gates) ───────────
+    "manga-review":         ("mediaconductor.reviews",                              "main",        "Review & rights",  "Record/check hash-bound crop, narration, and final-video reviews (crop|narration|final-video|check)."),
+    "panel-decisions":      ("mediaconductor.panel_decisions",                      "main",        "Review & rights",  "Account for every panel: narrated, or deliberately omitted for a stated reason."),
+    "manga-rights":         ("mediaconductor.rights",                               "main",        "Review & rights",  "Create/verify the rights manifest that authorizes publication (init|check|show)."),
+
     # ── External AI tool environments ─────────────────────────────────────────
-    "tools":                ("mediaconductor.tools.external",                       "main",        "External tools",   "Show where external tool envs (Kokoro/IndexTTS/MAGI/DeepSeek/Z-Image) resolve."),
+    "tools":                ("mediaconductor.tools.external",                       "main",        "External tools",   "Show where manga tool envs (Kokoro/IndexTTS/MAGI/DeepSeek OCR) resolve."),
     "index-tts":            ("mediaconductor.tools.index_tts",                      "main",        "External tools",   "Run IndexTTS inside its external uv env."),
-    "deepseek-ocr2":        ("mediaconductor.tools.deepseek_ocr2",                  "main",        "External tools",   "Run DeepSeek-OCR 2 and write `ocr` fields into narration JSON files."),
-    "zimage":               ("mediaconductor.tools.zimage",                         "main",        "External tools",   "Generate images with Z-Image Turbo (text-to-image; thumbnails, backgrounds)."),
-    "ace-step":             ("mediaconductor.tools.ace_step",                        "main",        "External tools",   "Generate a song with ACE-Step 1.5 inside its isolated uv environment."),
-    "demucs":               ("mediaconductor.tools.demucs",                          "main",        "External tools",   "Separate vocals from a song with Demucs inside its isolated uv environment."),
-    "whisperx":             ("mediaconductor.tools.whisperx",                        "main",        "External tools",   "Transcribe vocals and align authoritative lyrics with WhisperX timestamps."),
-
-    # AI Story
-    "story-init":           ("mediaconductor.story.workflow",                       "init_main",   "AI Story",        "Create a continuity-first AI story project manifest for an agent to complete."),
-    "story-check":          ("mediaconductor.story.workflow",                       "check_main",  "AI Story",        "Validate story structure, continuity anchors, scene prompts, narration, and publish metadata (--json)."),
-    "story-build":          ("mediaconductor.story.workflow",                       "build_main",  "AI Story",        "Materialize prompts and build scene images, narration video, and optional YouTube upload."),
-
-    # Song & lyrics video
-    "song-init":            ("mediaconductor.song.workflow",                        "init_main",   "Song Video",      "Create a song project manifest with lyrics and the minimalistic-sky visual default."),
-    "song-check":           ("mediaconductor.song.workflow",                        "check_main",  "Song Video",      "Validate lyrics, generation prompt, alignment inputs, visual prompt, and publish metadata (--json)."),
-    "song-build":           ("mediaconductor.song.workflow",                        "build_main",  "Song Video",      "Generate or ingest a song, align corrected lyrics, render a lyric video, and optionally upload."),
-
     # ── Manga chapter workflow: acquire & crop ────────────────────────────────
     "download":             ("mediaconductor.download.mangadex",                    "main",        "Manga: acquire",   "Download manga chapters from MangaDex (--url + --all for a whole series; polite and resumable)."),
     "style-detect":         ("mediaconductor.panels.style_detect",                  "main",        "Manga: acquire",   "Detect webtoon vs paged manga from page dimensions (--json) to pick the crop tool."),
@@ -147,13 +138,9 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "page-split":           ("mediaconductor.panels.page",                          "main",        "Manga: acquire",   "Split paged manga into panels with MAGI v3 detection and verify sheets."),
     "panel-transcript":     ("mediaconductor.ocr.panel_transcript",                 "main",        "Manga: acquire",   "Add optional SHA-bound, unverified OCR cross-evidence to <item>/transcript.json."),
 
-    # ── Image export & AI context ─────────────────────────────────────────────
-    "to-pdf":               ("mediaconductor.images.pdf",                           "main",        "Manga: export",    "Export chapter images to a PDF."),
-    "to-pdf-lossless":      ("mediaconductor.images.pdf_lossless",                  "main",        "Manga: export",    "Export images to a lossless PDF."),
-    "convert-images":       ("mediaconductor.images.convert",                       "main",        "Manga: export",    "Convert / normalize image formats."),
-    "thumbnail-compose":    ("mediaconductor.images.thumbnail_compose",             "main",        "Manga: export",    "Compose a YouTube thumbnail: base art + stroked text blocks + border (1280x720)."),
-    "watermark":            ("mediaconductor.images.watermark",                     "main",        "Manga: export",    "Apply a text watermark to images."),
-    "ai-zip":               ("mediaconductor.images.ai_zip_cli",                    "main",        "Manga: export",    "Pack chapter panels into a labelled ZIP for AI context."),
+    # ── Packaging for publication ─────────────────────────────────────────────
+    "thumbnail-compose":    ("mediaconductor.images.thumbnail_compose",             "main",        "Manga: publish",   "Compose a YouTube thumbnail: base art + stroked text blocks + border (1280x720)."),
+    "panels-context-pack":  ("mediaconductor.images.ai_zip_cli",                    "main",        "Manga: publish",   "Pack a chapter's panels into a labelled ZIP so an LLM can read them as narration context."),
 }
 
 
@@ -169,8 +156,6 @@ def _group_order() -> list[str]:
 PRIMARY_COMMANDS = frozenset({
     "modes", "commands", "where", "doctor", "setup", "mcp",
     "job-start", "job-status", "jobs", "video", "download",
-    "story-init", "story-check", "story-build",
-    "song-init", "song-check", "song-build",
 })
 
 
@@ -183,7 +168,7 @@ def _print_help(stream=None, mode: str | None = None, all_commands: bool = False
     mode = normalize_mode(mode)
     visible = MODES[mode].commands if mode else frozenset(COMMANDS) if all_commands else PRIMARY_COMMANDS
     suffix = f" - {MODES[mode].title} mode" if mode else ""
-    write(f"{PRODUCT_NAME} {__version__}{suffix} - agent-native media production\n\n")
+    write(f"{PRODUCT_NAME} {__version__}{suffix} - manga and webtoon recap production\n\n")
     write("Usage:\n")
     write(f"  {CLI_NAME} <command> [args...]\n")
     write(f"  {CLI_NAME} <command> --help     Show a command's own options\n")
@@ -192,11 +177,11 @@ def _print_help(stream=None, mode: str | None = None, all_commands: bool = False
     write(f"  ({LEGACY_CLI_NAME} remains available as a compatibility alias.)\n\n")
 
     if mode is None:
-        write("Modes:\n")
+        write("Production catalog:\n")
         for spec in MODES.values():
             write(f"  {spec.key:<14}{spec.description}\n")
-        write(f"\nUse `{CLI_NAME} commands --mode <mode>` for a selected catalog, or "
-              f"`{CLI_NAME} --help --all` for legacy low-level commands.\n\n")
+        write(f"\nUse `{CLI_NAME} commands --mode manga-video --json --full` "
+              "for the machine-readable contract.\n\n")
 
     width = max(len(name) for name in visible) + 2
     for group in _group_order():

@@ -10,15 +10,12 @@ import zipfile
 
 MEDIA_SUFFIXES = {".avi", ".flac", ".m4a", ".mkv", ".mov", ".mp3", ".mp4", ".wav", ".webm"}
 WHEEL_REQUIRED = {
-    "mediaconductor/agent_skills/ai-story/SKILL.md",
     "mediaconductor/agent_skills/manga-video/SKILL.md",
-    "mediaconductor/agent_skills/media-conductor/SKILL.md",
-    "mediaconductor/agent_skills/song-video/SKILL.md",
+    "mediaconductor/agent_skills/manga-video/references/youtube-publishing.md",
+    "mediaconductor/assets/tools/batch_detect_magi.py",
+    "mediaconductor/assets/tools/detect_magi.py",
+    "mediaconductor/assets/prompts/narration.md",
     "mediaconductor/assets/fonts/edosz.ttf",
-    "mediaconductor/assets/tools/generate_ace_step.py",
-    "mediaconductor/assets/tools/generate_zimage.py",
-    "mediaconductor/assets/tools/separate_demucs.py",
-    "mediaconductor/assets/tools/transcribe_whisperx.py",
 }
 SDIST_REQUIRED_SUFFIXES = {
     "/AGENTS.md",
@@ -27,11 +24,16 @@ SDIST_REQUIRED_SUFFIXES = {
     "/SECURITY.md",
     "/THIRD_PARTY_NOTICES.md",
     "/mcp.example.json",
-    "/skills/ai-story/SKILL.md",
     "/skills/manga-video/SKILL.md",
-    "/skills/media-conductor/SKILL.md",
-    "/skills/song-video/SKILL.md",
 }
+# Anything a distribution must never advertise again. A wheel that still ships
+# a removed pipeline's skill or adapter is a working install of a feature the
+# CLI no longer registers — the exact drift the registry tests exist to stop.
+FORBIDDEN_TOKENS = (
+    "ai-story", "song-video", "media-conductor/SKILL",
+    "ace_step", "generate_zimage", "separate_demucs", "transcribe_whisperx",
+    "/story/", "/song/", "images/pdf", "images/convert", "images/watermark",
+)
 
 
 def _one(paths: list[Path], label: str) -> Path:
@@ -46,6 +48,15 @@ def _reject_media(names: set[str], artifact: Path) -> None:
         raise SystemExit(f"user/generated media leaked into {artifact.name}: {media}")
 
 
+def _reject_removed_features(names: set[str], artifact: Path) -> None:
+    leaked = sorted(
+        name for name in names
+        if any(token in name for token in FORBIDDEN_TOKENS)
+    )
+    if leaked:
+        raise SystemExit(f"removed features leaked into {artifact.name}: {leaked}")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     dist = Path(args[0] if args else "dist")
@@ -58,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     if missing_wheel:
         raise SystemExit(f"wheel is missing required files: {missing_wheel}")
     _reject_media(wheel_names, wheel)
+    _reject_removed_features(wheel_names, wheel)
 
     with tarfile.open(sdist, "r:gz") as archive:
         sdist_names = {member.name for member in archive.getmembers() if member.isfile()}
@@ -67,9 +79,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     if missing_sdist:
         raise SystemExit(f"source archive is missing required files: {missing_sdist}")
-    if not any(name.endswith("/mediaconductor/assets/fonts/edosz.ttf") for name in sdist_names):
-        raise SystemExit("source archive is missing mediaconductor/assets/fonts/edosz.ttf")
     _reject_media(sdist_names, sdist)
+    _reject_removed_features(sdist_names, sdist)
 
     print(f"Distribution payload passed: {wheel.name}, {sdist.name}")
     return 0

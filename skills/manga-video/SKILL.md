@@ -51,6 +51,6 @@ and spot checks do not replace that review. Never use raw filesystem deletion
 for generated outputs.
 Never publish unless the user explicitly requested it and YouTube status is
 connected. Before publishing, read the shared
-[`youtube-publishing.md`](../media-conductor/references/youtube-publishing.md),
+[`youtube-publishing.md`](references/youtube-publishing.md),
 verify the intended named profile/channel, and pass `--profile <name>` to each
 YouTube command.

@@ -250,20 +250,11 @@ def validate_items_strict(config: LongVideoConfig, chapters: dict[str, Path], na
             continue
 
         panels = files_by_stem(item_dir / "panels", IMAGE_EXTENSIONS)
-        narration_images = [entry.get("image", "") for entry in narration if isinstance(entry, dict)]
-        narration_stems = [Path(image).stem for image in narration_images if image]
+        narration_stems = [Path(entry["image"]).stem for entry in narration]
 
         missing_panels = sorted(set(narration_stems) - set(panels))
         if missing_panels:
             problems.append(f"{label}: missing panel image(s) for {', '.join(missing_panels[:10])}")
-
-        missing_text = [
-            Path(entry.get("image", "")).stem or f"#{idx}"
-            for idx, entry in enumerate(narration, start=1)
-            if isinstance(entry, dict) and not (entry.get("narration") or entry.get("text") or "").strip()
-        ]
-        if missing_text:
-            problems.append(f"{label}: empty narration text for {', '.join(missing_text[:10])}")
 
         if audio_root is not None:
             audios = files_by_stem(audio_root / project / item_dir.name, AUDIO_EXTENSIONS)

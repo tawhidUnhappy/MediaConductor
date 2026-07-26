@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
 
-from mediaconductor.audio.narration_safety import (
-    narration_delivery_lint,
-    narration_fluency_lint,
-)
+from mediaconductor.audio.narration_safety import narration_quality_findings
 from mediaconductor.video_pipeline.common import project_name
 from mediaconductor.video_pipeline.ffmpeg_tools import probe_duration
+from mediaconductor.video_pipeline.narration_contract import validate_item_narration
 
 
 from mediaconductor.video_pipeline.common import IMAGE_EXTENSIONS  # noqa: F401  (single home: common.py)
@@ -30,51 +27,40 @@ def frame_aligned_duration(audio_duration: float, fps: int) -> tuple[float, int]
     return frames / fps, frames
 
 
-def load_narration(item_dir: Path) -> list[dict[str, str]]:
-    """Load an item's narration entries, in playback order.
+def load_narration(item_dir: Path, *, require_files: bool = True) -> list[dict]:
+    """Load an item's narration entries, in playback order, contract-validated.
 
     If `intro.json` exists alongside `narration.json`, its entries are
     prepended -- a project-agnostic way to give one item (usually the first
     chapter) a cold-open trailer/hook reel without splicing it into the
     item's own narration.json. Same `{"image": ..., "narration": ...}` shape,
-    same panels/ folder; every existing caller (audio generation, rendering,
-    validation) sees one combined list and needs no changes.
-    """
-    path = item_dir / "narration.json"
-    with path.open("r", encoding="utf-8-sig") as f:
-        data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError(f"{path} must contain a JSON array.")
+    same panels/ folder; every caller (audio generation, rendering,
+    validation) sees one combined list.
 
-    intro_path = item_dir / "intro.json"
-    if intro_path.exists():
-        with intro_path.open("r", encoding="utf-8-sig") as f:
-            intro_data = json.load(f)
-        if not isinstance(intro_data, list):
-            raise ValueError(f"{intro_path} must contain a JSON array.")
-        data = intro_data + data
-    return data
+    Every entry is validated by
+    :mod:`mediaconductor.video_pipeline.narration_contract` first, so no
+    consumer downstream has to re-derive what a safe ``image`` value is. Pass
+    ``require_files=False`` to validate shape without touching the disk.
+    """
+    return validate_item_narration(Path(item_dir), require_files=require_files)
 
 
 def validate_calm_narration(entries: list[dict], source: Path) -> None:
-    """Reject narration that could produce a loud or exaggerated performance.
+    """Reject narration that cannot be spoken acceptably.
 
     This preflight stays separate from ``load_narration`` so QA can still load
     unsafe entries and report precise edit commands. Audio and video entry
     points call it before doing expensive or destructive work.
+
+    Only ``error`` findings raise. Style warnings (repetition, meta phrasing,
+    beat length) are reported by ``narration-check`` and ``work-qa``, where a
+    human can weigh them, and never block a render on their own.
     """
-    problems: list[str] = []
-    for index, entry in enumerate(entries, start=1):
-        if not isinstance(entry, dict):
-            continue
-        image = entry.get("image") or f"entry {index}"
-        text = str(entry.get("narration") or entry.get("text") or "").strip()
-        delivery = narration_delivery_lint(text)
-        if delivery:
-            problems.append(f"{image}: {delivery}")
-        fluency = narration_fluency_lint(text)
-        if fluency:
-            problems.append(f"{image}: {fluency}")
+    problems = [
+        f"{finding.beat}: {finding.message}"
+        for finding in narration_quality_findings(entries)
+        if finding.is_error
+    ]
     if problems:
         details = "\n".join(f"  - {problem}" for problem in problems[:20])
         more = f"\n  ... and {len(problems) - 20} more" if len(problems) > 20 else ""

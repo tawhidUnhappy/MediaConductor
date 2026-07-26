@@ -31,7 +31,7 @@ _YOUTUBE_PROFILE = {
     "type": "string",
     "pattern": r"^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$",
     "default": "default",
-    "description": "Isolated YouTube account profile (default: default; e.g. manga, song, ai-story).",
+    "description": "Isolated YouTube account profile (default: default; e.g. manga-main).",
 }
 _YOUTUBE_AUTO_AUTH = {
     "type": "boolean",
@@ -50,32 +50,12 @@ _PROJECT_ROOT = {
     "type": "string",
     "description": "Absolute path to the folder containing the item folders (usually library/<project>).",
 }
-_MANUAL_REVIEW_CONFIRMED = {
-    "type": "boolean",
-    "x-mcp-only": True,
-    "description": (
-        "Must be true. Set it only after a vision-capable reviewer has opened every original "
-        "page/strip overlay and every final crop at readable resolution, resolved all withheld "
-        "or uncertain crops, and compared every narration line with its original panel. MAGI-v3 "
-        "and DeepSeek-OCR2 output cannot satisfy this confirmation."
-    ),
-}
-_FINAL_VIDEO_REVIEW_CONFIRMED = {
-    "type": "boolean",
-    "x-mcp-only": True,
-    "description": (
-        "Manga-video upload gate. Must be true only after a reviewer has watched and listened "
-        "to the complete final video at normal speed, checking every crop, narration-to-panel "
-        "pairing, transition, pronunciation, audio boundary, pacing, and final mix."
-    ),
-}
-
 # MCP tool name -> (cli command, description, {property: schema}, [required], {property: flag spec})
 TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "modes": (
         "modes",
-        "List the three isolated production modes, their dependencies, and the MCP restart command.",
-        {"mode": {"type": "string", "enum": ["manga-video", "ai-story", "song-video"]}},
+        "Show the manga-video production catalog, dependencies, and MCP restart command.",
+        {"mode": {"type": "string", "enum": ["manga-video"]}},
         [], {"mode": ("--mode", "value")},
     ),
     "setup": (
@@ -86,10 +66,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "to preview the plan.",
         {"all": {**_BOOL, "description": "Install every tool regardless of hardware."},
          "minimal": {**_BOOL, "description": "Core binaries only; no AI tool envs."},
-         "mode": {"type": "string", "enum": ["manga-video", "ai-story", "song-video"],
-                  "description": "Install only the selected mode's isolated toolchain."},
+         "mode": {"type": "string", "enum": ["manga-video"],
+                  "description": "Install the manga-video toolchain."},
          "skip": {"type": "array", "items": {"type": "string"},
-                  "description": "Tool names to skip, e.g. [\"z-image-turbo\"]."},
+                  "description": "Optional manga tool names to skip, e.g. [\"deepseek-ocr2\"]."},
          "skip_models": _BOOL, "cpu": _BOOL, "cuda": _BOOL, "dry_run": _BOOL},
         [],
         {"all": ("--all", "flag"), "minimal": ("--minimal", "flag"),
@@ -288,12 +268,14 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "thumbnail_compose": (
         "thumbnail-compose",
-        "Compose a YouTube thumbnail: base art (e.g. best zimage variant) + bold stroked text "
+        "Compose a YouTube thumbnail from an APPROVED SOURCE PANEL + bold stroked text "
         "blocks (rotate/shadow supported) + fat outlined block-arrows + white inset border at "
-        "1280x720. Prefer spec_json (inline, no file). Tilt the big hook block a few degrees "
-        "and keep arrows chunky so the markup reads hand-placed. Inspect the output image "
-        "before uploading.",
-        {"base": {**_STR, "description": "Absolute path to the base image."},
+        "1280x720. Generated key art is not used: it promises art the video does not contain. "
+        "The base panel must be listed in rights.json under thumbnail_sources. Prefer "
+        "spec_json (inline, no file). Tilt the big hook block a few degrees and keep arrows "
+        "chunky so the markup reads hand-placed. Inspect the output at mobile size before "
+        "uploading.",
+        {"base": {**_STR, "description": "Absolute path to an approved source panel."},
          "output": {**_STR, "description": "Absolute output PNG path."},
          "text": {"type": "array", "items": {"type": "string"},
                   "description": "Quick mode: 1-3 short text blocks (3-5 punchy words each)."},
@@ -338,7 +320,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "doctor": (
         "doctor",
         "Check this machine: ffmpeg/uv/git presence, GPU backend (cuda/mps/cpu), installed AI tools.",
-        {"mode": {"type": "string", "enum": ["manga-video", "ai-story", "song-video"],
+        {"mode": {"type": "string", "enum": ["manga-video"],
                   "description": "Limit readiness output to one production mode."},
          "check_updates": {**_BOOL, "description": "Also check installed AI tools for upstream updates."}},
         [],
@@ -398,6 +380,22 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "project_name": ("--project-name", "value"), "items": ("--items", "list"),
          "item_range": ("--item-range", "value"), "allow_gaps": ("--allow-gaps", "flag")},
     ),
+    "video_quality": (
+        "video-quality",
+        "Measure the ENCODED deliverable, not the pre-encode filter: integrated loudness and "
+        "true peak, audio/video drift, black and frozen frames, long silence, and stale item "
+        "renders. Extracts evenly spaced full-resolution frames for the crop-readability and "
+        "face/bubble-clipping pass no detector can perform. Exit 3 means machine-clean with "
+        "review items outstanding. Passing is NOT a substitute for watching the whole video.",
+        {"project_root": _PROJECT_ROOT, "output_root": _STR, "project_name": _STR,
+         "video": {**_STR, "description": "Exact MP4 to measure (default: latest joined long video)."},
+         "items": _ITEMS,
+         "review_frames": {**_INT, "description": "Frames to extract for the manual pass (0 to skip)."}},
+        ["project_root", "output_root"],
+        {"project_root": ("--project-root", "value"), "output_root": ("--output-root", "value"),
+         "project_name": ("--project-name", "value"), "video": ("--video", "value"),
+         "items": ("--items", "list"), "review_frames": ("--review-frames", "value")},
+    ),
     "audio_audit": (
         "video-audio-audit",
         "ffprobe every expected narration audio file; report missing panels vs missing/corrupt audio. "
@@ -415,8 +413,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "prefer job_start. Existing audio is skipped unless overwrite=true (old takes are "
         "archived, never lost). Blocked until manual crop/narration review is confirmed.",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "project_name": _STR, "items": _ITEMS,
-         "overwrite": _BOOL, "manual_review_confirmed": _MANUAL_REVIEW_CONFIRMED},
-        ["project_root", "audio_root", "manual_review_confirmed"],
+         "overwrite": _BOOL},
+        ["project_root", "audio_root"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "project_name": ("--project-name", "value"), "items": ("--items", "list"),
          "overwrite": ("--overwrite", "flag")},
@@ -426,9 +424,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Render one video per item from panels + audio after confirmed manual crop/narration "
         "review. Needs audio to exist (run generate_audio/audio_audit first).",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR,
-         "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL,
-         "manual_review_confirmed": _MANUAL_REVIEW_CONFIRMED},
-        ["project_root", "audio_root", "output_root", "manual_review_confirmed"],
+         "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL},
+        ["project_root", "audio_root", "output_root"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "project_name": ("--project-name", "value"),
          "items": ("--items", "list"), "overwrite": ("--overwrite", "flag")},
@@ -439,10 +436,9 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "add_bgm afterward).",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR,
          "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL,
-         "manual_review_confirmed": _MANUAL_REVIEW_CONFIRMED,
          "allow_gaps": {**_BOOL, "description": "Skip chapters genuinely missing from the source "
                         "instead of failing (never use it to paper over a failed render)."}},
-        ["project_root", "output_root", "manual_review_confirmed"],
+        ["project_root", "output_root"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "project_name": ("--project-name", "value"),
          "items": ("--items", "list"), "overwrite": ("--overwrite", "flag"),
@@ -468,7 +464,6 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "LONG-RUNNING — prefer job_start. Requires confirmed manual crop/narration review. "
         "Prefer the single-step tools when iterating.",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR, "items": _ITEMS,
-         "manual_review_confirmed": _MANUAL_REVIEW_CONFIRMED,
          "tts": {"type": "string", "enum": ["auto", "kokoro", "indextts"]},
          "speaker_wav": {**_STR, "description": "IndexTTS speaker reference WAV (defaults to "
                          "config.system.json -> tts.speaker_wav)."},
@@ -494,7 +489,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "no_background_music": _BOOL,
          "background_music": _STR,
          "music_volume_db": _NUM},
-        ["project_root", "audio_root", "output_root", "manual_review_confirmed"],
+        ["project_root", "audio_root", "output_root"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "items": ("--items", "list"),
          "tts": ("--tts", "value"), "speaker_wav": ("--speaker-wav", "value"),
@@ -536,15 +531,17 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Default privacy is private; one upload costs 1,600 quota units.",
         {"profile": _YOUTUBE_PROFILE,
          "auto_auth": _YOUTUBE_AUTO_AUTH,
+         "project_root": {**_PROJECT_ROOT, "description": "Manga project whose current final-video "
+                          "review and rights record is bound to this exact file."},
          "video": {**_STR, "description": "Absolute path to the video file."},
          "title": {**_STR, "description": "Video title (max 100 chars)."},
          "description": _STR,
          "tags": {**_STR, "description": "Comma-separated tags, e.g. 'manga,recap'."},
          "privacy": {"type": "string", "enum": ["private", "unlisted", "public"]},
-         "thumbnail": _STR, "made_for_kids": _BOOL, "contains_synthetic_media": _BOOL,
-         "final_video_review_confirmed": _FINAL_VIDEO_REVIEW_CONFIRMED},
-        ["video", "title"],
+         "thumbnail": _STR, "made_for_kids": _BOOL, "contains_synthetic_media": _BOOL},
+        ["project_root", "video", "title"],
         {"profile": ("--profile", "value"), "auto_auth": ("--no-auto-auth", "no-flag"),
+         "project_root": ("--project-root", "value"),
          "video": ("--video", "value"), "title": ("--title", "value"),
          "description": ("--description", "value"), "tags": ("--tags", "value"),
          "privacy": ("--privacy", "value"), "thumbnail": ("--thumbnail", "value"),
@@ -597,25 +594,13 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "install_tool": (
         "install-tool",
         "Install an external AI tool env (multi-GB download). LONG-RUNNING — prefer job_start.",
-        {"name": {"type": "string", "enum": ["ace-step", "demucs", "whisperx", "kokoro-82m",
-                                                       "faster-whisper", "index-tts", "magi-v3",
-                                                       "deepseek-ocr2", "z-image-turbo"]},
+        {"name": {"type": "string", "enum": ["kokoro-82m", "index-tts", "magi-v3",
+                                              "deepseek-ocr2"]},
          "ref": _STR, "skip_model": _BOOL, "cpu": _BOOL, "cuda": _BOOL, "update": _BOOL},
         ["name"],
         {"name": (None, "positional"), "ref": ("--ref", "value"),
          "skip_model": ("--skip-model", "flag"), "cpu": ("--cpu", "flag"),
          "cuda": ("--cuda", "flag"), "update": ("--update", "flag")},
-    ),
-    "deepseek_ocr2": (
-        "deepseek-ocr2",
-        "Run DeepSeek-OCR 2 over narration JSON files and write `ocr` fields. LONG-RUNNING — "
-        "prefer job_start. Requires `mediaconductor install-tool deepseek-ocr2` first.",
-        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
-         "force": {**_BOOL, "description": "Replace existing OCR fields."},
-         "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]}},
-        ["project_root"],
-        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
-         "force": ("--force", "flag"), "device": ("--device", "value")},
     ),
     "work_status": (
         "work-status",
@@ -705,142 +690,79 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         ["project_root"],
         {"project_root": ("--project-root", "value")},
     ),
-    "generate_image": (
-        "zimage",
-        "Generate images with Z-Image Turbo (text-to-image). LONG-RUNNING on first call "
-        "(model load ~1-2 min; then ~10-30 s per image on a GPU) — prefer job_start. Requires "
-        "`mediaconductor install-tool z-image-turbo` first. Long descriptive prompts work best.",
-        {"prompt": {**_STR, "description": "Text prompt (English or Chinese)."},
-         "output": {**_STR, "description": "Absolute output PNG path."},
-         "width": _INT, "height": _INT,
-         "count": {**_INT, "description": "Number of variants (files get _01.._NN suffixes)."},
-         "seed": _INT,
-         "strategy": {"type": "string", "enum": ["auto", "bf16", "nf4", "offload", "cpu"],
-                      "description": "VRAM strategy; auto detects GPU/VRAM and is the default."}},
-        ["prompt", "output"],
-        {"prompt": ("--prompt", "value"), "output": ("--output", "value"),
-         "width": ("--width", "value"), "height": ("--height", "value"),
-         "count": ("--count", "value"), "seed": ("--seed", "value"),
-         "strategy": ("--strategy", "value")},
+    "manga_review": (
+        "manga-review",
+        "Record and check the hash-bound human reviews production depends on. 'crop' approves "
+        "the exact source pages and panel crops, 'narration' approves the exact panels plus "
+        "narration.json/intro.json, 'final-video' approves one exact MP4 together with the "
+        "rights, voice-consent, and source-permission acknowledgements, and 'check' reports "
+        "whether those records still match the current bytes. Any change to the inputs "
+        "invalidates the approval — a boolean is never accepted as evidence that a review "
+        "happened.",
+        {"action": {"type": "string", "enum": ["crop", "narration", "final-video", "check"],
+                    "description": "Which review to record, or 'check' to verify currency."},
+         "project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "reviewer": {**_STR, "description": "Who performed the review (name or agent identity)."},
+         "video": {**_STR, "description": "Absolute path to the final MP4 (final-video only)."},
+         "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
+         "stages": {"type": "array", "items": {"type": "string",
+                                               "enum": ["crop", "narration", "final_video"]},
+                    "description": "Stages to check (default: crop + narration)."},
+         "rights_confirmed": {**_BOOL, "description": "Final-video: rights to the source art are confirmed."},
+         "voice_consent_confirmed": {**_BOOL, "description": "Final-video: narrator voice consent/provenance is confirmed."},
+         "source_permission_confirmed": {**_BOOL, "description": "Final-video: permission to use the source is confirmed."}},
+        ["action", "project_root"],
+        {"action": (None, "positional"), "project_root": ("--project-root", "value"),
+         "items": ("--items", "list"), "reviewer": ("--reviewer", "value"),
+         "video": ("--video", "value"), "source_subdir": ("--source-subdir", "value"),
+         "stages": ("--stage", "repeat"),
+         "rights_confirmed": ("--rights-confirmed", "flag"),
+         "voice_consent_confirmed": ("--voice-consent-confirmed", "flag"),
+         "source_permission_confirmed": ("--source-permission-confirmed", "flag")},
     ),
-    "story_init": (
-        "story-init",
-        "Create an AI Story manifest. The agent must then fill its continuity bible and scenes before building.",
-        {"project_root": _PROJECT_ROOT, "title": _STR,
-         "story": {**_STR, "description": "Complete source story text; use exactly one of story/story_file."},
-         "story_file": {**_STR, "description": "UTF-8 source story file; use exactly one of story/story_file."},
-         "force": _BOOL},
-        ["project_root", "title"],
-        {"project_root": ("--project-root", "value"), "title": ("--title", "value"),
-         "story": ("--story", "value"), "story_file": ("--story-file", "value"),
+    "panel_decisions": (
+        "panel-decisions",
+        "Account for every cropped panel: narrated, or deliberately omitted for a stated "
+        "reason bound to the panel's SHA-256. Called with panels+reason+reviewer it records "
+        "omissions; called without them it audits which panels are still unaccounted for. "
+        "Re-cropping invalidates a decision rather than silently inheriting it.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "item": {**_STR, "description": "Item folder the recorded decisions apply to, e.g. '01'."},
+         "panels": {"type": "array", "items": {"type": "string"},
+                    "description": "Panel filenames to mark as deliberately omitted."},
+         "reason": {"type": "string",
+                    "enum": ["credit", "scanlator_notice", "decorative", "duplicate",
+                             "sfx_only", "platform_safety", "other"],
+                    "description": "Why those panels carry no narration."},
+         "note": {**_STR, "description": "Explanation; required when reason='other'."},
+         "reviewer": {**_STR, "description": "Who made the decision."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "item": ("--item", "value"), "panels": ("--panels", "list"),
+         "reason": ("--reason", "value"), "note": ("--note", "value"),
+         "reviewer": ("--reviewer", "value")},
+    ),
+    "manga_rights": (
+        "manga-rights",
+        "Create and verify the rights manifest that authorizes publication: source URL, "
+        "edition, language, creator, publisher, permission basis, allowed chapters, "
+        "attribution, translation provenance, voice consent, music licences, thumbnail "
+        "source panels, and platform-safety scans. Fails closed — a reachable webtoon page "
+        "is not permission, and neither is attribution or a disclaimer.",
+        {"action": {"type": "string", "enum": ["init", "check", "show"]},
+         "project_root": _PROJECT_ROOT,
+         "force": {**_BOOL, "description": "init: overwrite an existing manifest."}},
+        ["action", "project_root"],
+        {"action": (None, "positional"), "project_root": ("--project-root", "value"),
          "force": ("--force", "flag")},
     ),
-    "generate_song": (
-        "ace-step",
-        "LONG-RUNNING. Generate a WAV from a music prompt and canonical lyrics with pinned ACE-Step 1.5.",
-        {"prompt": _STR, "lyrics_file": _STR, "output": _STR, "seed": _INT,
-         "duration": _NUM, "language": _STR, "bpm": _INT,
-         "device": {"type": "string", "enum": ["auto", "cuda", "mps", "cpu"]}},
-        ["prompt", "lyrics_file", "output"],
-        {"prompt": ("--prompt", "value"), "lyrics_file": ("--lyrics-file", "value"),
-         "output": ("--output", "value"), "seed": ("--seed", "value"),
-         "duration": ("--duration", "value"), "language": ("--language", "value"),
-         "bpm": ("--bpm", "value"), "device": ("--device", "value")},
-    ),
-    "separate_vocals": (
-        "demucs",
-        "LONG-RUNNING. Separate deterministic vocals.wav and accompaniment.wav with the pinned local HTDemucs-ft snapshot. Runtime network access is disabled.",
-        {"audio": _STR, "output_dir": _STR,
-         "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]}},
-        ["audio", "output_dir"],
-        {"audio": ("--audio", "value"), "output_dir": ("--output-dir", "value"),
-         "device": ("--device", "value")},
-    ),
-    "align_lyrics": (
-        "whisperx",
-        "LONG-RUNNING. Time supplied canonical lyrics from a vocal stem and write styled SRT/ASS; output includes confidence and a review gate.",
-        {"audio": _STR, "lyrics_file": _STR, "output_dir": _STR,
-         "language": _STR, "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]},
-         "width": _INT, "height": _INT,
-         "minimum_confidence": {"type": "number", "minimum": 0, "maximum": 1,
-                                "default": 0.72},
-         "font_name": _STR, "font_size_ratio": _NUM, "outline": _NUM, "shadow": _NUM,
-         "fade_in_ms": _INT, "fade_out_ms": _INT,
-         "alignment": {"type": "integer", "minimum": 1, "maximum": 9},
-         "margin_vertical_ratio": _NUM},
-        ["audio", "lyrics_file", "output_dir"],
-        {"audio": ("--audio", "value"), "lyrics_file": ("--lyrics-file", "value"),
-         "output_dir": ("--output-dir", "value"), "language": ("--language", "value"),
-         "device": ("--device", "value"), "width": ("--width", "value"),
-         "height": ("--height", "value"), "font_name": ("--font-name", "value"),
-         "minimum_confidence": ("--minimum-confidence", "value"),
-         "font_size_ratio": ("--font-size-ratio", "value"),
-         "outline": ("--outline", "value"), "shadow": ("--shadow", "value"),
-         "fade_in_ms": ("--fade-in-ms", "value"),
-         "fade_out_ms": ("--fade-out-ms", "value"),
-         "alignment": ("--alignment", "value"),
-         "margin_vertical_ratio": ("--margin-vertical-ratio", "value")},
-    ),
-    "story_check": (
-        "story-check",
-        "Validate continuity anchors, scene references, image prompts, narration, and publish metadata.",
-        {"manifest": {**_STR, "description": "Absolute story.json path; use exactly one of manifest/project_root."},
-         "project_root": {**_PROJECT_ROOT, "description": "Folder containing story.json; use exactly one of manifest/project_root."},
-         "for_publish": _BOOL},
-        [], {"manifest": ("--manifest", "value"), "project_root": ("--project-root", "value"),
-             "for_publish": ("--for-publish", "flag")},
-    ),
-    "story_build": (
-        "story-build",
-        "LONG-RUNNING. Build a validated story in deterministic stages. Publishing is never implicit; pass stage=publish explicitly.",
-        {"manifest": {**_STR, "description": "Absolute story.json path; use exactly one of manifest/project_root."},
-         "project_root": {**_PROJECT_ROOT, "description": "Folder containing story.json; use exactly one of manifest/project_root."},
-         "stage": {"type": "string", "enum": ["prepare", "images", "video", "publish", "all"]},
-         "overwrite": _BOOL, "dry_run": _BOOL,
-         "speaker_wav": _STR,
-         "privacy": {"type": "string", "enum": ["private", "unlisted", "public"]}},
+    "workspace_layout": (
+        "workspace-layout",
+        "Report every resolved persistent root (items, audio, output, work, jobs, tool envs, "
+        "caches, state, OAuth tokens) and whether each stays inside the workspace. Read-only.",
+        {"strict": {**_BOOL, "description": "Exit non-zero when a root escapes the workspace."}},
         [],
-        {"manifest": ("--manifest", "value"), "project_root": ("--project-root", "value"),
-         "stage": ("--stage", "value"),
-         "overwrite": ("--overwrite", "flag"), "dry_run": ("--dry-run", "flag"),
-         "speaker_wav": ("--speaker-wav", "value"), "privacy": ("--privacy", "value")},
-    ),
-    "song_init": (
-        "song-init",
-        "Create a Song Video manifest using supplied canonical lyrics and the editable minimalistic-sky visual default.",
-        {"project_root": _PROJECT_ROOT, "title": _STR,
-         "lyrics": {**_STR, "description": "Canonical lyrics; use exactly one of lyrics/lyrics_file."},
-         "lyrics_file": {**_STR, "description": "UTF-8 canonical lyrics file; use exactly one of lyrics/lyrics_file."},
-         "music_prompt": _STR, "audio": _STR, "force": _BOOL},
-        ["project_root", "title"],
-        {"project_root": ("--project-root", "value"), "title": ("--title", "value"),
-         "lyrics": ("--lyrics", "value"), "lyrics_file": ("--lyrics-file", "value"),
-         "music_prompt": ("--music-prompt", "value"),
-         "audio": ("--audio", "value"), "force": ("--force", "flag")},
-    ),
-    "song_check": (
-        "song-check",
-        "Validate canonical lyrics, generation/audio source, alignment, visual, rights, and publish metadata.",
-        {"manifest": {**_STR, "description": "Absolute song.json path; use exactly one of manifest/project_root."},
-         "project_root": {**_PROJECT_ROOT, "description": "Folder containing song.json; use exactly one of manifest/project_root."},
-         "for_publish": {**_BOOL, "description": "Turn missing rights confirmations into errors."}},
-        [],
-        {"manifest": ("--manifest", "value"), "project_root": ("--project-root", "value"),
-         "for_publish": ("--for-publish", "flag")},
-    ),
-    "song_build": (
-        "song-build",
-        "LONG-RUNNING. Generate/ingest song audio, isolate vocals, time canonical lyrics, render, and explicitly publish.",
-        {"manifest": {**_STR, "description": "Absolute song.json path; use exactly one of manifest/project_root."},
-         "project_root": {**_PROJECT_ROOT, "description": "Folder containing song.json; use exactly one of manifest/project_root."},
-         "stage": {"type": "string", "enum": ["prepare", "generate", "separate", "align", "visual", "render", "publish", "all"]},
-         "overwrite": _BOOL, "dry_run": _BOOL,
-         "privacy": {"type": "string", "enum": ["private", "unlisted", "public"]}},
-        [],
-        {"manifest": ("--manifest", "value"), "project_root": ("--project-root", "value"),
-         "stage": ("--stage", "value"),
-         "overwrite": ("--overwrite", "flag"), "dry_run": ("--dry-run", "flag"),
-         "privacy": ("--privacy", "value")},
+        {"strict": ("--strict", "flag")},
     ),
     "job_start": (
         "job-start",
@@ -870,12 +792,14 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 }
 
 # Commands whose --json flag should be appended automatically by the MCP server.
+# manga-review, panel-decisions and manga-rights always print one JSON object,
+# so they are deliberately absent — appending --json would be an unknown flag.
 JSON_COMMANDS = {"modes", "doctor", "where", "library-list", "video-check", "video-validate", "video-chapters",
                  "video-audio-audit", "youtube-profiles", "youtube-status", "youtube-upload",
-                 "style-detect", "narration-check", "series-plan",
+                 "style-detect", "narration-check", "series-plan", "workspace-layout",
+                 "panel-decisions", "video-quality",
                  "work-status", "work-claim", "work-note", "work-todo", "work-qa", "work-artifacts",
                  "youtube-list", "youtube-delete", "youtube-thumbnail",
-                 "story-init", "story-check", "song-init", "song-check",
                  "job-status", "jobs"}
 
 # CLI commands that run for minutes to hours. Surfaced structurally so agents
@@ -883,9 +807,9 @@ JSON_COMMANDS = {"modes", "doctor", "where", "library-list", "video-check", "vid
 # without parsing prose.
 LONG_RUNNING = {"setup", "download", "webtoon-split", "page-split", "panel-transcript",
                 "video", "video-audio", "video-audio-indextts", "video-render",
-                "video-join", "video-normalize-audio", "zimage", "deepseek-ocr2",
+                "video-join", "video-normalize-audio",
                 "install-tool", "bootstrap-tools", "youtube-upload", "smoke-test",
-                "story-build", "song-build", "ace-step", "demucs", "whisperx"}
+                }
 
 # cli command name -> mcp tool name (reverse index)
 CLI_TO_TOOL: dict[str, str] = {cli: tool for tool, (cli, *_rest) in TOOLS.items()}

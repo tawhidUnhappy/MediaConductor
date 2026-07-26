@@ -24,6 +24,8 @@ loop, TTS/render preflight, and tests all use it outside the TTS environment.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 # Narration text that spells out a laugh or another vocal sound instead of
 # describing it in prose. The joined form includes the real-world failure that
@@ -193,3 +195,204 @@ def narration_fluency_lint(text: str) -> str | None:
                 "beat. Say what actually happens on the panel, e.g. 'he looks up, confused'."
             )
     return None
+
+
+# --- Script-level quality (style) ---------------------------------------
+# The two lints above judge one line in isolation. These read the whole item:
+# a recap fails just as hard when every beat is grammatical but the script
+# repeats itself, narrates the artwork instead of the story, or holds one
+# panel for a paragraph. They are WARNINGS — a human decides whether the
+# repetition is deliberate — except where the text cannot be spoken at all.
+
+# Panels are shown, not described. "The panel shows him drawing his sword"
+# spends the listener's attention on the medium; "he draws his sword" spends
+# it on the story. This is the single most common tell of an LLM narrating
+# from a contact sheet rather than recapping a chapter.
+_META_PHRASE_PATTERN = re.compile(
+    r"\b(?:th(?:is|e)\s+(?:panel|page|image|frame|scene|artwork|art|shot)"
+    r"|we\s+(?:can\s+)?see|we're\s+shown|you\s+can\s+see|here\s+we\s+see"
+    r"|the\s+(?:panel|page|image|frame)\s+(?:shows|depicts|cuts|reveals)"
+    r"|(?:is|are)\s+(?:shown|depicted|pictured)|in\s+the\s+(?:panel|image|frame))\b",
+    re.IGNORECASE,
+)
+# "Then he draws. Then she runs. Then they leave." — grammatical, and an
+# inventory rather than a story. Causal prose ("so", "because", "which is why")
+# is what makes a recap worth listening to.
+_INVENTORY_OPENER_PATTERN = re.compile(
+    r"\A(?:and\s+)?then\b|\Aafter\s+that\b|\Anext\b|\Ameanwhile\b", re.IGNORECASE
+)
+_PUNCTUATION_ONLY_PATTERN = re.compile(r"\A[\W_]+\Z", re.UNICODE)
+
+# Spoken-word budget per beat. At the target 145-175 wpm a 55-word beat holds
+# one panel for ~20 seconds, well past the 6-10 second ceiling documented for
+# even a dense panel.
+QUALITY_MIN_WORDS = 4
+QUALITY_MAX_WORDS = 55
+# Three consecutive beats opening on the same two words is audible as a tic.
+REPEATED_OPENING_RUN = 3
+# Token overlap above this, on consecutive beats, is a restatement.
+NEAR_DUPLICATE_RATIO = 0.8
+# A minority of "Then ..." openers is natural pacing; a majority is a list.
+INVENTORY_OPENER_RATIO = 0.34
+INVENTORY_MIN_ENTRIES = 6
+
+
+@dataclass(frozen=True)
+class NarrationFinding:
+    """One narration problem, addressed to the beat that caused it."""
+
+    severity: str  # "error" blocks TTS/render; "warning" is editorial advice
+    code: str
+    beat: str
+    message: str
+
+    @property
+    def is_error(self) -> bool:
+        return self.severity == "error"
+
+    def as_dict(self) -> dict:
+        return {
+            "severity": self.severity,
+            "code": self.code,
+            "beat": self.beat,
+            "message": self.message,
+        }
+
+
+def _words(text: str) -> list[str]:
+    return [word for word in re.findall(r"[\w']+", text) if word]
+
+
+def _entry_label(entry: dict, index: int) -> str:
+    for key in ("beat_id", "image"):
+        value = entry.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return f"entry {index}"
+
+
+def _entry_text(entry: dict) -> str:
+    return str(entry.get("narration") or "").strip()
+
+
+def narration_quality_findings(entries: Sequence[dict]) -> list[NarrationFinding]:
+    """Every delivery, fluency, and style problem in one item's narration.
+
+    Errors are text that cannot be spoken acceptably (empty lines, phonetic
+    screams, copied stammers). Warnings are editorial: repetition, meta
+    phrasing, beats that are too short to carry meaning or too long to sit on
+    one panel.
+    """
+    findings: list[NarrationFinding] = []
+    texts: list[str] = []
+    labels: list[str] = []
+
+    for index, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            continue
+        label = _entry_label(entry, index)
+        text = _entry_text(entry)
+        labels.append(label)
+        texts.append(text)
+
+        if not text or _PUNCTUATION_ONLY_PATTERN.match(text):
+            findings.append(NarrationFinding(
+                "error", "empty-narration", label,
+                "narration is empty or punctuation only; there is nothing to speak.",
+            ))
+            continue
+
+        delivery = narration_delivery_lint(text)
+        if delivery:
+            findings.append(NarrationFinding("error", "delivery", label, delivery))
+        fluency = narration_fluency_lint(text)
+        if fluency:
+            findings.append(NarrationFinding("error", "fluency", label, fluency))
+
+        word_count = len(_words(text))
+        if word_count < QUALITY_MIN_WORDS:
+            findings.append(NarrationFinding(
+                "warning", "too-short", label,
+                f"beat is {word_count} word(s); under {QUALITY_MIN_WORDS} rarely carries a "
+                "complete story beat and lands as a clipped fragment.",
+            ))
+        elif word_count > QUALITY_MAX_WORDS:
+            findings.append(NarrationFinding(
+                "warning", "too-long", label,
+                f"beat is {word_count} words; over {QUALITY_MAX_WORDS} holds one panel for "
+                "roughly 20 seconds. Split it across panels or tighten it.",
+            ))
+
+        meta = _META_PHRASE_PATTERN.search(text)
+        if meta:
+            findings.append(NarrationFinding(
+                "warning", "meta-phrasing", label,
+                f"narration describes the artwork ({meta.group(0)!r}) instead of the story. "
+                "Say what happens, not what the panel shows.",
+            ))
+
+    findings.extend(_script_level_findings(labels, texts))
+    return findings
+
+
+def _script_level_findings(labels: list[str], texts: list[str]) -> list[NarrationFinding]:
+    """Repetition patterns that only exist between beats, never within one."""
+    findings: list[NarrationFinding] = []
+
+    seen: dict[str, str] = {}
+    for label, text in zip(labels, texts, strict=True):
+        key = " ".join(_words(text)).casefold()
+        if not key:
+            continue
+        if key in seen:
+            findings.append(NarrationFinding(
+                "warning", "duplicate-line", label,
+                f"narration is identical to the beat on {seen[key]}; the listener hears the "
+                "same sentence twice.",
+            ))
+        else:
+            seen[key] = label
+
+    for index in range(1, len(texts)):
+        previous = set(word.casefold() for word in _words(texts[index - 1]))
+        current = set(word.casefold() for word in _words(texts[index]))
+        if len(previous) < 4 or len(current) < 4:
+            continue
+        overlap = len(previous & current) / len(previous | current)
+        if overlap >= NEAR_DUPLICATE_RATIO:
+            findings.append(NarrationFinding(
+                "warning", "near-duplicate", labels[index],
+                f"beat restates the previous one ({overlap:.0%} shared wording). Advance the "
+                "story or merge the two beats.",
+            ))
+
+    openings = [" ".join(_words(text)[:2]).casefold() for text in texts]
+    run_start = 0
+    for index in range(1, len(openings) + 1):
+        same = index < len(openings) and openings[index] and openings[index] == openings[run_start]
+        if same:
+            continue
+        run = index - run_start
+        if run >= REPEATED_OPENING_RUN and openings[run_start]:
+            findings.append(NarrationFinding(
+                "warning", "repeated-opening", labels[run_start],
+                f"{run} consecutive beats open with {openings[run_start]!r}; vary the sentence "
+                "openings so the delivery does not sound like a template.",
+            ))
+        run_start = index
+
+    inventory = [
+        label for label, text in zip(labels, texts, strict=True)
+        if _INVENTORY_OPENER_PATTERN.match(text)
+    ]
+    if (
+        len(texts) >= INVENTORY_MIN_ENTRIES
+        and len(inventory) / len(texts) >= INVENTORY_OPENER_RATIO
+    ):
+        findings.append(NarrationFinding(
+            "warning", "inventory-style", inventory[0],
+            f"{len(inventory)} of {len(texts)} beats open with 'Then'/'Next'/'After that'. "
+            "That is an inventory of events, not a recap. Use causal links "
+            "(so, because, which is why) and let the panels carry sequence.",
+        ))
+    return findings

@@ -11,14 +11,10 @@ from mediaconductor.runtime import is_frozen
 
 
 TOOL_ENVS = {
-    "ace-step": ("ACESTEP_ROOT", "ACE_STEP_ROOT"),
-    "demucs": ("DEMUCS_ROOT",),
-    "whisperx": ("WHISPERX_ROOT",),
     "kokoro-82m": ("KOKORO_ROOT",),
     "index-tts": ("INDEX_TTS_ROOT", "INDEX_TTS_DIR"),
     "magi-v3": ("MAGI_V3_ROOT", "MAGI_V3_DIR"),
     "deepseek-ocr2": ("DEEPSEEK_OCR2_ROOT", "DEEPSEEK_OCR2_DIR"),
-    "z-image-turbo": ("Z_IMAGE_TURBO_ROOT", "Z_IMAGE_TURBO_DIR"),
 }
 
 TOOL_ENV = {tool_name: env_vars[0] for tool_name, env_vars in TOOL_ENVS.items()}
@@ -200,12 +196,9 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     set_cache("UV_CACHE_DIR", str(data_home() / "uv_cache"))
     set_cache("UV_PYTHON_INSTALL_DIR", str(data_home() / "uv_python"))
     set_cache("XDG_CACHE_HOME", str(data_home() / "xdg_cache"))
-    set_cache("NLTK_DATA", str(data_home() / "nltk_data"))
     set_cache("TRITON_CACHE_DIR", str(data_home() / "triton_cache"))
     set_cache("TORCHINDUCTOR_CACHE_DIR", str(data_home() / "torchinductor_cache"))
     set_cache("TORCH_EXTENSIONS_DIR", str(data_home() / "torch_extensions"))
-    env.setdefault("ACESTEP_CHECKPOINTS_DIR", str(tools_home() / "ace-step" / "checkpoints"))
-    env.setdefault("ACESTEP_TMPDIR", str(data_home() / "ace_step_tmp"))
     env.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
     env.setdefault("HF_XET_HIGH_PERFORMANCE", "1")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")

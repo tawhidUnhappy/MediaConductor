@@ -39,7 +39,6 @@ Install what's missing:
 ```bash
 mediaconductor install-tool magi-v3       # panel detection (needed for paged manga)
 mediaconductor install-tool index-tts     # default recap TTS: voice clone, slow, best quality
-mediaconductor install-tool z-image-turbo # generated thumbnails; auto GPU/CPU strategy
 # Kokoro installs the same way if absent: mediaconductor install-tool kokoro-82m
 ```
 
@@ -645,43 +644,35 @@ first at `0:00`, each ≥10 s. **Recompute after every audio regeneration**
 
 ## Phase 9 — Thumbnail (1280×720)
 
-Two proven approaches — pick by what tools are installed:
+**Base art comes from the approved source panels.** Generated key art is
+deliberately not an option: the channel's value is the actual comic, and a
+generated cover promises art the video does not contain — a thumbnail-policy
+problem and a straightforward disappointment for whoever clicks. The panel you
+use must be listed in `rights.json` under `thumbnail_sources`, or
+`manga-rights check` fails closed.
 
-**A. Generated scene (high-energy recap key art).** Use one coherent
-anime/manhwa illustration with a strong focal character, readable emotion,
-clear silhouette separation, and enough negative space for the title. Keep it
-platform-safe and faithful to the chapter; never sexualize young-looking
-characters or rely on misleading imagery. Write the prompt for the actual
-characters and scene rather than reusing a generic template, then generate it
-with **Z-Image Turbo**:
+Pick a panel with a strong focal character, readable emotion, clear silhouette
+separation, and enough negative space for the title:
 
 ```bash
-mediaconductor zimage --prompt-file thumb_prompt.txt --output thumb_base.png \
-    --width 1280 --height 720 --count 4   # generate 4 variants, pick the best
+mediaconductor thumbnail-compose \
+    --base library/<P>/01/panels/<approved>.jpg --output thumb_base.png
 ```
 
-Prompt-writing rules (non-negotiable — this is what keeps the channel
-monetizable, not optional flavor):
+Selection rules (non-negotiable — this is what keeps the channel monetizable,
+not optional flavor):
 
-- **Every character drawn as a visibly adult, fully-clothed** — form-fitting
-  or revealing-but-not-explicit outfits (the MamoruManhwa reference range:
-  swimsuits, battle armor, low necklines) are the ceiling; no nudity, no
-  transparent/see-through clothing, no explicit sexual content or pose, no
-  characters that read as minors regardless of the source material's art.
-- Composition: two- or three-character face-off, foreground face ~30% of
-  frame height, depth-of-field background matching the story's actual
-  setting, one side shocked/flustered/blushing, the other calm/smug/
-  powered-up — the emotional contrast between the two *is* the hook.
-- Glossy anime/manhwa rendering, saturated blues and gold, dramatic
-  low-angle or dutch-tilt camera. No in-image text/logo/watermark — that
-  gets added after, with `mediaconductor thumbnail-compose` (below), where it
-  can be positioned precisely.
-- Example prompt shape: `"glossy anime key art, [character A] blushing
-  deeply with sparkling wide eyes and a flustered expression, form-fitting
-  [outfit from the story], next to [character B] standing calm and
-  confident with a faint smirk, [story setting] background softly blurred,
-  saturated cyan-blue sky, dramatic low-angle shot, highly detailed,
-  cinematic anime lighting, no text"`.
+- **One to three focal characters.** A crowd at 320×180 is a smudge.
+- **One clear conflict or contrast** — the thing the title promises. The
+  emotional contrast between two characters *is* the hook.
+- **Never a sexualized minor**, no nudity, no graphic gore, regardless of what
+  the source material shows. Recap source material commonly has teenage leads,
+  so this is a live constraint. `manga-rights check` requires each of those
+  scans to be recorded clear by a named reviewer.
+- **Title and thumbnail must agree.** A thumbnail implying a beat the video
+  does not contain is a misleading thumbnail regardless of intent.
+- Foreground face ≈ 30% of frame height; keep the payload out of the
+  bottom-right corner, where the duration badge sits.
 
 Then add the signature text/furniture with `mediaconductor thumbnail-compose`
 (quick mode: repeated `--text` flags; full placement control via `--spec`
@@ -837,8 +828,8 @@ mediaconductor youtube-upload --profile <profile> \
 - [ ] Complete final MP4 watched and listened at 1x; duration/timing sane,
       frames spot-checked, ≈ −14 LUFS and ≤ −1.5 dBTP
 - [ ] Timestamps recomputed from the *current* WAVs; total matches duration
-- [ ] Thumbnail rendered, viewed, no unsafe bubble text; if generated with
-      Z-Image, all variants checked against the prompt-writing safety rules
+- [ ] Thumbnail rendered from an approved source panel, viewed at mobile size,
+      no unsafe bubble text; all candidates checked against the safety rules
 - [ ] Title ≤ 100 chars, tags ≤ 500 chars, description leads with the hook
 - [ ] Uploaded with `--privacy public` + thumbnail set; profile/channel/id/privacy verified
 - [ ] Replacement publish record written and YouTube list + series plan rechecked

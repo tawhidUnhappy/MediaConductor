@@ -8,7 +8,7 @@ Typical layouts are:
 
 - `manga` -> a manga recap channel
 - `song` -> a music/lyrics channel
-- `ai-story` -> an AI story channel
+- `manga-alt` -> a second recap channel
 - one shared profile (for example `main`) -> all three modes
 
 Profile names are lowercase machine identifiers: 1-64 letters, numbers,
@@ -68,7 +68,7 @@ Once the shared file exists, an LLM or user can call a live command directly:
 ```bash
 mediaconductor youtube-status --profile manga --verify --json
 mediaconductor youtube-status --profile song --verify --json
-mediaconductor youtube-status --profile ai-story --verify --json
+mediaconductor youtube-status --profile manga-alt --verify --json
 ```
 
 The first call for each new profile opens Google's consent page automatically.
@@ -111,7 +111,7 @@ Named profiles are isolated:
 <application-data>/.mangaeasy/youtube/profiles/
   manga/{token.json,channel.json}
   song/{token.json,channel.json}
-  ai-story/{token.json,channel.json}
+  manga-alt/{token.json,channel.json}
 ```
 
 The root `client_secret.json` is shared. A named folder contains its own

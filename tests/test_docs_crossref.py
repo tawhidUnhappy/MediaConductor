@@ -28,13 +28,14 @@ DOCS = [
 # Docs whose internal (relative) links are checked for existence. Scoped to
 # the navigation set this reorg controls; widen as older docs are audited.
 LINK_CHECKED_DOCS = [
+    REPO / "README.md",
     REPO / "CLAUDE.md",
     REPO / "docs" / "multi-agent.md",
     REPO / "AGENTS.md",
+    REPO / "docs" / "ai-guide.md",
+    REPO / "docs" / "manga-quality-design.md",
     REPO / "docs" / "operate" / "crop-verify-narrate.md",
     REPO / "docs" / "setup.md",
-    REPO / "docs" / "history" / "reorg-plan.md",
-    REPO / "docs" / "history" / "legacy-inventory.md",
     *sorted((REPO / "skills").rglob("*.md")),
 ]
 
@@ -124,28 +125,27 @@ def test_every_package_has_a_readme():
     assert not missing, f"packages missing a README.md: {missing}"
 
 
+def test_only_the_manga_skill_ships():
+    """One product, one skill — the removed pipelines must leave nothing behind."""
+    assert sorted(p.name for p in (REPO / "skills").iterdir() if p.is_dir()) == ["manga-video"]
+
+
 def test_bundled_mode_skills_work_without_a_source_checkout():
     """Wheel/frozen agents must not be told that the repository is required."""
-    for mode in ("manga-video", "ai-story", "song-video"):
-        skill_dir = REPO / "skills" / mode
-        skill = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
-        all_guidance = "\n".join(
-            path.read_text(encoding="utf-8") for path in sorted(skill_dir.rglob("*.md"))
-        )
-        assert "<mc>" in skill
-        assert "globally installed" in skill
-        assert "frozen" in skill
-        assert "uv --project D:/MediaConductor run mediaconductor" not in all_guidance
-
-    router = (REPO / "skills" / "media-conductor" / "SKILL.md").read_text(encoding="utf-8")
-    assert "Global/wheel install" in router
-    assert "Frozen archive" in router
-    assert "--allow-root <media-workspace>" in router
+    skill_dir = REPO / "skills" / "manga-video"
+    skill = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+    all_guidance = "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(skill_dir.rglob("*.md"))
+    )
+    assert "<mc>" in skill
+    assert "globally installed" in skill
+    assert "frozen" in skill
+    assert "uv --project D:/MediaConductor run mediaconductor" not in all_guidance
 
 
 def test_packaged_youtube_reference_is_self_contained():
     text = (
-        REPO / "skills" / "media-conductor" / "references" / "youtube-publishing.md"
+        REPO / "skills" / "manga-video" / "references" / "youtube-publishing.md"
     ).read_text(encoding="utf-8")
     for needle in (
         "Google Cloud Console",

@@ -6,7 +6,7 @@ script, an agent's foreground shell — for that long is the wrong shape, and
 "spawn it yourself and forensically infer liveness from log mtimes and
 nvidia-smi" was the documented workaround. This module replaces that:
 
-    mediaconductor job-start video --project-root library/X --items 01-12
+    mediaconductor job-start --tool run_full_pipeline --arguments-json '{...}'
     -> {"ok": true, "job_id": "20260714-153000-video-a1b2c3d4", ...}   (returns instantly)
     mediaconductor job-status 20260714-153000-video-a1b2c3d4 --json
     -> status running/succeeded/review_required/failed/orphaned, exit code, last
@@ -24,6 +24,15 @@ the job is reported `orphaned` rather than forever "running".
 
 Jobs dir: `<work-dir>/jobs` (MEDIACONDUCTOR_JOBS_DIR overrides). State files are
 small JSON; logs are plain text. Both are safe to delete when a job is done.
+
+Only the typed form is accepted. Raw positional argv used to be passed through
+verbatim, which made a background job a strictly *wider* interface than the MCP
+call it was supposed to mirror: anything the schema rejected could be smuggled
+through as a flag, including reaching a lower-level render command to sidestep
+a review gate. Arguments now go through the same validator and the same
+mode catalog, and the review/workspace gates live in the commands themselves,
+so running something as a job grants no capability that running it directly
+would not.
 """
 
 from __future__ import annotations
@@ -210,58 +219,56 @@ def start_main() -> int:
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} job-start",
         description=f"Run a long-running {PRODUCT_NAME} tool as a detached background job. "
-                    "Prefer the typed --tool/--arguments-json form; the legacy positional "
-                    "command form remains accepted. Prints one JSON object with the job id.")
-    parser.add_argument("--tool",
+                    "Only the typed form is accepted: --tool NAME --arguments-json OBJECT. "
+                    "Arguments are validated against the same schema the MCP server uses, so "
+                    "a job cannot reach a command or a bypass that a direct call could not. "
+                    "Prints one JSON object with the job id.")
+    parser.add_argument("--tool", required=True,
                         help="Typed MCP tool name, e.g. 'run_full_pipeline'.")
     parser.add_argument("--arguments-json", default="{}", metavar="OBJECT",
                         help="JSON object matching --tool's machine schema (default: {}).")
-    parser.add_argument("command", nargs="?",
-                        help="Compatibility form: CLI command name, e.g. 'video'.")
-    parser.add_argument("args", nargs=argparse.REMAINDER,
-                        help="Compatibility form: arguments passed through verbatim.")
     parser.add_argument("--jobs-dir", type=Path, default=None,
                         help="Where job state/log files live (default: <work>/jobs).")
     args = parser.parse_args()
 
     from mediaconductor.cli import COMMANDS  # late import: cli imports nothing heavy
+    from mediaconductor.command_spec import LONG_RUNNING, TOOLS
+    from mediaconductor.mcp_server import _allowed_tools, _build_args
+    from mediaconductor.modes import DEFAULT_MODE
 
     typed_tool = args.tool
-    if typed_tool and (args.command is not None or args.args):
-        parser.error("use either --tool/--arguments-json or the positional command form, not both")
-
-    if typed_tool:
-        from mediaconductor.command_spec import LONG_RUNNING, TOOLS
-        from mediaconductor.mcp_server import _build_args
-
-        if typed_tool not in TOOLS or typed_tool == "job_start":
-            print(json.dumps({"ok": False, "error": f"unknown or recursive tool: {typed_tool}"}))
-            return 2
-        command = TOOLS[typed_tool][0]
-        if command not in LONG_RUNNING:
-            print(json.dumps({
-                "ok": False,
-                "error": f"tool '{typed_tool}' is not marked long-running; call it directly",
-            }))
-            return 2
-        try:
-            arguments = json.loads(args.arguments_json)
-        except ValueError as exc:
-            print(json.dumps({"ok": False, "error": f"--arguments-json is invalid JSON: {exc}"}))
-            return 2
-        if not isinstance(arguments, dict):
-            print(json.dumps({"ok": False, "error": "--arguments-json must be a JSON object"}))
-            return 2
-        try:
-            command_args = _build_args(typed_tool, arguments)
-        except ValueError as exc:
-            print(json.dumps({"ok": False, "error": str(exc)}))
-            return 2
-    else:
-        if args.command is None:
-            parser.error("provide --tool or a positional command")
-        command = args.command
-        command_args = list(args.args)
+    if typed_tool not in TOOLS or typed_tool == "job_start":
+        print(json.dumps({"ok": False, "error": f"unknown or recursive tool: {typed_tool}"}))
+        return 2
+    # A job runs unattended, so it must not be able to reach anything the mode
+    # itself does not expose — including tools that were removed from the
+    # product but still have a module on disk.
+    if typed_tool not in _allowed_tools(DEFAULT_MODE):
+        print(json.dumps({
+            "ok": False,
+            "error": f"tool '{typed_tool}' is outside the '{DEFAULT_MODE}' catalog",
+        }))
+        return 2
+    command = TOOLS[typed_tool][0]
+    if command not in LONG_RUNNING:
+        print(json.dumps({
+            "ok": False,
+            "error": f"tool '{typed_tool}' is not marked long-running; call it directly",
+        }))
+        return 2
+    try:
+        arguments = json.loads(args.arguments_json)
+    except ValueError as exc:
+        print(json.dumps({"ok": False, "error": f"--arguments-json is invalid JSON: {exc}"}))
+        return 2
+    if not isinstance(arguments, dict):
+        print(json.dumps({"ok": False, "error": "--arguments-json must be a JSON object"}))
+        return 2
+    try:
+        command_args = _build_args(typed_tool, arguments)
+    except ValueError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}))
+        return 2
 
     if command not in COMMANDS:
         print(json.dumps({"ok": False, "error": f"unknown command: {command}"}))
@@ -288,9 +295,8 @@ def start_main() -> int:
         "supervisor_pid": None,
         "child_pid": None,
         "exit_code": None,
+        "tool": typed_tool,
     }
-    if typed_tool:
-        state["tool"] = typed_tool
     _save_state(state_file, state)
 
     supervisor = runtime.popen(

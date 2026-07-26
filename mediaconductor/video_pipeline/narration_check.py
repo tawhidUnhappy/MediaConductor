@@ -1,14 +1,21 @@
 """mediaconductor.video_pipeline.narration_check — structural narration validation.
 
-``mediaconductor narration-check`` verifies the *shape* of each item's narration
-before audio generation: files parse, every entry references a panel image
-that exists, image/audio stems are unique, and no narration is empty. Panels
-may be deliberately omitted after visual review. It
-covers ``intro.json`` too (checked separately, since its errors need fixing
-in a different file) — and flags any panel listed in *both* ``intro.json`` and
-``narration.json``, because the intro is prepended at render time so such a
-panel plays twice (the cold-open replays a beat that then shows again
-in-context).
+``mediaconductor narration-check`` verifies each item's narration before audio
+generation. Three passes, one report:
+
+1. **Contract** — :mod:`mediaconductor.video_pipeline.narration_contract`
+   validates every entry in ``intro.json`` and ``narration.json``: safe
+   basename images that resolve inside ``panels/``, non-empty narration,
+   case-insensitive filename *and* stem uniqueness across the combined
+   playback list (the intro is prepended at render time, so a panel in both
+   files would play twice and both beats would fight over one WAV), no unknown
+   properties, and in-range motion/pause values.
+2. **Quality** — unspeakable text (phonetic screams, copied stammers, empty
+   lines) is a problem; editorial style findings (repetition, meta phrasing,
+   beats too short or too long) are warnings.
+3. **Coverage** — every cropped panel must be narrated or carry a recorded
+   omission decision (``mediaconductor panel-decisions``). An un-narrated,
+   un-decided panel is a problem, not an unfalsifiable warning.
 
 This is the machine half of narration verification. The semantic half — is
 the narration faithful to the panels, is dialogue attributed to the right
@@ -24,120 +31,67 @@ import argparse
 import json
 from pathlib import Path
 
+from mediaconductor.audio.narration_safety import narration_quality_findings
 from mediaconductor.brand import CLI_NAME
-
-_IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
-
-
-def _check_entries(entries, panels_dir: Path, label: str, problems: list[str]) -> list[str]:
-    """Validate one file's entry list; return the images it references, in order."""
-    images: list[str] = []
-    seen_images: set[str] = set()
-    seen_stems: dict[str, str] = {}
-    if not isinstance(entries, list):
-        problems.append(f"{label}: must be a JSON array")
-        return images
-    for idx, entry in enumerate(entries):
-        where = f"{label}[{idx}]"
-        if not isinstance(entry, dict):
-            problems.append(f"{where}: entry is not an object")
-            continue
-        image = entry.get("image")
-        narration = entry.get("narration")
-        if not isinstance(image, str) or not image:
-            problems.append(f"{where}: missing/empty 'image'")
-        else:
-            images.append(image)
-            if not (panels_dir / image).is_file():
-                problems.append(f"{where}: image '{image}' not found in panels/")
-            image_key = image.casefold()
-            stem_key = Path(image).stem.casefold()
-            if image_key in seen_images:
-                problems.append(
-                    f"{where}: duplicate image '{image}' would render the same panel twice "
-                    "and reuse one audio file"
-                )
-            elif stem_key in seen_stems:
-                problems.append(
-                    f"{where}: image stem '{Path(image).stem}' collides with "
-                    f"'{seen_stems[stem_key]}'; audio is keyed by image stem"
-                )
-            seen_images.add(image_key)
-            seen_stems.setdefault(stem_key, image)
-        if not isinstance(narration, str) or not narration.strip():
-            problems.append(f"{where}: missing/empty 'narration'"
-                            + (f" (image '{image}')" if isinstance(image, str) else ""))
-    return images
+from mediaconductor.panel_decisions import audit_item as audit_panel_decisions
+from mediaconductor.video_pipeline.narration_contract import (
+    NarrationContractError,
+    narration_problems,
+    validate_item_narration,
+)
 
 
 def check_item(item_dir: Path) -> dict:
-    """Structural report for one item; 'problems' empty means clean."""
+    """Structural + editorial report for one item; 'problems' empty means clean."""
     panels_dir = item_dir / "panels"
-    problems: list[str] = []
-    narration_images: list[str] = []
-    intro_images: list[str] = []
-
-    narration_path = item_dir / "narration.json"
-    if not narration_path.is_file():
-        problems.append("narration.json missing")
-    else:
-        try:
-            data = json.loads(narration_path.read_text(encoding="utf-8-sig"))
-            narration_images = _check_entries(data, panels_dir, "narration.json", problems)
-        except Exception as exc:
-            problems.append(f"narration.json: invalid JSON ({exc})")
-
-    intro_path = item_dir / "intro.json"
-    if intro_path.is_file():
-        try:
-            data = json.loads(intro_path.read_text(encoding="utf-8-sig"))
-            intro_images = _check_entries(data, panels_dir, "intro.json", problems)
-        except Exception as exc:
-            problems.append(f"intro.json: invalid JSON ({exc})")
-
-    # intro.json is prepended before narration.json at render time, so any
-    # panel listed in both plays twice — a cold-open that silently replays a
-    # beat that then shows again in-context. Almost always an authoring slip;
-    # the cold open should use panels the chapter's narration.json omits.
-    narration_set = set(narration_images)
-    narration_stems = {Path(image).stem.casefold() for image in narration_images}
-    overlap = [
-        image for image in dict.fromkeys(intro_images)
-        if Path(image).stem.casefold() in narration_stems
-    ]
-    if overlap:
-        problems.append(
-            f"{len(overlap)} panel stem(s) are in both intro.json and narration.json and "
-            "will render twice (the cold-open replays them; give the intro panels the "
-            "chapter's narration.json does not use): "
-            + ", ".join(overlap[:5]) + ("…" if len(overlap) > 5 else ""))
-
-    entry_count = len(narration_images) + len(intro_images)
-    covered = narration_set | set(intro_images)
-    uncovered: list[str] = []
+    problems: list[str] = list(narration_problems(item_dir))
     warnings: list[str] = []
-    if panels_dir.is_dir():
-        panel_names = sorted(p.name for p in panels_dir.iterdir()
-                             if p.suffix.lower() in _IMAGE_EXTS)
-        uncovered = [name for name in panel_names if name not in covered]
-        if uncovered:
-            # A warning, not a problem: skipping credits/banner/SFX panels is
-            # the documented correct workflow (the renderer only shows
-            # narrated panels). This used to be a problem -> ok:false, which
-            # failed every correctly-produced project and sent agents chasing
-            # phantom errors. Confirm via narration-review-sheets that none
-            # of these is a story panel.
-            warnings.append(f"{len(uncovered)} panel image(s) have no narration entry "
-                            "(fine for credits/banners/SFX; confirm none is a story panel): "
-                            + ", ".join(uncovered[:5])
-                            + ("…" if len(uncovered) > 5 else ""))
-    else:
+
+    if not panels_dir.is_dir():
         problems.append("panels/ folder missing")
+
+    entries: list[dict] = []
+    if not problems:
+        try:
+            entries = validate_item_narration(item_dir)
+        except NarrationContractError as exc:  # pragma: no cover — narration_problems caught it
+            problems.append(str(exc))
+
+    # Style findings never fail the check on their own: whether a repeated
+    # opening is a tic or a deliberate refrain is an editorial call. Errors
+    # from the same pass (unspeakable text) are already blocking at TTS time,
+    # so surface them here as problems rather than letting a render discover
+    # them an hour later.
+    for finding in narration_quality_findings(entries):
+        message = f"{finding.beat}: {finding.message}"
+        (problems if finding.is_error else warnings).append(message)
+
+    decisions = audit_panel_decisions(item_dir, [entry["image"] for entry in entries])
+    uncovered = decisions["unaccounted"]
+    if uncovered:
+        problems.append(
+            f"{len(uncovered)} panel image(s) are neither narrated nor recorded as a "
+            "deliberate omission: "
+            + ", ".join(uncovered[:5]) + ("…" if len(uncovered) > 5 else "")
+            + f". Narrate them, or run `{CLI_NAME} panel-decisions --item {item_dir.name} "
+            "--panels <image> --reason <reason> --reviewer <name>`."
+        )
+    for stale in decisions["stale_decisions"]:
+        problems.append(f"{stale['panel']}: {stale['detail']}")
+    if decisions["decided"]:
+        warnings.append(
+            f"{len(decisions['decided'])} panel(s) deliberately omitted: "
+            + ", ".join(
+                f"{entry['panel']} ({entry['reason']})" for entry in decisions["decided"][:5]
+            )
+            + ("…" if len(decisions["decided"]) > 5 else "")
+        )
 
     return {
         "item": item_dir.name,
-        "entries": entry_count,
+        "entries": len(entries),
         "uncovered_panels": uncovered,
+        "omitted_panels": decisions["decided"],
         "problems": problems,
         "warnings": warnings,
         "ok": not problems,
@@ -149,12 +103,11 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} narration-check",
-        description="Validate narration.json/intro.json structure per item: "
-                    "parseable, every entry's image exists, no empty narration, "
-                    "no intro/narration overlap. Panels without an entry are a "
-                    "WARNING (skipping credits/banners is correct), never a "
-                    "failure. Semantic review (accuracy, speaker attribution) "
-                    "remains an agent's reading job.",
+        description="Validate narration.json/intro.json per item against the strict "
+                    "narration contract, lint the script for unspeakable text and "
+                    "editorial repetition, and require every cropped panel to be "
+                    "narrated or recorded as a deliberate omission. Semantic review "
+                    "(accuracy, speaker attribution) remains an agent's reading job.",
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT,
                         help="Project folder containing item subfolders (library/<name>).")

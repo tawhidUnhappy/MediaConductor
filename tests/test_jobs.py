@@ -19,12 +19,15 @@ def run_cli(*args: str, cwd=None) -> subprocess.CompletedProcess:
 
 def test_job_lifecycle(tmp_path):
     jobs_dir = tmp_path / "jobs"
-    start = run_cli("job-start", "--jobs-dir", str(jobs_dir), "where", "--json")
+    start = run_cli(
+        "job-start", "--jobs-dir", str(jobs_dir),
+        "--tool", "setup", "--arguments-json", json.dumps({"dry_run": True}),
+    )
     assert start.returncode == 0, start.stderr
     payload = json.loads(start.stdout)
     assert payload["ok"] is True
     job_id = payload["job_id"]
-    assert "where" in job_id
+    assert "setup" in job_id
 
     # The supervisor is detached; poll until it records a final state.
     report = None
@@ -45,15 +48,44 @@ def test_job_lifecycle(tmp_path):
     assert jobs[0]["status"] == "succeeded"
 
 
-def test_job_start_rejects_unknown_and_denylisted(tmp_path):
+def test_job_start_rejects_unknown_and_recursive_tools(tmp_path):
     jobs_dir = str(tmp_path / "jobs")
-    bad = run_cli("job-start", "--jobs-dir", jobs_dir, "not-a-command")
+    bad = run_cli("job-start", "--jobs-dir", jobs_dir, "--tool", "not_a_tool")
     assert bad.returncode == 2
     assert json.loads(bad.stdout)["ok"] is False
 
-    recursive = run_cli("job-start", "--jobs-dir", jobs_dir, "mcp")
+    recursive = run_cli("job-start", "--jobs-dir", jobs_dir, "--tool", "job_start")
     assert recursive.returncode == 2
-    assert json.loads(recursive.stdout)["ok"] is False
+    assert "recursive" in json.loads(recursive.stdout)["error"]
+
+
+def test_job_start_rejects_positional_argv(tmp_path):
+    """Raw argv was a wider interface than the schema it was meant to mirror:
+    anything validation rejected could be smuggled through as a bare flag,
+    including reaching a lower-level render command to skip a review gate."""
+    jobs_dir = str(tmp_path / "jobs")
+    positional = run_cli("job-start", "--jobs-dir", jobs_dir, "where", "--json")
+    assert positional.returncode == 2
+    assert "--tool" in positional.stderr
+
+
+def test_job_start_rejects_tools_outside_the_mode_catalog(tmp_path):
+    """A job must not reach anything a direct MCP call could not."""
+    jobs_dir = str(tmp_path / "jobs")
+    result = run_cli(
+        "job-start", "--jobs-dir", jobs_dir, "--tool", "youtube_auth",
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stdout)["ok"] is False
+
+
+def test_job_start_rejects_short_running_tools(tmp_path):
+    jobs_dir = str(tmp_path / "jobs")
+    result = run_cli(
+        "job-start", "--jobs-dir", jobs_dir, "--tool", "where",
+    )
+    assert result.returncode == 2
+    assert "not marked long-running" in json.loads(result.stdout)["error"]
 
 
 def test_job_start_typed_wrapper_validates_and_builds_cli_args(tmp_path):

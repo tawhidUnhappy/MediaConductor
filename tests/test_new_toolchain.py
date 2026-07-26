@@ -6,21 +6,6 @@ from pathlib import Path
 import pytest
 
 from mediaconductor.tools import install
-from mediaconductor.assets.tools.generate_ace_step import _require_initialized
-
-
-def test_song_toolchain_is_immutably_pinned():
-    ace = install.TOOLS["ace-step"]
-    demucs = install.TOOLS["demucs"]
-    whisperx = install.TOOLS["whisperx"]
-    assert ace.ref == "dce621408bee8c31b4fcf4811682eb9359e1bc94"
-    assert ace.model_revision == "19671f406d603126926c1b7e2adc169acbcade22"
-    assert ace.preserve_upstream_torch is True and ace.sync_args == ["--frozen"]
-    assert demucs.ref and demucs.model_revision
-    assert whisperx.ref and whisperx.model_revision
-    assert "whisperx==3.8.6" in whisperx.env_deps
-    assert whisperx.extra_models[0].repo == "facebook/wav2vec2-base-960h"
-    assert whisperx.extra_models[0].revision == "22aad52d435eb6dbaf354bdad9b0da84ce7d6156"
 
 
 def test_index_tts_skips_build_hostile_extras():
@@ -44,14 +29,9 @@ def test_index_tts_skips_build_hostile_extras():
             "2f3699ebbb96fa8af32212e8c170f2cc28730fad",
             "aaa02f3811945a91062062994c5c4a3f4c0af2b0",
         ),
-        (
-            "z-image-turbo",
-            None,
-            "f332072aa78be7aecdf3ee76d5c247082da564a6",
-        ),
     ],
 )
-def test_installer_managed_legacy_models_are_now_immutable(
+def test_installer_managed_models_are_immutable(
     tool_name, source_revision, model_revision
 ):
     spec = install.TOOLS[tool_name]
@@ -65,47 +45,25 @@ def test_optional_source_clones_are_commit_pinned():
     assert install.TOOLS["kokoro-82m"].ref == "dfb907a02bba8152ca444717ca5d78747ccb4bec"
 
 
-def test_ace_step_adapter_checks_second_tuple_member():
-    _require_initialized("fixture", ("ready", True))
-    with pytest.raises(RuntimeError, match="not ready"):
-        _require_initialized("fixture", ("not ready", False))
-
-
-def test_whisperx_generated_env_routes_complete_torch_trio(tmp_path):
-    install._write_managed_pyproject(install.TOOLS["whisperx"], tmp_path, "cuda")
-    text = (tmp_path / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'torch = [{ index = "pytorch" }]' in text
-    assert 'torchvision = [{ index = "pytorch" }]' in text
-    assert 'torchaudio = [{ index = "pytorch" }]' in text
-    assert "cu128" in text
-
-
 def test_hf_download_includes_model_revision(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(install, "_require", lambda *_args, **_kwargs: None)
-    spec = install.TOOLS["whisperx"]
+    spec = install.TOOLS["deepseek-ocr2"]
 
     def fake_run(command, *_args, **_kwargs):
         calls.append(command)
         target = Path(command[command.index("--local-dir") + 1])
         target.mkdir(parents=True, exist_ok=True)
-        required = (
-            spec.required_model_files
-            if command[command.index("download") + 1] == spec.model_repo
-            else spec.extra_models[0].required_files
-        )
-        for filename in required:
+        for filename in spec.required_model_files:
             (target / filename).write_bytes(b"fixture")
 
     monkeypatch.setattr(install, "_run", fake_run)
-    install._download_model(install.TOOLS["whisperx"], tmp_path, lambda _message: None)
+    install._download_model(spec, tmp_path, lambda _message: None)
     command = calls[0]
     assert command[command.index("--from") + 1] == "huggingface-hub==1.23.0"
     assert "--revision" in command
-    assert command[command.index("--revision") + 1] == install.TOOLS["whisperx"].model_revision
-    assert len(calls) == 2
-    assert calls[1][calls[1].index("--revision") + 1] == spec.extra_models[0].revision
-    assert "--include" in calls[1]
+    assert command[command.index("--revision") + 1] == spec.model_revision
+    assert len(calls) == 1
 
 
 def test_hf_download_rejects_metadata_only_snapshot(tmp_path, monkeypatch):
@@ -175,7 +133,7 @@ def test_existing_pinned_clone_fetches_only_requested_revision(tmp_path, monkeyp
 
 
 def test_ready_health_rejects_partial_and_accepts_complete(tmp_path):
-    spec = install.TOOLS["whisperx"]
+    spec = install.TOOLS["deepseek-ocr2"]
     healthy, reasons = install._tool_health(tmp_path, spec)
     assert not healthy and reasons
     python = tmp_path / ".venv" / ("Scripts" if __import__("sys").platform == "win32" else "bin") / (
@@ -183,19 +141,13 @@ def test_ready_health_rejects_partial_and_accepts_complete(tmp_path):
     )
     python.parent.mkdir(parents=True)
     python.write_bytes(b"")
-    (tmp_path / "transcribe_whisperx.py").write_text("# adapter\n", encoding="utf-8")
     (tmp_path / "READY.json").write_text(json.dumps({
-        "tool": "whisperx", "model_downloaded": True,
+        "tool": "deepseek-ocr2", "model_downloaded": True,
     }), encoding="utf-8")
     for filename in spec.required_model_files:
         path = tmp_path / spec.model_subdir / filename
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"model")
-    for model in spec.extra_models:
-        for filename in model.required_files:
-            path = tmp_path / model.subdir / filename
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(b"model")
     healthy, reasons = install._tool_health(tmp_path, spec)
     assert healthy and not reasons
 
@@ -218,7 +170,7 @@ def test_ready_health_rejects_malformed_marker_contract(tmp_path, marker_text):
 
 @pytest.mark.parametrize(
     "tool_name",
-    ["ace-step", "index-tts", "deepseek-ocr2", "z-image-turbo"],
+    ["index-tts", "deepseek-ocr2"],
 )
 def test_ready_health_requires_complete_declared_model_payload(tmp_path, tool_name):
     spec = install.TOOLS[tool_name]
@@ -255,7 +207,7 @@ def test_ready_health_requires_complete_declared_model_payload(tmp_path, tool_na
 
 
 def test_snapshot_health_rejects_empty_required_file(tmp_path):
-    spec = install.TOOLS["demucs"]
+    spec = install.TOOLS["deepseek-ocr2"]
     model_root = tmp_path / spec.model_subdir
     model_root.mkdir(parents=True)
     for filename in spec.required_model_files:

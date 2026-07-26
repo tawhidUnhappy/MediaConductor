@@ -31,10 +31,7 @@ import json
 import sys
 from pathlib import Path
 
-from mediaconductor.audio.narration_safety import (
-    narration_delivery_lint,
-    narration_fluency_lint,
-)
+from mediaconductor.audio.narration_safety import narration_quality_findings
 from mediaconductor.brand import CLI_NAME
 from mediaconductor.video_pipeline.check_items import is_speakable
 from mediaconductor.video_pipeline.common import (
@@ -46,8 +43,9 @@ from mediaconductor.video_pipeline.common import (
     merge_item_selection,
     project_name,
 )
-from mediaconductor.video_pipeline.item_assets import IMAGE_EXTENSIONS, load_narration
+from mediaconductor.video_pipeline.item_assets import IMAGE_EXTENSIONS
 from mediaconductor.video_pipeline.narration_check import check_item
+from mediaconductor.workboard import _narration_entries as narration_entries_for_report
 from mediaconductor.workboard import item_status
 
 # Below this size a WAV cannot hold audible narration — it is a truncated or
@@ -102,49 +100,39 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
         add("error", "narration:structure", problem,
             f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} --list  "
             f"(then fix the entry with --set/--delete --prune-audio)")
-    if report["uncovered_panels"]:
-        add("info", "narration:uncovered",
-            f"{len(report['uncovered_panels'])} panel(s) have no narration entry "
-            "(correct for credits/banners/SFX; confirm none is a story panel)",
-            f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item}, then OPEN every sheet and corresponding original crop")
+    for warning in report.get("warnings", []):
+        add("review", "narration:style", warning,
+            f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item}, "
+            "then OPEN every sheet and corresponding original crop before rewriting")
 
-    # 3. Speakability and narration-safety lint, per entry.
-    try:
-        entries = load_narration(item_dir)
-    except Exception:  # noqa: BLE001 — structure errors already reported above
-        entries = []
+    # 3. Speakability and narration-quality lints, per entry.
+    #    The tolerant reader is deliberate: a file with one dangling image
+    #    still has 40 other lines worth linting, and reporting every problem
+    #    in one pass is the whole point of the fix-until-clean loop.
+    entries = narration_entries_for_report(item_dir)
     for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        image = entry.get("image", "?")
-        text = (entry.get("narration") or entry.get("text") or "").strip()
+        image = entry.get("image") or "?"
+        text = str(entry.get("narration") or "").strip()
         if text and not is_speakable(text):
             add("error", "narration:unspeakable",
                 f"{image}: narration has no letters/digits (TTS emits near-silence): {text!r}",
                 f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
                 f"--set {image} \"<speakable line>\" --prune-audio")
-        delivery = narration_delivery_lint(text)
-        if delivery:
-            add("error", "narration:delivery", f"{image}: {delivery}",
-                f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
-                f"--set {image} \"<rewritten line>\" --prune-audio")
-        fluency = narration_fluency_lint(text)
-        if fluency:
-            add("error", "narration:fluency", f"{image}: {fluency}",
-                f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
-                f"--set {image} \"<rewritten line>\" --prune-audio")
+    for finding in narration_quality_findings(entries):
+        add("error" if finding.is_error else "review", f"narration:{finding.code}",
+            f"{finding.beat}: {finding.message}",
+            f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
+            f"--set {finding.beat} \"<rewritten line>\" --prune-audio")
 
     # 4. Audio coverage + integrity (cheap size gate; deep decode check is
     #    video-audio-audit).
     audio_dir = audio_root / name / item
     missing, corrupt = [], []
     for entry in entries:
-        if not isinstance(entry, dict) or not entry.get("image"):
+        image = entry.get("image")
+        if not image or not str(entry.get("narration") or "").strip():
             continue
-        text = (entry.get("narration") or entry.get("text") or "").strip()
-        if not text:
-            continue
-        wav = audio_dir / f"{Path(entry['image']).stem}.wav"
+        wav = audio_dir / f"{Path(image).stem}.wav"
         if not wav.is_file():
             missing.append(wav.name)
         elif wav.stat().st_size < MIN_AUDIO_BYTES:

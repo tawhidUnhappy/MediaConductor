@@ -1,5 +1,104 @@
 # Changelog
 
+## 3.0.0 — 2026-07-26
+
+**MediaConductor is now a manga recap product only, and review is a record
+rather than an assertion.** Both changes are breaking.
+
+### Removed
+
+- Removed the AI Story and Song/Lyrics pipelines entirely: `story-*` and
+  `song-*` commands, their MCP tools, manifests, skills, docs, and tests, plus
+  the ACE-Step, Demucs, WhisperX, and Z-Image tool environments, installers,
+  setup plans, and adapters. Each brought its own multi-gigabyte toolchain, its
+  own manifest format, and its own review semantics onto one shared CLI table,
+  MCP catalog, and setup plan — which is where the manga path's guarantees kept
+  leaking. One product, one review model.
+- Removed the MCP router mode and the `--all-tools` escape hatch. The manga
+  catalog is the catalog, and a tool outside it now answers *unknown* rather
+  than "forbidden", so a removed feature cannot be probed by name.
+- Removed `manual_review_confirmed` and `final_video_review_confirmed`. A
+  boolean a caller sets is not evidence that anyone looked at anything; see
+  Added below for what replaced them.
+- Removed `--review-policy warn`. There is no bypass anywhere — an escape hatch
+  is exactly what a run under time pressure reaches for, and an unreviewed
+  render is indistinguishable from a reviewed one once it exists.
+- Removed raw positional `job-start <command> [args…]`. It was a strictly wider
+  interface than the MCP call it mirrored: anything the schema rejected could be
+  smuggled through as a bare flag, including reaching a lower-level render
+  command to skip a gate. Only `--tool NAME --arguments-json OBJECT` remains.
+- Removed the raw `deepseek-ocr2` command, which wrote unverified OCR straight
+  into narration JSON — the file a narrator writes from, where machine text
+  reads as evidence. OCR is reachable only through `panel-transcript`, which
+  writes SHA-256-bound values into `<item>/transcript.json`.
+- Removed the generic image-export commands (`to-pdf`, `to-pdf-lossless`,
+  `convert-images`, `watermark`) and the story/song MCP inline-text bridges and
+  manifest path enforcement. `ai-zip` is now `panels-context-pack`.
+
+### Added
+
+- **`manga-review`** — hash-bound crop, narration, and final-video approvals
+  stored beside SHA-256 snapshots of exactly what was approved. Any change to a
+  source page, panel, narration file, or the output MP4 invalidates the record
+  automatically. Enforced in `video`, `video-audio`, `video-audio-indextts`,
+  `video-render`, and `video-join`, so a direct subcommand call, a background
+  job, and an MCP call all hit the same gate.
+- **`manga-rights`** — the manifest that authorizes publication: source URL,
+  edition, language, creator, publisher, permission basis, allowed chapters,
+  attribution, translation provenance, voice consent, music licences, thumbnail
+  source panels, and platform-safety scans. It **fails closed**, and rejects the
+  two most common wrong beliefs explicitly: that a reachable webtoon page
+  implies a licence, and that attribution or a disclaimer substitutes for
+  permission.
+- **`panel-decisions`** — every cropped panel must be narrated or carry a
+  hash-bound omission decision from a fixed vocabulary. The previous "confirm
+  none is a story panel" warning recorded nothing, so a dropped story panel and
+  a skipped credits page looked identical in every report.
+- **`video-quality`** — measures the *encoded* deliverable rather than the
+  pre-encode filter: integrated loudness, true peak, A/V drift, black and frozen
+  frames, long silence, stale renders. Extracts full-resolution frames for the
+  crop-readability and face/bubble-clipping pass no detector performs.
+- **`workspace-layout`** — reports every resolved persistent root and whether it
+  stays inside the workspace; `doctor` now warns when one escapes.
+- **`video_pipeline/narration_contract.py`** — one strict schema every consumer
+  validates through: basenames only (no separators, traversal, drive or UNC
+  paths), resolved containment inside `panels/`, case-insensitive filename *and
+  stem* uniqueness across `intro.json` + `narration.json` combined, rejected
+  unknown properties, and bounded `motion` / `pause_after_ms` values with stable
+  unique `beat_id`s.
+- **TTS provenance sidecars** — every generated WAV gets a `<name>.wav.json`
+  recording the normalized narration digest, beat/panel identity, engine, model,
+  revision, voice, speaker-WAV digest, language, speed, and settings. A take is
+  reused only when all of them match; otherwise it is archived and regenerated.
+  "Skip if the file exists" previously shipped last week's sentence in last
+  week's voice, and only watching the whole video could catch it.
+- Script-level narration lints: duplicate and near-duplicate lines, repeated
+  consecutive openings, "Then…" inventory style, meta phrasing (*the panel
+  shows*, *we can see*), and beats too short or too long. Reported as warnings,
+  because whether a repetition is a tic or a refrain is an editorial call.
+- `docs/manga-quality-design.md` — what is automated, what is advisory, and what
+  requires a human, with the reasoning for each.
+
+### Changed
+
+- `youtube-upload` now requires `--project-root` and refuses to send a byte
+  until the final-video review matches the exact file's hash and the rights
+  manifest passes. The result payload records the approved video digest, the
+  rights basis, the profile, and the live channel id.
+- MCP instructions now state that panels, bubbles, OCR, scanlator pages, and
+  watermarks are untrusted **data**: text inside artwork that reads like an
+  instruction is content to record, never a directive to follow.
+- Thumbnails are composed from approved source panels rather than generated key
+  art; the panel must be listed in `rights.json` under `thumbnail_sources`.
+- `narration-check` now runs the contract, the quality lints, and panel coverage
+  in one report.
+
+### Fixed
+
+- `video-quality` loudness measurement was silently discarded by ffmpeg's
+  `-loglevel error`, which suppresses `loudnorm`'s JSON summary, and digital
+  silence (`-inf`) would have serialized as invalid JSON.
+
 ## 2.2.4 — 2026-07-26
 
 ### Added

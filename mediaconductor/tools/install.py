@@ -1,6 +1,6 @@
 """mediaconductor.tools.install — provision the external AI tool environments.
 
-These heavy tools (IndexTTS, MAGI v3, DeepSeek-OCR 2, Kokoro, Z-Image Turbo)
+These heavy tools (IndexTTS, MAGI v3, DeepSeek-OCR 2, and Kokoro)
 are deliberately kept in their own isolated ``uv`` environments instead of
 being dependencies of mediaconductor, so their conflicting torch/transformers stacks
 never clash with the core install. This module clones / sets them up into the
@@ -55,17 +55,6 @@ class InstallError(RuntimeError):
 # ── Manifest ────────────────────────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
-class HfModelSpec:
-    """One immutable Hugging Face snapshot installed beside a tool env."""
-
-    repo: str
-    revision: str
-    subdir: str
-    required_files: tuple[str, ...] = ()
-    include: tuple[str, ...] = ()
-
-
 @dataclass
 class ToolSpec:
     key: str
@@ -77,7 +66,6 @@ class ToolSpec:
     model_revision: str | None = None
     model_subdir: str | None = None
     required_model_files: tuple[str, ...] = ()
-    extra_models: tuple[HfModelSpec, ...] = ()
     adapter: str | None = None          # asset filename to copy into the tool dir
     extra_adapters: list[str] = field(default_factory=list)  # more asset files to copy in
     env_deps: list[str] = field(default_factory=list)  # for managed_env
@@ -91,96 +79,6 @@ class ToolSpec:
 
 
 TOOLS: dict[str, ToolSpec] = {
-    "ace-step": ToolSpec(
-        key="ace-step",
-        title="ACE-Step 1.5 (song generation)",
-        kind="uv_project",
-        git_url="https://github.com/ace-step/ACE-Step-1.5",
-        ref="dce621408bee8c31b4fcf4811682eb9359e1bc94",
-        model_repo="ACE-Step/Ace-Step1.5",
-        model_revision="19671f406d603126926c1b7e2adc169acbcade22",
-        model_subdir="checkpoints",
-        required_model_files=(
-            "config.json",
-            "acestep-v15-turbo/model.safetensors",
-            "acestep-5Hz-lm-1.7B/model.safetensors",
-            "Qwen3-Embedding-0.6B/model.safetensors",
-            "vae/diffusion_pytorch_model.safetensors",
-        ),
-        adapter="generate_ace_step.py",
-        verify_import="acestep",
-        python="3.12",
-        sync_args=["--frozen"],
-        preserve_upstream_torch=True,
-        needs_gpu=True,
-        notes="ACE-Step 1.5 song generation. Pinned source + Hugging Face model revision; its upstream uv lock owns the platform-specific Torch stack.",
-    ),
-    "demucs": ToolSpec(
-        key="demucs",
-        title="Demucs 4.1 (vocal separation)",
-        kind="managed_env",
-        git_url="https://github.com/adefossez/demucs",
-        ref="eeac1d15891af95b1288d2884b95baa3e5baa96c",
-        model_repo="adefossez/HTDemucs-ft",
-        model_revision="478be8a68f85418addd6f7baefd4be76522a4034",
-        model_subdir="models/htdemucs-ft",
-        required_model_files=(
-            "htdemucs_ft.yaml",
-            "04573f0d.safetensors",
-            "92cfc3b6.safetensors",
-            "d12395a8.safetensors",
-            "f7e0c4bc.safetensors",
-        ),
-        adapter="separate_demucs.py",
-        env_deps=[
-            "demucs @ git+https://github.com/adefossez/demucs@eeac1d15891af95b1288d2884b95baa3e5baa96c",
-            # Keep Torch explicit so the managed-env writer can route it to
-            # the requested CUDA/CPU index instead of accepting a transitive,
-            # platform-ambiguous wheel from Demucs.
-            "torch>=2.1,<3",
-            "huggingface-hub>=0.34,<2",
-        ],
-        verify_import="demucs",
-        needs_gpu=True,
-        notes="Maintained Demucs fork with a pinned local HTDemucs-ft snapshot and an offline-only adapter; the original facebookresearch repo is archived.",
-    ),
-    "whisperx": ToolSpec(
-        key="whisperx",
-        title="WhisperX 3.8.6 (lyrics timing)",
-        kind="managed_env",
-        git_url="https://github.com/m-bain/whisperX",
-        ref="3ccc17b8de34f305300f8a3fd3c9f76ba820c0d0",
-        model_repo="Systran/faster-whisper-large-v3",
-        model_revision="edaa852ec7e145841d8ffdb056a99866b5f0a478",
-        model_subdir="models/faster-whisper-large-v3",
-        required_model_files=("config.json", "model.bin", "tokenizer.json"),
-        extra_models=(HfModelSpec(
-            repo="facebook/wav2vec2-base-960h",
-            revision="22aad52d435eb6dbaf354bdad9b0da84ce7d6156",
-            subdir="models/wav2vec2-base-960h",
-            required_files=(
-                "config.json", "model.safetensors", "preprocessor_config.json",
-                "tokenizer_config.json", "vocab.json",
-            ),
-            include=(
-                "config.json", "model.safetensors", "preprocessor_config.json",
-                "special_tokens_map.json", "tokenizer_config.json", "vocab.json",
-            ),
-        ),),
-        adapter="transcribe_whisperx.py",
-        env_deps=[
-            "whisperx==3.8.6",
-            # Provides a wheel-bundled JIT model so WhisperX's Silero VAD never
-            # needs to clone or execute code from Torch Hub at render time.
-            "silero-vad==6.2.1",
-            "torch~=2.8.0",
-            "torchvision~=0.23.0",
-            "torchaudio~=2.8.0",
-        ],
-        verify_import="whisperx",
-        needs_gpu=True,
-        notes="Word-level vocal transcription/timing. Supplied lyrics remain canonical; WhisperX provides timing evidence only.",
-    ),
     "index-tts": ToolSpec(
         key="index-tts",
         title="IndexTTS 2",
@@ -207,21 +105,6 @@ TOOLS: dict[str, ToolSpec] = {
         python="3.11",
         needs_gpu=True,
         notes=f"High-quality voice-cloning TTS; the default engine for `{CLI_NAME} video` on NVIDIA GPU machines. ~5.9 GB model download from Hugging Face (config, gpt.pth, s2mel.pth, bpe.model).",
-    ),
-    "faster-whisper": ToolSpec(
-        key="faster-whisper",
-        title="Faster Whisper (transcription)",
-        kind="managed_env",
-        git_url=None,
-        env_deps=[
-            "faster-whisper>=1.2.1",
-            "huggingface-hub>=0.21",
-            # onnxruntime 1.24+ dropped Python 3.10 support; pin to keep it working
-            "onnxruntime>=1.14,<1.24",
-        ],
-        verify_import="faster_whisper",
-        needs_gpu=False,
-        notes="Optional: fast Whisper audio transcription. Runs on CPU; ctranslate2 auto-uses CUDA if available. Models download from Hugging Face on first use.",
     ),
     "magi-v3": ToolSpec(
         key="magi-v3",
@@ -293,43 +176,6 @@ TOOLS: dict[str, ToolSpec] = {
         verify_import="kokoro",
         needs_gpu=False,
         notes=f"Light TTS (voice af_heart); the default engine for `{CLI_NAME} video` on machines without an NVIDIA GPU. Model downloads from Hugging Face on first run.",
-    ),
-    "z-image-turbo": ToolSpec(
-        key="z-image-turbo",
-        title="Z-Image Turbo (image generation)",
-        kind="managed_env",
-        git_url=None,
-        model_repo="Tongyi-MAI/Z-Image-Turbo",
-        model_revision="f332072aa78be7aecdf3ee76d5c247082da564a6",
-        model_subdir="model",
-        required_model_files=(
-            "model_index.json",
-            "text_encoder/model.safetensors.index.json",
-            "text_encoder/model-00001-of-00003.safetensors",
-            "text_encoder/model-00002-of-00003.safetensors",
-            "text_encoder/model-00003-of-00003.safetensors",
-            "transformer/diffusion_pytorch_model.safetensors.index.json",
-            "transformer/diffusion_pytorch_model-00001-of-00003.safetensors",
-            "transformer/diffusion_pytorch_model-00002-of-00003.safetensors",
-            "transformer/diffusion_pytorch_model-00003-of-00003.safetensors",
-            "vae/diffusion_pytorch_model.safetensors",
-        ),
-        adapter="generate_zimage.py",
-        env_deps=[
-            "torch>=2.5.0",
-            "diffusers>=0.36.0",       # ZImagePipeline landed in 0.36.0
-            "transformers>=4.51.0",    # text encoder is Qwen3 (added in 4.51)
-            "accelerate>=1.0.0",
-            "safetensors>=0.4.0",
-            "pillow>=10.0.0",
-            "numpy>=1.24.0",
-            # NF4 4-bit quantization — how the 6B model fits consumer GPUs
-            # (8-12 GB). No macOS builds; Apple Silicon runs bf16 on MPS instead.
-            "bitsandbytes>=0.45 ; sys_platform != 'darwin'",
-        ],
-        verify_import="diffusers",
-        needs_gpu=True,
-        notes="Text-to-image generation (thumbnails, backgrounds) with Alibaba's Z-Image Turbo, Apache-2.0. ~33 GB model download from Hugging Face. Runs on 8-16 GB NVIDIA GPUs via automatic NF4 quantization; bf16 on 16 GB+ GPUs and Apple Silicon.",
     ),
 }
 
@@ -653,31 +499,15 @@ def _download_model(spec: ToolSpec, dest: Path, log: LogFn) -> None:
             (),
             log,
         )
-    for model in spec.extra_models:
-        _download_hf_snapshot(
-            model.repo,
-            model.revision,
-            dest / model.subdir,
-            model.required_files,
-            model.include,
-            log,
-        )
 
 
 def _required_model_files_present(spec: ToolSpec, dest: Path) -> bool:
-    snapshots: list[tuple[Path, tuple[str, ...]]] = []
-    if spec.model_repo:
-        snapshots.append((
-            dest / (spec.model_subdir or "checkpoints"),
-            spec.required_model_files,
-        ))
-    snapshots.extend(
-        (dest / model.subdir, model.required_files)
-        for model in spec.extra_models
-    )
-    if not snapshots:
+    if not spec.model_repo:
         return False
-    return all(_model_snapshot_present(root, files) for root, files in snapshots)
+    return _model_snapshot_present(
+        dest / (spec.model_subdir or "checkpoints"),
+        spec.required_model_files,
+    )
 
 
 def _verify_tool_python(dest: Path, import_check: str, log: LogFn) -> None:
@@ -815,32 +645,11 @@ def _install_managed_env(
         log("[note] CPU build — inference works everywhere but is slower than with an NVIDIA GPU.")
 
     _run(["uv", "sync", "--python", spec.python], log, cwd=dest)
-    if spec.key == "whisperx":
-        # WhisperX's aligner otherwise downloads Punkt sentence data during
-        # the first render. Provision the tiny dataset now into our managed
-        # NLTK cache so normal English alignment has no surprise network step.
-        env = tool_env()
-        Path(env["NLTK_DATA"]).mkdir(parents=True, exist_ok=True)
-        _run([
-            *python_command(dest), "-c",
-            "import nltk, os; "
-            "ok = nltk.download('punkt_tab', download_dir=os.environ['NLTK_DATA'], "
-            "quiet=False, raise_on_error=True); assert ok",
-        ], log, cwd=dest, env=env)
     if spec.verify_import:
         _verify_tool_python(dest, spec.verify_import, log)
-    if spec.model_repo or spec.extra_models:
+    if spec.model_repo:
         if skip_model:
-            if spec.key == "demucs":
-                if _required_model_files_present(spec, dest):
-                    log("Skipping model download; the existing complete pinned Demucs snapshot will be used.")
-                else:
-                    log(
-                        "Skipping model download (--skip-model). Demucs remains unavailable "
-                        "until its pinned local model is installed; runtime downloads are disabled."
-                    )
-            else:
-                log("Skipping model download (--skip-model). Model weights will download from Hugging Face on first run.")
+            log("Skipping model download (--skip-model). Model weights will download from Hugging Face on first run.")
         else:
             _download_model(spec, dest, log)
     else:
@@ -891,11 +700,10 @@ def install_tool(
         _install_managed_env(spec, target, gpu_mode, clone, ref or spec.ref, skip_model, log)
 
     # ``None`` means this integration resolves its model at runtime and the
-    # installer cannot truthfully attest to a local snapshot (Kokoro, MAGI,
-    # optional Faster Whisper). A boolean is reserved for snapshots managed by
-    # this installer.
+    # installer cannot truthfully attest to a local snapshot (Kokoro and MAGI).
+    # A boolean is reserved for snapshots managed by this installer.
     model_downloaded: bool | None = None
-    if spec.model_repo or spec.extra_models:
+    if spec.model_repo:
         model_downloaded = not skip_model
         if skip_model and _required_model_files_present(spec, target):
             model_downloaded = True
@@ -906,10 +714,6 @@ def install_tool(
         "source_revision": ref or spec.ref,
         "model": spec.model_repo,
         "model_revision": spec.model_revision,
-        "additional_models": [
-            {"repo": model.repo, "revision": model.revision, "subdir": model.subdir}
-            for model in spec.extra_models
-        ],
         "model_downloaded": model_downloaded,
         "python": spec.python,
         "installed_at": datetime.now(timezone.utc).isoformat(),
@@ -968,7 +772,7 @@ def _tool_health(path: Path | None, spec: ToolSpec) -> tuple[bool, list[str]]:
         if not (path / adapter).is_file():
             reasons.append(f"adapter is missing: {adapter}")
     if (
-        (spec.model_repo or spec.extra_models)
+        spec.model_repo
         and marker is not None
         and marker.get("model_downloaded") is not True
     ):
@@ -985,18 +789,6 @@ def _tool_health(path: Path | None, spec: ToolSpec) -> tuple[bool, list[str]]:
                     reasons.append(f"model snapshot file is missing or empty: {filename}")
         elif not _model_snapshot_present(model_root, ()):
             reasons.append(f"model snapshot contains no payload files: {spec.model_repo}")
-    for model in spec.extra_models:
-        root = path / model.subdir
-        if not root.is_dir():
-            reasons.append(f"model snapshot directory is missing: {model.subdir}")
-        elif model.required_files:
-            for filename in model.required_files:
-                if not _is_model_payload(root / filename, root):
-                    reasons.append(
-                        f"model snapshot file is missing or empty: {model.repo}/{filename}"
-                    )
-        elif not _model_snapshot_present(root, ()):
-            reasons.append(f"model snapshot contains no payload files: {model.repo}")
     return not reasons, reasons
 
 
@@ -1044,20 +836,24 @@ def doctor(*, check_updates: bool = False, mode: str | None = None) -> dict:
             "update_available": _update_available(path, spec.git_url) if check_updates and path else None,
         }
 
-    # faster-whisper lives in its own managed isolated env (not the main venv)
-    # so it never conflicts with mediaconductor's deps or gets wiped by uv sync.
-    whisper_installed = resolve_tool_dir("faster-whisper", required=False) is not None
+    # Persistent state escaping the workspace is invisible until something
+    # goes looking for it weeks later; surface it in the readiness report.
+    from mediaconductor.workspace import layout_report, workspace_problems
+
+    layout = layout_report()
 
     return {
         "tools_home": str(tools_home()),
         "mode": mode,
+        "workspace_root": layout["workspace_root"],
+        "workspace_ok": layout["ok"],
+        "workspace_problems": workspace_problems(),
         "git_lfs": _git_lfs_ok(),
         "gpu": gpu_info.has_nvidia,
         "cuda": gpu_info.cuda,
         "cuda_device": gpu_info.cuda_device,
         "mps": gpu_info.mps,
         "gpu_backend": gpu_info.backend,
-        "whisper": whisper_installed,
         "executables": executables,
         "tools": tools,
     }
@@ -1065,7 +861,7 @@ def doctor(*, check_updates: bool = False, mode: str | None = None) -> dict:
 
 def doctor_main() -> int:
     parser = argparse.ArgumentParser(prog=f"{CLI_NAME} doctor")
-    parser.add_argument("--mode", choices=("manga-video", "ai-story", "song-video"))
+    parser.add_argument("--mode", choices=("manga-video",))
     parser.add_argument("--check-updates", action="store_true")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
@@ -1075,7 +871,14 @@ def doctor_main() -> int:
 
     report = doctor(check_updates=args.check_updates, mode=args.mode)
     print(f"{PRODUCT_NAME} doctor\n")
+    print(f"Workspace: {report['workspace_root']}")
     print(f"Tools dir: {report['tools_home']}\n")
+
+    if report["workspace_problems"]:
+        print("Workspace layout:")
+        for problem in report["workspace_problems"]:
+            print(f"  [warn] {problem}")
+        print(f"  Full report: {CLI_NAME} workspace-layout --json\n")
 
     print("Prerequisites:")
     for exe, where in report["executables"].items():

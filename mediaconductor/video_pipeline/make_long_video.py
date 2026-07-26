@@ -4,8 +4,16 @@ import argparse
 from pathlib import Path
 
 from mediaconductor.defaults import DEFAULT_NARRATION_VOLUME, default_music_volume_db
+from mediaconductor.reviews import enforce_production_reviews
 from mediaconductor.utils import emit_result
-from mediaconductor.video_pipeline.common import DEFAULT_AUDIO_ROOT, DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
+from mediaconductor.video_pipeline.common import (
+    DEFAULT_AUDIO_ROOT,
+    DEFAULT_OUTPUT_ROOT,
+    DEFAULT_PROJECT_ROOT,
+    DEFAULT_WORK_DIR,
+    item_dirs,
+    merge_item_selection,
+)
 from mediaconductor.video_pipeline.long_video_builder import LongVideoConfig, build_long_video
 
 
@@ -44,6 +52,14 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    # The join is the last step before a file that looks publishable exists.
+    selected = item_dirs(args.project_root.resolve(),
+                         merge_item_selection(args.items, args.item_range))
+    enforce_production_reviews(
+        args.project_root,
+        [item_dir.name for item_dir in selected],
+        stage="joining the long video",
+    )
     out_path = build_long_video(
         LongVideoConfig(
             project_root=args.project_root,

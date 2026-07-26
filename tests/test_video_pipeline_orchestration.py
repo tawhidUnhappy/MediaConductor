@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from mediaconductor import defaults
+from mediaconductor.reviews import record_crop_review, record_narration_review
 from mediaconductor.video_pipeline import run_pipeline
 
 
@@ -37,11 +38,17 @@ def _invoke(
     output_root = tmp_path / "output"
     project_root.mkdir(parents=True)
     item_dir = project_root / "01"
-    item_dir.mkdir()
+    (item_dir / "panels").mkdir(parents=True)
+    (item_dir / "panels" / "01_001.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     (item_dir / "narration.json").write_text(
         json.dumps([{"image": "01_001.png", "narration": "The story begins calmly."}]),
         encoding="utf-8",
     )
+    # The review gate has no bypass flag, so the fixture records approvals over
+    # the bytes it just wrote.
+    record_crop_review(project_root, ["01"], reviewer="orchestration fixture",
+                       source_subdir="panels")
+    record_narration_review(project_root, ["01"], reviewer="orchestration fixture")
     long_video = output_root / "Story" / "Story_full.mp4"
     long_video.parent.mkdir(parents=True)
     long_video.write_bytes(b"placeholder")
@@ -199,11 +206,15 @@ def test_item_only_validation_uses_raw_audio_and_render_fps(tmp_path, monkeypatc
 def test_pipeline_preflight_blocks_before_fade_or_render(tmp_path, monkeypatch):
     project_root = tmp_path / "library" / "Story"
     item_dir = project_root / "01"
-    item_dir.mkdir(parents=True)
+    (item_dir / "panels").mkdir(parents=True)
+    (item_dir / "panels" / "01_001.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     (item_dir / "narration.json").write_text(
         json.dumps([{"image": "01_001.png", "narration": "GHAHA! The phoenix appears."}]),
         encoding="utf-8",
     )
+    record_crop_review(project_root, ["01"], reviewer="preflight fixture",
+                       source_subdir="panels")
+    record_narration_review(project_root, ["01"], reviewer="preflight fixture")
     commands: list[list[str]] = []
     monkeypatch.setattr(defaults, "SYSTEM_CONFIG_FILE", tmp_path / "missing.json")
     monkeypatch.setattr(run_pipeline, "run", lambda command, _cwd: commands.append(list(command)))

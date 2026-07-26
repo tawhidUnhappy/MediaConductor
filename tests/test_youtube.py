@@ -23,6 +23,61 @@ def run_cli(env_home, *args: str) -> subprocess.CompletedProcess:
     )
 
 
+def approved_project(tmp_path, video):
+    """A project whose reviews and rights authorize uploading *video*.
+
+    Upload is gated on a hash-bound final-video review plus a fail-closed
+    rights manifest, so every upload test has to produce a genuinely approved
+    state rather than a flag.
+    """
+    from mediaconductor.reviews import (
+        record_crop_review,
+        record_final_video_review,
+        record_narration_review,
+    )
+    from mediaconductor.rights import SAFETY_SCANS, write_rights
+
+    project = tmp_path / "library" / "Recap"
+    panels = project / "01" / "panels"
+    panels.mkdir(parents=True)
+    (panels / "01_001.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (project / "01" / "narration.json").write_text(
+        json.dumps([{"image": "01_001.png", "narration": "The gate opens from inside."}]),
+        encoding="utf-8",
+    )
+    record_crop_review(project, ["01"], reviewer="tester", source_subdir="panels")
+    record_narration_review(project, ["01"], reviewer="tester")
+    record_final_video_review(
+        project, video, ["01"],
+        reviewer="tester",
+        rights_confirmed=True,
+        voice_consent_confirmed=True,
+        source_permission_confirmed=True,
+    )
+    write_rights(project, {
+        "schema_version": 1,
+        "source": {"url": "https://example.test/title", "title": "Recap",
+                   "edition": "digital", "language": "en",
+                   "creator": "A. Author", "publisher": "Example Press"},
+        "permission": {"basis": "explicit_permission", "detail": "written grant 2026-07",
+                       "granted_by": "Example Press", "evidence": "grant.pdf",
+                       "allowed_chapters": ["1-12"]},
+        "attribution": "Art by A. Author, published by Example Press.",
+        "translation": {"provenance": "official English edition", "scanlator": ""},
+        "voice_consent": {"basis": "synthetic_licensed", "detail": "Kokoro licence",
+                          "speaker": ""},
+        "music": [{"path": "bgm/track.wav", "license": "CC-BY 4.0",
+                   "source": "https://example.test/track"}],
+        "thumbnail_sources": ["01/panels/01_001.png"],
+        "commentary": {"adds": "Chapter-by-chapter analysis of the reveal structure.",
+                       "source_to_script_originality": "Narration is original prose; no bubble text copied.",
+                       "edit_decision_list": "output/Recap/edl.json"},
+        "safety_scans": {name: {"scanned_by": "tester", "scanned_at": "2026-07-26",
+                                "clear": True} for name in SAFETY_SCANS},
+    })
+    return project
+
+
 def test_status_snapshot_disconnected(tmp_path, monkeypatch):
     monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
     snapshot = store.status_snapshot()
@@ -52,9 +107,48 @@ def test_status_json_cli(tmp_path):
 def test_upload_without_auth_fails_actionably(tmp_path):
     video = tmp_path / "v.mp4"
     video.write_bytes(b"x")
-    proc = run_cli(tmp_path, "youtube-upload", "--video", str(video), "--title", "t")
+    project = approved_project(tmp_path, video)
+    proc = run_cli(tmp_path, "youtube-upload", "--project-root", str(project),
+                   "--video", str(video), "--title", "t")
     assert proc.returncode == 1
     assert "youtube-auth" in proc.stderr
+
+
+def test_upload_refuses_a_video_no_one_reviewed(tmp_path):
+    """The gate runs before authorization, so an unapproved file fails fast."""
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x")
+    project = tmp_path / "library" / "Unreviewed"
+    (project / "01" / "panels").mkdir(parents=True)
+    proc = run_cli(tmp_path, "youtube-upload", "--project-root", str(project),
+                   "--video", str(video), "--title", "t")
+    assert proc.returncode == 1
+    assert "not covered by a current review" in proc.stderr
+    assert "manga-review final-video" in proc.stderr
+
+
+def test_upload_refuses_when_the_approved_bytes_changed(tmp_path):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x")
+    project = approved_project(tmp_path, video)
+    video.write_bytes(b"a different render entirely")
+    proc = run_cli(tmp_path, "youtube-upload", "--project-root", str(project),
+                   "--video", str(video), "--title", "t")
+    assert proc.returncode == 1
+    assert "not covered by a current review" in proc.stderr
+
+
+def test_upload_refuses_when_rights_are_unknown(tmp_path):
+    from mediaconductor.rights import rights_path
+
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x")
+    project = approved_project(tmp_path, video)
+    rights_path(project).unlink()
+    proc = run_cli(tmp_path, "youtube-upload", "--project-root", str(project),
+                   "--video", str(video), "--title", "t")
+    assert proc.returncode == 1
+    assert "no rights manifest" in proc.stderr
 
 
 def test_auth_without_client_secrets_fails_actionably(tmp_path):
@@ -102,12 +196,15 @@ def test_friendly_api_error_non_json():
 
 def test_mcp_upload_args():
     args = _build_args("youtube_upload", {
+        "project_root": "/library/Recap",
         "video": "/v.mp4", "title": "T", "tags": "a,b", "privacy": "unlisted",
     })
-    assert args == ["--video", "/v.mp4", "--title", "T", "--tags", "a,b",
-                    "--privacy", "unlisted", "--json"]
+    assert args == ["--project-root", "/library/Recap", "--video", "/v.mp4",
+                    "--title", "T", "--tags", "a,b", "--privacy", "unlisted", "--json"]
     with pytest.raises(ValueError):
-        _build_args("youtube_upload", {"video": "/v.mp4"})  # title missing
+        _build_args("youtube_upload", {"project_root": "/p", "video": "/v.mp4"})  # title missing
+    with pytest.raises(ValueError, match="project_root"):
+        _build_args("youtube_upload", {"video": "/v.mp4", "title": "T"})
 
 
 def test_mcp_status_args():
@@ -300,10 +397,11 @@ def test_mcp_profile_mappings_and_validation():
         "--profile", "manga", "--verify", "--json",
     ]
     assert _build_args("youtube_upload", {
-        "profile": "song", "video": "/v.mp4", "title": "T",
-    }) == ["--profile", "song", "--video", "/v.mp4", "--title", "T", "--json"]
-    assert _build_args("youtube_list", {"profile": "ai-story", "limit": 5}) == [
-        "--profile", "ai-story", "--limit", "5", "--json",
+        "profile": "manga-main", "project_root": "/p", "video": "/v.mp4", "title": "T",
+    }) == ["--profile", "manga-main", "--project-root", "/p", "--video", "/v.mp4",
+           "--title", "T", "--json"]
+    assert _build_args("youtube_list", {"profile": "manga-alt", "limit": 5}) == [
+        "--profile", "manga-alt", "--limit", "5", "--json",
     ]
     assert _build_args("youtube_delete", {
         "profile": "manga", "video_id": "abc123", "confirm": True,
@@ -315,9 +413,10 @@ def test_mcp_profile_mappings_and_validation():
         "profile": "song", "auto_auth": False, "verify": True,
     }) == ["--profile", "song", "--no-auto-auth", "--verify", "--json"]
     assert _build_args("youtube_upload", {
-        "profile": "song", "auto_auth": False, "video": "/v.mp4", "title": "T",
-    }) == ["--profile", "song", "--no-auto-auth", "--video", "/v.mp4",
-           "--title", "T", "--json"]
+        "profile": "manga-main", "auto_auth": False, "project_root": "/p",
+        "video": "/v.mp4", "title": "T",
+    }) == ["--profile", "manga-main", "--no-auto-auth", "--project-root", "/p",
+           "--video", "/v.mp4", "--title", "T", "--json"]
     assert "--no-auto-auth" in _build_args(
         "youtube_list", {"profile": "song", "auto_auth": False}
     )
@@ -339,25 +438,30 @@ def test_upload_json_identifies_selected_profile_and_channel(tmp_path, monkeypat
 
     video = tmp_path / "video.mp4"
     video.write_bytes(b"video")
+    project = approved_project(tmp_path, video)
     monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(auth, "load_credentials", lambda profile: object())
     monkeypatch.setattr(auth, "_fetch_channel",
-                        lambda _creds: {"id": "UCSONG", "title": "Song Channel"})
+                        lambda _creds: {"id": "UCMANGA", "title": "Manga Channel"})
     monkeypatch.setattr(upload, "_session", lambda _creds: object())
     monkeypatch.setattr(upload, "_start_session", lambda *_args: "upload-url")
     monkeypatch.setattr(upload, "_upload_file", lambda *_args: {
         "id": "video123", "status": {"privacyStatus": "private"},
     })
     monkeypatch.setattr(sys, "argv", [
-        "mediaconductor youtube-upload", "--profile", "song", "--video", str(video),
+        "mediaconductor youtube-upload", "--profile", "manga-main",
+        "--project-root", str(project), "--video", str(video),
         "--title", "Title", "--json",
     ])
 
     assert upload.main() == 0
     report = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert report["profile"] == "song"
-    assert report["channel_title"] == "Song Channel"
-    assert report["channel_id"] == "UCSONG"
+    assert report["profile"] == "manga-main"
+    assert report["channel_title"] == "Manga Channel"
+    assert report["channel_id"] == "UCMANGA"
+    # Enough provenance to reconstruct which approved bytes went where.
+    assert report["approved_video_sha256"]
+    assert report["rights_basis"] == "explicit_permission"
 
 
 def test_upload_thumbnail_reauthorizes_and_retries_once_on_401(
@@ -369,6 +473,7 @@ def test_upload_thumbnail_reauthorizes_and_retries_once_on_401(
     thumbnail = tmp_path / "thumbnail.png"
     video.write_bytes(b"video")
     thumbnail.write_bytes(b"image")
+    project = approved_project(tmp_path, video)
     monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "home"))
     initial_credentials = object()
     replacement_credentials = object()
@@ -403,6 +508,7 @@ def test_upload_thumbnail_reauthorizes_and_retries_once_on_401(
     monkeypatch.setattr(upload, "_set_thumbnail", fake_thumbnail)
     monkeypatch.setattr(sys, "argv", [
         "mediaconductor youtube-upload", "--profile", "manga",
+        "--project-root", str(project),
         "--video", str(video), "--title", "Title",
         "--thumbnail", str(thumbnail), "--skip-verify", "--json",
     ])

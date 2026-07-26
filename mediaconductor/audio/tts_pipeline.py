@@ -29,8 +29,15 @@ if str(_INDEX_TTS_DIR) not in sys.path:
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.append(str(_PROJECT_ROOT))
 
+from mediaconductor.audio.provenance import (
+    TtsContract,
+    archive_stale_take,
+    file_digest,
+    stale_reason,
+    write_provenance,
+)
 from mediaconductor.config import HF_CACHE_DIR
-from mediaconductor.utils import LazyArchiveRunDir, archive_into_run
+from mediaconductor.utils import LazyArchiveRunDir
 from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
 from mediaconductor.video_pipeline.common import (
     item_dirs,
@@ -143,11 +150,28 @@ def ordered_audio_paths(audio_root: Path, name: str, selected: list[Path]) -> li
         except Exception:
             continue
         for item in narration:
-            image_name = item.get("image") if isinstance(item, dict) else None
-            if not image_name:
-                continue
-            paths.append(item_audio_dir / f"{Path(image_name).stem}.wav")
+            paths.append(item_audio_dir / f"{Path(item['image']).stem}.wav")
     return paths
+
+
+def indextts_contract(speaker_wav: Path) -> TtsContract:
+    """The exact synthesis contract this run would use for every line.
+
+    The speaker reference is recorded by *digest*, not path: swapping the
+    contents of ``vocal/narrator.wav`` changes the voice without changing any
+    filename, and reusing takes across that swap is exactly the silent failure
+    provenance exists to prevent.
+    """
+    return TtsContract(
+        engine="indextts",
+        model="IndexTTS2",
+        revision=str(CHECKPOINTS_DIR.name),
+        voice=speaker_wav.name,
+        speaker_wav_sha256=file_digest(speaker_wav),
+        language="en",
+        speed=1.0,
+        settings={"use_deepspeed": False},
+    )
 
 
 def main() -> int:
@@ -189,24 +213,35 @@ def main() -> int:
                 flush=True,
             )
 
-    per_chapter: list[list[tuple[str, Path]]] = []
+    contract = indextts_contract(speaker_wav)
+    per_chapter: list[list[tuple[str, Path, str, str]]] = []
     for item_dir in selected:
         item_audio_dir = audio_root / name / item_dir.name
         item_audio_dir.mkdir(parents=True, exist_ok=True)
         narrations = load_narration(item_dir)
         print(f"\n[{item_dir.name}] {len(narrations)} narration item(s) -> {item_audio_dir}", flush=True)
-        jobs_for_item: list[tuple[str, Path]] = []
+        jobs_for_item: list[tuple[str, Path, str, str]] = []
         for item in narrations:
-            image_name = item.get("image")
-            text = (item.get("narration") or item.get("text") or "").strip()
-            if not image_name or not text:
+            image_name = item["image"]
+            text = item["narration"].strip()
+            beat_id = item["beat_id"]
+            if not text:
                 continue
             dst = item_audio_dir / f"{Path(image_name).stem}.wav"
             if dst.exists():
-                if not args.overwrite:
+                reason = stale_reason(
+                    dst,
+                    contract=contract,
+                    narration=text,
+                    beat_id=beat_id,
+                    image=image_name,
+                )
+                if reason is None and not args.overwrite:
                     continue
-                archive_into_run(dst, archive_run_dir.dir, subdir=item_dir.name)
-            jobs_for_item.append((text, dst))
+                if reason is not None:
+                    print(f"  regenerating {dst.name}: {reason}", flush=True)
+                archive_stale_take(dst, archive_run_dir.dir, subdir=item_dir.name)
+            jobs_for_item.append((text, dst, beat_id, image_name))
         per_chapter.append(jobs_for_item)
 
     if archive_run_dir.allocated is not None:
@@ -234,7 +269,7 @@ def main() -> int:
     failures: list[Path] = []
     i = 0
     for chapter_idx, (item_dir, jobs_for_item) in enumerate(zip(selected, per_chapter, strict=False), start=1):
-        for text, dst in jobs_for_item:
+        for text, dst, beat_id, image_name in jobs_for_item:
             i += 1
             print(f"  [{i}/{len(to_generate)}] {dst.parent.name}/{dst.name}", flush=True)
             try:
@@ -243,6 +278,13 @@ def main() -> int:
                     text=text,
                     output_path=str(dst),
                     verbose=False,
+                )
+                write_provenance(
+                    dst,
+                    contract=contract,
+                    narration=text,
+                    beat_id=beat_id,
+                    image=image_name,
                 )
                 generated += 1
             except Exception as exc:

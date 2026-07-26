@@ -14,6 +14,7 @@ from mediaconductor.defaults import (
     default_music_volume_db,
     default_tts_engine,
 )
+from mediaconductor.reviews import enforce_production_reviews
 from mediaconductor.runtime import cli_command
 from mediaconductor.tools.hardware import has_nvidia_gpu
 from mediaconductor.utils import emit_result
@@ -231,6 +232,14 @@ def main() -> int:
     selected_dirs = item_dirs(args.project_root.resolve(), selected_items)
     if not selected_dirs:
         raise FileNotFoundError(f"No item folders selected under {args.project_root.resolve()}")
+    # Review assertions are useful only when bound to the bytes they approved.
+    # Enforce them before fades, archives, model loads, or rendering; the
+    # diagnostic warning policy must be selected explicitly by the caller.
+    enforce_production_reviews(
+        args.project_root,
+        [item_dir.name for item_dir in selected_dirs],
+        stage="the full pipeline",
+    )
     # Run once before audio fades, resume archives, model loads, or rendering.
     # Individual stages repeat this guard so direct subcommand calls stay safe.
     for item_dir in selected_dirs:

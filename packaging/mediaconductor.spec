@@ -45,7 +45,7 @@ a = Analysis(
         (str(ROOT / "packaging" / "icon.ico"), "."),  # loaded at runtime to set the Win32 window icon
     ],
     hiddenimports=hiddenimports,
-    excludes=["torch", "torchvision", "transformers", "faster_whisper"],
+    excludes=["torch", "torchvision", "transformers"],
     noarchive=False,
 )
 

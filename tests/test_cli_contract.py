@@ -50,6 +50,12 @@ def test_full_catalog_describes_typed_job_wrapper_and_source_layout(capsys):
     sheets = commands["narration-review-sheets"]["args"]
     assert sheets["output_root"]["flag"] == "--output-root"
 
+    # The review gates are part of the published contract, not side doors.
+    assert commands["manga-review"]["args"]["action"]["kind"] == "positional"
+    assert commands["youtube-upload"]["args"]["project_root"]["required"] is True
+    assert commands["manga-rights"]["args"]["action"]["kind"] == "positional"
+    assert "review_policy" not in commands["video"]["args"]
+
 
 def test_where_json_keys(capsys):
     assert main(["where", "--json"]) == 0
@@ -64,9 +70,10 @@ def test_tools_json(capsys):
     assert main(["tools", "--json"]) == 0
     data = json.loads(capsys.readouterr().out)
     assert "tools_home" in data
+    # Only the manga toolchain remains: TTS (two engines), panel detection,
+    # and the optional OCR cross-check.
     assert set(data["tools"]) == {
-        "ace-step", "demucs", "whisperx", "kokoro-82m", "index-tts",
-        "magi-v3", "deepseek-ocr2", "z-image-turbo",
+        "kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2",
     }
 
 

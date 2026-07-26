@@ -1,23 +1,27 @@
 # MediaConductor — guide for AI agents changing this codebase
 
-MediaConductor is an agent-native CLI and MCP server for manga recap videos,
-continuity-checked AI story videos, and generated or imported song lyric
-videos. Heavy AI tools live in isolated `uv` projects. **There is no GUI** (the
-old Electron/Flask surfaces were removed; see
-`docs/history/legacy-inventory.md`). The Python package and compatibility
-command remain `mediaconductor` during the 2.x migration.
+MediaConductor is an agent-native CLI and MCP server for **manga, manhwa, and
+webtoon recap videos**. Heavy AI tools live in isolated `uv` projects. **There
+is no GUI.** The Python package and compatibility command remain
+`mediaconductor` during the 2.x migration.
+
+The product used to carry two more pipelines — AI story videos and generated
+song/lyrics videos — plus generic image export. They were removed: each brought
+its own multi-gigabyte toolchain, its own manifest format, and its own review
+semantics, and the shared surface (one CLI table, one MCP catalog, one setup
+plan) made every one of those a place for the manga path's guarantees to leak.
+One product, one review model.
 
 This file is for **changing MediaConductor itself**. For *using* it, begin with
-[docs/ai-guide.md](docs/ai-guide.md), select one mode, and load only that
-mode's skill.
+[docs/ai-guide.md](docs/ai-guide.md) and load
+[skills/manga-video/SKILL.md](skills/manga-video/SKILL.md).
 
 ## Which doc for which job
 
 | Job | Doc |
 |---|---|
-| Select a scoped CLI/MCP mode | [docs/ai-guide.md](docs/ai-guide.md) |
-| Written story to narrated video | [skills/ai-story/SKILL.md](skills/ai-story/SKILL.md) |
-| Song generation or timed lyric video | [skills/song-video/SKILL.md](skills/song-video/SKILL.md) |
+| CLI/MCP contract for agents | [docs/ai-guide.md](docs/ai-guide.md) |
+| Quality design: what is automated, what needs eyes and ears | [docs/manga-quality-design.md](docs/manga-quality-design.md) |
 | Fresh clone/machine setup + verification | [docs/setup.md](docs/setup.md) |
 | Produce a recap series (URL → uploads) | [.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) |
 | Manga CLI/MCP reference | [docs/manga-video-guide.md](docs/manga-video-guide.md) |
@@ -33,17 +37,16 @@ Each package has its own README.md with entry points and gotchas.
 
 | Stage | Package / module | What it does |
 |---|---|---|
-| core | `cli.py`, `command_spec.py`, `runtime.py`, `config.py`, `paths.py`, `library_scan.py`, `series_plan.py`, `mcp_server.py`, `jobs.py`, `workboard.py`, `qa_loop.py` | dispatch, shared command schemas, self-spawning, config, batch planning, MCP server, background jobs, multi-agent board |
+| core | `cli.py`, `command_spec.py`, `runtime.py`, `config.py`, `paths.py`, `library_scan.py`, `series_plan.py`, `mcp_server.py`, `jobs.py`, `workboard.py`, `qa_loop.py`, `workspace.py` | dispatch, shared command schemas, self-spawning, config, batch planning, MCP server, background jobs, multi-agent board, resolved-root reporting |
+| gates | `reviews.py`, `panel_decisions.py`, `rights.py` | hash-bound crop/narration/final-video approvals, per-panel omission decisions, the fail-closed rights manifest |
 | acquire | `download/` | MangaDex fetch (polite, resumable, writes `manga.json`) |
 | acquire | `panels/` | crop: `webtoon-split`, `page-split` (MAGI), cutcheck, overrides, remap |
 | read | `ocr/` | DeepSeek-OCR 2 panel transcripts |
-| produce | `video_pipeline/` | audio → faded derivatives → render → join → BGM → final normalize |
-| produce | `story/` | AI Story manifest, continuity prompts, visual QA gates, orchestration |
-| produce | `song/` | Song manifest, canonical lyric alignment, subtitle/render orchestration |
-| produce | `audio/` | IndexTTS pipeline + narration safety checks |
+| produce | `video_pipeline/` | narration contract, editorial timeline, audio → faded derivatives → render → join → BGM → final normalize → encoded-output quality gate |
+| produce | `audio/` | IndexTTS pipeline, narration safety/quality lints, TTS provenance |
 | publish | `youtube/` | OAuth, resumable upload, list/delete/thumbnail |
 | tools | `tools/` | isolated external AI tool envs + vendored ffmpeg/uv/git-lfs |
-| shared | `images/`, `utils/` | image ops, thumbnail compose, archive/result helpers |
+| shared | `images/`, `utils/` | thumbnail compose, panel context packs, archive/result helpers |
 
 ## Architecture (what calls what)
 
@@ -59,14 +62,21 @@ Each package has its own README.md with entry points and gotchas.
   you add/change a subcommand flag, update command_spec.py in the same
   change** — it is what agents see.
 - **MCP server** (`mediaconductor/mcp_server.py`): stdlib-only JSON-RPC over
-  stdio; every tool shells out to the CLI. Long-running work must go through
-  the `job_start`/`job_status` tools, never a blocking call. Public startup
-  always applies `--allow-root` (the current directory by default) to direct,
-  nested-job, configured-default, and manifest-linked filesystem paths.
-- **Background jobs** (`mediaconductor/jobs.py`): `job-start <command> [args…]`
-  spawns a detached supervisor that logs to `<work>/jobs/<id>.log` and
-  records exit code + `MEDIACONDUCTOR_RESULT` into `<id>.json`; `job-status` /
-  `jobs` read it back, detecting orphaned (dead-supervisor) jobs.
+  stdio; every tool shells out to the CLI. The catalog is the manga catalog —
+  no router mode, no `--all-tools`; a tool outside the mode answers *unknown*,
+  not "forbidden", so a removed feature cannot be probed by name. Long-running
+  work must go through the `job_start`/`job_status` tools, never a blocking
+  call. Public startup always applies `--allow-root` (the current directory by
+  default) to direct, nested-job, and configured-default filesystem paths,
+  including review records, rights manifests, and final-video paths.
+- **Background jobs** (`mediaconductor/jobs.py`): `job-start --tool NAME
+  --arguments-json OBJECT` only. Raw positional argv is rejected — it was a
+  strictly *wider* interface than the MCP call it mirrored, so anything the
+  schema refused could be smuggled through as a bare flag, including reaching a
+  lower-level render command to skip a review gate. The supervisor logs to
+  `<work>/jobs/<id>.log` and records exit code + `MEDIACONDUCTOR_RESULT` into
+  `<id>.json`; `job-status` / `jobs` read it back, detecting orphaned
+  (dead-supervisor) jobs.
 - **The item pipeline** (`video-*`): `video` = audio (`video-audio` Kokoro /
   `video-audio-indextts`; `--tts auto` prefers IndexTTS when GPU + model +
   speaker WAV exist) → symmetric 8 ms per-clip fade derivatives →
@@ -76,24 +86,42 @@ Each package has its own README.md with entry points and gotchas.
   under `audio/` is never modified and `--audio-source raw` is an explicit
   diagnostic override. Any BGM change invalidates final normalization, so a
   standalone re-mix must be normalized again after the music is mixed.
-- **External AI tools** (Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2, Z-Image)
-  live in isolated uv envs under `<install>/.mangaeasy/tools/<tool>/`
+- **The review gates** (`mediaconductor/reviews.py`): crop, narration, and
+  final-video approvals are stored in `<project>/.mediaconductor/manga-reviews.json`
+  beside SHA-256 snapshots of the exact inputs, so any change to a source page,
+  panel, narration file, or the output MP4 invalidates the record without
+  anyone having to notice. `enforce_production_reviews()` runs in `video`,
+  `video-audio`, `video-audio-indextts`, `video-render`, and `video-join`, so a
+  direct subcommand call and a background job hit the same gate as the
+  pipeline. **There is no bypass** — the old `--review-policy warn` was removed
+  because an escape hatch is exactly what a run under time pressure reaches for,
+  and an unreviewed render is indistinguishable from a reviewed one once it
+  exists.
+- **External AI tools** (Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2) live in
+  isolated uv envs under `<install>/.mangaeasy/tools/<tool>/`
   (`install-tool`, resolved by `tools/external.resolve_tool_dir()`).
   `tool_env()` **force-pins** HF/torch/uv caches under `<data>/.mangaeasy/`
   (opt-out: `MEDIACONDUCTOR_SHARE_CACHES=1`). `ensure_vendored_path()` at the top
   of cli.py makes bare `"ffmpeg"`-style calls resolve to vendored binaries.
-  Z-Image facts that must not be "optimized" away: guidance_scale 0.0,
-  bf16/fp32 only (fp16 = black frames), NF4 for 8–12 GB GPUs.
 
 ## Data layout
+
+Everything persistent lives below one workspace so a production can be moved,
+backed up, or deleted as a unit. `mediaconductor workspace-layout --json`
+reports every resolved root and whether it escaped; `doctor` warns when one has.
 
 ```
 library/<project>/            source items; manga.json (machine-managed source record)
   01/panels/ 01/narration.json [01/intro.json] [01/transcript.json]
-audio/<project>/<item>/*.wav  per-panel narration; _items/ holds per-item tracks
+  01/panel_decisions.json     why each un-narrated panel is omitted (hash-bound)
+  rights.json                 source, permission basis, consent, safety scans
+  .mediaconductor/manga-reviews.json   hash-bound crop/narration/final-video approvals
+audio/<project>/<item>/*.wav  per-panel narration; each with a *.wav.json provenance sidecar
 audio_faded/<project>/<item>/*.wav  production render derivatives; raw TTS untouched
-output/<project>/             item videos + <project>_full.mp4
+output/<project>/             item videos + <project>_full.mp4 + quality/ reports
 work/                         scratch incl. jobs/ — video-clean-work clears it
+bgm/ vocal/                   user-owned licensed music and narrator references
+.mediaconductor/              tools/, cache/, state/, gitignored OAuth secrets
 ```
 
 Roots default from env (`MEDIACONDUCTOR_ITEMS_ROOT`/`MEDIACONDUCTOR_AUDIO_ROOT`/
@@ -111,7 +139,25 @@ dispatcher renders it; never `sys.exit` from library code). Note
   (`old/run_NNNN/`). `audio-takes-list/-restore` browse the archives.
   `video-clean-*` are the only sanctioned deleters and never touch `library/`.
 - **`load_narration()` (`video_pipeline/item_assets.py`) is the only
-  narration reader** — it alone knows `intro.json` prepending.
+  narration reader** — it alone knows `intro.json` prepending, and it validates
+  every entry through `video_pipeline/narration_contract.py` so no consumer
+  re-derives what a safe `image` value is. The contract is strict on purpose:
+  basenames only (no path separators, traversal, drive or UNC paths), resolved
+  containment inside `panels/`, case-insensitive filename *and stem*
+  uniqueness (audio is `<stem>.wav`), no unknown properties, bounded motion and
+  pause values. `workboard._narration_entries()` is the one deliberately
+  tolerant reader — the board answers "which stage is this item in", so a file
+  that needs one fix must still read as narrated.
+- **Every generated WAV carries a provenance sidecar** (`audio/provenance.py`):
+  normalized narration digest, beat/panel identity, engine, model, voice,
+  speaker-WAV digest, language, speed. A take is reused only when all of them
+  match the current contract; otherwise it is archived and regenerated. "Skip
+  if the file exists" silently shipped last week's sentence in last week's
+  voice, and nothing but watching the whole video could catch it.
+- **Every cropped panel is accounted for**: narrated, or carrying a hash-bound
+  omission decision from a fixed reason vocabulary (`panel_decisions.py`). The
+  previous "confirm none is a story panel" warning recorded nothing, so a
+  dropped story panel and a skipped credits page looked identical.
 - **Production manga renders use faded derivatives, not raw clip edges**:
   `audio_faded/` contains symmetric 8 ms fade-in/fade-out copies and `audio/`
   remains the recoverable TTS source. Keep `--audio-source raw` opt-in.

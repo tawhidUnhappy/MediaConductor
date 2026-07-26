@@ -107,8 +107,6 @@ jobs:
           "$backend" doctor --json | python -c "import json,sys; json.loads(sys.stdin.read().strip().splitlines()[-1]); print('doctor JSON ok')"
           python scripts/smoke_mcp.py "$backend" mcp
           python scripts/smoke_mcp.py "$backend" mcp --mode manga-video
-          python scripts/smoke_mcp.py "$backend" mcp --mode ai-story
-          python scripts/smoke_mcp.py "$backend" mcp --mode song-video
 
       - name: Package release archive
         shell: bash
@@ -151,14 +149,14 @@ jobs:
           body: |
             ## MediaConductor ${{ github.ref_name }}
 
-            MediaConductor is a CLI and MCP server for manga video, AI story,
-            and song video production. These archives contain the frozen
+            MediaConductor is a CLI and MCP server for manga, manhwa, and
+            webtoon recap-video production. These archives contain the frozen
             `mediaconductor` executable and do not require a system Python.
 
             AI models and media tools are intentionally not embedded. After
-            unpacking, run `mediaconductor modes`, then
-            `mediaconductor setup --mode <mode>` to provision only the selected
-            mode in isolated environments. A source install is also available:
+            unpacking, run `mediaconductor setup --mode manga-video` to
+            provision the isolated manga toolchain. A source install is also
+            available:
 
             `uv tool install git+${{ github.server_url }}/${{ github.repository }}.git`
 

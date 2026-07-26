@@ -72,7 +72,7 @@ mediaconductor" / wrong-paths failure.
 ### Step 2 — Provision binaries, tool envs and models
 
 ```bash
-uv run mediaconductor setup --mode <manga-video|ai-story|song-video>
+uv run mediaconductor setup --mode manga-video
 ```
 
 GPU-aware and profile-driven — what gets installed, in order:
@@ -85,11 +85,7 @@ GPU-aware and profile-driven — what gets installed, in order:
    system-wide.
 2. **Hardware detection** — NVIDIA GPU check picks the profile.
 3. **AI tool environments** — each in its own isolated `uv` env under
-   `.mangaeasy/tools/`, models included. With `--mode`, setup installs only
-   that pipeline: Manga Video uses Kokoro/IndexTTS/MAGI/DeepSeek/Z-Image; AI
-   Story uses Kokoro/IndexTTS/Z-Image; Song Video uses
-   ACE-Step/Demucs/WhisperX/Z-Image. Their environments and instructions stay
-   separate:
+   `.mangaeasy/tools/`, models included:
 
    | Tool env | Installed when | Role | Download budget |
    |---|---|---|---|
@@ -97,10 +93,6 @@ GPU-aware and profile-driven — what gets installed, in order:
    | `index-tts` | NVIDIA GPU | voice-cloning TTS (the recap voice) | ~6 GB |
    | `magi-v3` | NVIDIA GPU | panel detection for paged manga | ~4 GB |
    | `deepseek-ocr2` | NVIDIA GPU | panel OCR (`panel-transcript`) | ~7 GB |
-   | `z-image-turbo` | NVIDIA GPU | thumbnail/key-art generation | ~33 GB |
-   | `ace-step` | Song Video | generated song audio | model-dependent |
-   | `demucs` | Song Video | offline vocal separation | model-dependent |
-   | `whisperx` | Song Video | offline English lyric timing | model-dependent |
 
 4. **Readiness report** — the same data as `mediaconductor doctor --json`, plus
    a `MEDIACONDUCTOR_RESULT` line with per-tool ok/failed status.
@@ -108,12 +100,12 @@ GPU-aware and profile-driven — what gets installed, in order:
 Useful variants:
 
 ```bash
-mediaconductor setup --mode ai-story --dry-run # inspect one exact mode plan
-mediaconductor setup --minimal                 # core binaries only (fast)
-mediaconductor setup --all                     # every cataloged tool, GPU or not
-mediaconductor setup --mode song-video --skip z-image-turbo # repeatable skip
-mediaconductor setup --mode manga-video --skip-models        # envs now, weights later
-mediaconductor setup --mode ai-story --cpu  # or use --cuda to force the torch target
+mediaconductor setup --mode manga-video --dry-run  # inspect the exact plan
+mediaconductor setup --minimal                     # core binaries only (fast)
+mediaconductor setup --all                         # every cataloged tool, GPU or not
+mediaconductor setup --mode manga-video --skip deepseek-ocr2  # repeatable skip
+mediaconductor setup --mode manga-video --skip-models         # envs now, weights later
+mediaconductor setup --mode manga-video --cpu  # or --cuda to force the torch target
 ```
 
 Expect the full GPU profile to take tens of minutes on a fast connection —
@@ -202,8 +194,8 @@ produced for a real channel usually want:
 | model download interrupted / partial | re-run `mediaconductor setup` (resumes) |
 | `ffmpeg not found` in smoke-test | `mediaconductor bootstrap-tools`, re-check `doctor` |
 | GPU expected but `cuda: false` | check `nvidia-smi` works on the host; fix drivers, re-run `setup --cuda` |
-| no GPU at all | fine — CPU profile: TTS = Kokoro, encoding = libx264; `page-split`/`zimage` need `setup --all` and are slow on CPU |
-| disk pressure | `--skip z-image-turbo` saves ~33 GB; `--skip-models` defers the rest |
+| no GPU at all | fine — CPU profile: TTS = Kokoro, encoding = libx264; `page-split` needs `setup --all` and is slow on CPU |
+| disk pressure | `--skip deepseek-ocr2` saves ~7 GB; `--skip-models` defers the rest |
 | corporate proxy blocks Hugging Face | set `HTTPS_PROXY` before `setup`; caches stay in-tree (`.mangaeasy/`) |
 
 ### Where everything lands

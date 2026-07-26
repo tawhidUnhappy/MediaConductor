@@ -102,9 +102,9 @@ uv --project D:/MediaConductor run mediaconductor install-tool kokoro-82m
 (null = missing → run `bootstrap-tools`), `gpu_backend` (`cuda`/`mps`/`cpu`
 — the *machine's* capability, which is what installs and engine selection key
 on; the main env deliberately has no torch), `tools` (installed AI tools).
-Optional bigger tools: `magi-v3` (panel detection), `deepseek-ocr2` (OCR),
-`z-image-turbo` (text-to-image generation, ~33 GB). `index-tts` is the
-default full-pipeline TTS engine and is also a long-running download. All
+Optional bigger tools: `magi-v3` (panel detection), `deepseek-ocr2` (OCR
+cross-check). `index-tts` is the default full-pipeline TTS engine and is also a
+long-running download. All
 model/tool installs can take minutes, so stream the output.
 
 ## 3. Project anatomy
@@ -270,11 +270,15 @@ provisioning), `bootstrap-tools`, `install-tool <name>`, `tools`,
 `library-list`, `series-plan` / `series-mark-published` (fixed 12-per-video
 upload batches: what's next, what's published — see the recipe below), `mcp`.
 
-**External tools** — `index-tts`, `deepseek-ocr2`, `zimage` (Z-Image Turbo
-text-to-image: `uv --project D:/MediaConductor run mediaconductor zimage
---prompt "..." --output out.png --width
-1280 --height 720 [--count 4] [--seed N]`; prints `MEDIACONDUCTOR_RESULT` with
-the generated files; needs `install-tool z-image-turbo` once).
+**External tools** — `index-tts`, `tools` (where each isolated tool env
+resolves). OCR is reachable only through `panel-transcript`, which writes
+SHA-256-bound values into `<item>/transcript.json`.
+
+**Review and rights gates** — `manga-review` (crop | narration | final-video |
+check), `panel-decisions` (account for every un-narrated panel),
+`manga-rights` (init | check | show), `video-quality` (measure the encoded
+deliverable). TTS, rendering, joining, and upload refuse to run without current
+hash-bound records, and there is no bypass flag.
 
 **Video pipeline (the recommended workflow)** —
 `video` (all-in-one: audio → render → optional join/normalize/BGM),
@@ -334,11 +338,16 @@ uv --project D:/MediaConductor run mediaconductor narration-review-sheets --proj
 uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" --work-dir "$WORK" \
     --item-range 01-12 --tts auto --build-long-video --normalize-audio \
     --background-music <music>
-uv --project D:/MediaConductor run mediaconductor zimage --prompt-file thumb_prompt.txt --output thumb.png --count 4
-uv --project D:/MediaConductor run mediaconductor thumbnail-compose --base thumb_02.png --output final_thumb.png \
+uv --project D:/MediaConductor run mediaconductor video-quality --project-root "$PROJ" --output-root "$OUT" --json
+uv --project D:/MediaConductor run mediaconductor thumbnail-compose --base "$PROJ/01/panels/<approved>.jpg" --output final_thumb.png \
     --text "3-5 PUNCHY WORDS"
-uv --project D:/MediaConductor run mediaconductor youtube-upload --profile <profile> --video "$OUT/<P>/<P>_full.mp4" --title "..." \
-    --thumbnail final_thumb.png --json
+# Watch and listen to the whole video, then bind the approval to its exact bytes:
+uv --project D:/MediaConductor run mediaconductor manga-review final-video --project-root "$PROJ" --item-range 01-12 \
+    --video "$OUT/<P>/<P>_full.mp4" --reviewer <name> \
+    --rights-confirmed --voice-consent-confirmed --source-permission-confirmed
+uv --project D:/MediaConductor run mediaconductor manga-rights check --project-root "$PROJ"
+uv --project D:/MediaConductor run mediaconductor youtube-upload --profile <profile> --project-root "$PROJ" \
+    --video "$OUT/<P>/<P>_full.mp4" --title "..." --thumbnail final_thumb.png --json
 uv --project D:/MediaConductor run mediaconductor series-mark-published --project-root "$PROJ" --items 01-12 \
     --video-id <id>
 ```

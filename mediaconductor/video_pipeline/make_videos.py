@@ -3,8 +3,16 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from mediaconductor.reviews import enforce_production_reviews
 from mediaconductor.utils import emit_result
-from mediaconductor.video_pipeline.common import DEFAULT_AUDIO_ROOT, DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
+from mediaconductor.video_pipeline.common import (
+    DEFAULT_AUDIO_ROOT,
+    DEFAULT_OUTPUT_ROOT,
+    DEFAULT_PROJECT_ROOT,
+    DEFAULT_WORK_DIR,
+    item_dirs,
+    merge_item_selection,
+)
 from mediaconductor.video_pipeline.item_video_builder import VideoBuildConfig, build_item_videos
 
 
@@ -44,6 +52,16 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    # Repeated here, not only in `video`: rendering is the step that turns an
+    # unreviewed narration into a shippable artifact, so calling it directly
+    # (or through a background job) must hit the same gate.
+    selected = item_dirs(args.project_root.resolve(),
+                         merge_item_selection(args.items, args.item_range))
+    enforce_production_reviews(
+        args.project_root,
+        [item_dir.name for item_dir in selected],
+        stage="item rendering",
+    )
     output_dir = build_item_videos(
         VideoBuildConfig(
             project_root=args.project_root,

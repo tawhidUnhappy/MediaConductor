@@ -49,9 +49,19 @@ quiet.
 - [`common.py`](common.py) — roots/defaults, `item_dirs()`,
   `merge_item_selection()`, `expand_item_tokens()`, `chunk_list()` (shard for
   GPU workers + resume pruning). Other stages import selection helpers from here.
+- [`narration_contract.py`](narration_contract.py) — **the one narration
+  schema**. Basenames only, resolved containment inside `panels/`,
+  case-insensitive filename *and stem* uniqueness (audio is `<stem>.wav`), no
+  unknown properties, bounded motion/pause values. Every consumer validates
+  through here so none of them re-derives what a safe `image` value is.
 - [`item_assets.py`](item_assets.py) — **`load_narration(item_dir)` is the single
-  source of truth** for reading narration (handles `intro.json`). Never re-parse
-  `narration.json` elsewhere. Also `frame_aligned_duration()`.
+  source of truth** for reading narration (handles `intro.json`, and validates
+  through the contract). Never re-parse `narration.json` elsewhere. Also
+  `frame_aligned_duration()`.
+- [`quality_gate.py`](quality_gate.py) — `video-quality`: measures the
+  **encoded** deliverable (loudness, true peak, A/V drift, black/frozen frames,
+  silence, stale renders) and extracts frames for the readability pass a
+  detector cannot perform.
 - [`audio_takes.py`](audio_takes.py) — browse/restore archived audio takes
   (`audio-takes-list/restore`).
 

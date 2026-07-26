@@ -32,7 +32,7 @@ if errorlevel 1 (
 )
 
 echo ==^> MediaConductor is ready. Start with:
-echo       uv run mediaconductor modes        ^(choose a production mode^)
+echo       uv run mediaconductor modes        ^(show the manga-video catalog^)
 echo       uv run mediaconductor where --json ^(resolved paths + version^)
 echo       uv run mediaconductor mcp           ^(run the MCP router for an agent host^)
 echo.

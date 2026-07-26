@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from mediaconductor.defaults import default_speaker_wav
+from mediaconductor.reviews import enforce_production_reviews
 from mediaconductor.tools.external import python_command, resolve_tool_dir, tool_env
 from mediaconductor.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -63,8 +64,13 @@ def main() -> int:
     if not selected:
         print(f"[FATAL] No item folders found in {project_root}")
         return 1
-    # Validate the complete selection before any worker can archive audio,
-    # load a model, or generate a shard.
+    # Gate and validate the complete selection before any worker can archive
+    # audio, load a model, or generate a shard.
+    enforce_production_reviews(
+        args.project_root,
+        [item_dir.name for item_dir in selected],
+        stage="IndexTTS",
+    )
     for item_dir in selected:
         narration = load_narration(item_dir)
         validate_calm_narration(narration, item_dir)

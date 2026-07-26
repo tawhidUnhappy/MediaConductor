@@ -8,8 +8,15 @@ from mediaconductor import runtime
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from mediaconductor.audio.provenance import (
+    TtsContract,
+    archive_stale_take,
+    stale_reason,
+    write_provenance,
+)
+from mediaconductor.reviews import enforce_production_reviews
 from mediaconductor.tools.external import python_command, resolve_tool_dir, tool_env
-from mediaconductor.utils import LazyArchiveRunDir, archive_into_run
+from mediaconductor.utils import LazyArchiveRunDir
 from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
 from mediaconductor.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -26,6 +33,10 @@ from mediaconductor.video_pipeline.common import (
 
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+
+# Passed explicitly to the worker AND recorded in every provenance sidecar, so
+# the model a take claims and the model that produced it cannot drift apart.
+KOKORO_REPO_ID = "hexgrad/Kokoro-82M"
 
 
 def parse_args() -> argparse.Namespace:
@@ -108,11 +119,20 @@ def ordered_audio_paths(args: argparse.Namespace, selected_items: list[Path]) ->
         except Exception:
             continue
         for item in narration:
-            image_name = item.get("image") if isinstance(item, dict) else None
-            if not image_name:
-                continue
-            paths.append(audio_dir / f"{Path(image_name).stem}.wav")
+            paths.append(audio_dir / f"{Path(item['image']).stem}.wav")
     return paths
+
+
+def kokoro_contract(args: argparse.Namespace) -> TtsContract:
+    """The exact synthesis contract this run would use for every line."""
+    return TtsContract(
+        engine="kokoro",
+        model=KOKORO_REPO_ID,
+        voice=str(args.voice),
+        language=str(args.lang),
+        speed=float(args.speed),
+        settings={"split_pattern": str(args.split_pattern)},
+    )
 
 
 def build_manifest(
@@ -120,6 +140,7 @@ def build_manifest(
 ) -> tuple[list[dict[str, str]], int]:
     manifest: list[dict[str, str]] = []
     skipped = 0
+    contract = kokoro_contract(args)
 
     for item_dir in selected_items:
         narration = load_narration(item_dir)
@@ -133,32 +154,71 @@ def build_manifest(
             with ThreadPoolExecutor(max_workers=1) as executor:
                 list(
                     executor.map(
-                        lambda item, item_dir=item_dir: validate_panel(item_dir, item.get("image", "")),
+                        lambda item, item_dir=item_dir: validate_panel(item_dir, item["image"]),
                         narration[: args.prefetch],
                     )
                 )
 
         for idx, item in enumerate(narration, start=1):
-            image_name = item.get("image")
-            text = (item.get("narration") or item.get("text") or "").strip()
-            if not image_name or not text:
+            image_name = item["image"]
+            text = item["narration"].strip()
+            beat_id = item["beat_id"]
+            if not text:
                 raise ValueError(f"Bad narration entry {idx} in {item_dir / 'narration.json'}")
             validate_panel(item_dir, image_name)
             output_path = audio_dir / f"{Path(image_name).stem}.wav"
             if output_path.exists():
-                if not args.overwrite:
+                reason = stale_reason(
+                    output_path,
+                    contract=contract,
+                    narration=text,
+                    beat_id=beat_id,
+                    image=image_name,
+                )
+                if reason is None and not args.overwrite:
                     skipped += 1
                     continue
-                archive_into_run(output_path, archive_run_dir.dir, subdir=item_dir.name)
+                if reason is not None:
+                    print(f"  regenerating {output_path.name}: {reason}", flush=True)
+                archive_stale_take(output_path, archive_run_dir.dir, subdir=item_dir.name)
             manifest.append(
                 {
                     "label": f"{item_dir.name}:{idx:03d}/{len(narration):03d}",
                     "text": text,
                     "output": str(output_path),
+                    "image": image_name,
+                    "beat_id": beat_id,
                 }
             )
 
     return manifest, skipped
+
+
+def record_manifest_provenance(
+    manifest: list[dict[str, str]], contract: TtsContract
+) -> tuple[int, list[str]]:
+    """Write a provenance sidecar for every manifest entry the worker produced.
+
+    The Kokoro worker runs inside its own isolated tool env, so the sidecar is
+    written here, in the parent, and only for outputs that actually exist —
+    a worker that died halfway must not leave provenance claiming otherwise.
+    """
+    written = 0
+    missing: list[str] = []
+    for entry in manifest:
+        output = Path(entry["output"])
+        if not output.is_file():
+            missing.append(output.name)
+            continue
+        write_provenance(
+            output,
+            contract=contract,
+            narration=entry["text"],
+            beat_id=entry["beat_id"],
+            image=entry["image"],
+        )
+        written += 1
+    return written, missing
 
 
 def write_manifest(args: argparse.Namespace, manifest: list[dict[str, str]], suffix: str = "") -> Path:
@@ -184,6 +244,8 @@ def kokoro_worker_command(args: argparse.Namespace, manifest_path: Path) -> tupl
         str(worker),
         "--manifest",
         str(manifest_path),
+        "--repo-id",
+        KOKORO_REPO_ID,
         "--voice",
         args.voice,
         "--lang",
@@ -249,8 +311,14 @@ def main() -> int:
     if not selected_items:
         raise FileNotFoundError(f"No item folders selected under {project_root}")
 
-    # Fail before resume archives or model loading. This protects direct
-    # video-audio calls that did not run work-qa first.
+    # Fail before resume archives or model loading. The review gate is repeated
+    # here rather than only in `video`, so a direct call — or a background job
+    # wrapping one — cannot reach TTS around it.
+    enforce_production_reviews(
+        args.project_root,
+        [item_dir.name for item_dir in selected_items],
+        stage="Kokoro TTS",
+    )
     for item_dir in selected_items:
         narration = load_narration(item_dir)
         validate_calm_narration(narration, item_dir)
@@ -285,9 +353,17 @@ def main() -> int:
         )
         return 0
 
-    print(f"\nQueued {len(manifest)} audio file(s); skipped {skipped} existing file(s).", flush=True)
+    print(f"\nQueued {len(manifest)} audio file(s); skipped {skipped} current file(s).", flush=True)
     run_kokoro_workers_sharded(args, manifest)
-    print(f"\nGenerated {len(manifest)} audio file(s) with Kokoro.", flush=True)
+    written, missing = record_manifest_provenance(manifest, kokoro_contract(args))
+    print(f"\nGenerated {written} audio file(s) with Kokoro (provenance recorded).", flush=True)
+    if missing:
+        print(
+            f"[ERROR] {len(missing)} queued file(s) were never written: "
+            + ", ".join(missing[:10]) + ("…" if len(missing) > 10 else ""),
+            flush=True,
+        )
+        return 1
     return 0
 
 

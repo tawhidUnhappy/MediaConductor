@@ -142,12 +142,36 @@ def _transcript_progress(item_dir: Path) -> tuple[int, int]:
 
 
 def _narration_entries(item_dir: Path) -> list[dict]:
+    """Entries for *status purposes*, tolerant of a file that needs fixing.
+
+    The board answers "which stage is this item in", so a narration file that
+    exists but violates the contract must still read as *narrated* — otherwise
+    a dangling image name would report the item as "not narrated at all" and
+    send an agent to rewrite the whole script instead of fixing one entry.
+    ``narration-check`` and ``work-qa`` are what report the actual violation.
+    """
     if not (item_dir / "narration.json").is_file():
         return []
     try:
         return load_narration(item_dir)
-    except Exception:  # noqa: BLE001 — invalid narration reads as "not narrated"
-        return []
+    except Exception:  # noqa: BLE001 — fall back to shape-only below
+        pass
+    try:
+        return load_narration(item_dir, require_files=False)
+    except Exception:  # noqa: BLE001 — fall back to a raw read below
+        pass
+    entries: list[dict] = []
+    for filename in ("intro.json", "narration.json"):
+        path = item_dir / filename
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, list):
+            entries.extend(entry for entry in data if isinstance(entry, dict))
+    return entries
 
 
 def _rendered_video(output_root: Path, name: str, item_dir: Path) -> Path | None:

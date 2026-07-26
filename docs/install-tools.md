@@ -40,29 +40,9 @@ Common flags:
 checks every required model file and rejects empty payloads or inconsistent
 markers without contacting the network.
 
-- Revision-pinned installer snapshots: ACE-Step 1.5, Demucs, both WhisperX
-  snapshots, IndexTTS 2, DeepSeek-OCR 2, and Z-Image Turbo.
+- Revision-pinned installer snapshots: IndexTTS 2 and DeepSeek-OCR 2.
 - Downloaded on first use without an installer-recorded immutable revision:
   Kokoro 82M, MAGI v3, and optional Faster Whisper models.
-
-## ace-step (ACE-Step 1.5 song generation)
-
-The installer shallow-clones the official
-[`ace-step/ACE-Step-1.5`](https://github.com/ace-step/ACE-Step-1.5) source at
-commit `dce621408bee8c31b4fcf4811682eb9359e1bc94`, syncs its committed uv lock in
-an isolated Python 3.12 environment, copies MediaConductor's adapter, and
-downloads `ACE-Step/Ace-Step1.5` from Hugging Face at immutable revision
-`19671f406d603126926c1b7e2adc169acbcade22`. Readiness verifies the required
-DiT, 5 Hz language model, Qwen embedding model, VAE, and configuration files.
-
-```bash
-mediaconductor install-tool ace-step
-mediaconductor ace-step --prompt "cinematic synth pop, clear lead vocal" \
-  --lyrics-file lyrics.txt --output song.wav --duration 180 --seed 7
-```
-
-ACE-Step is GPU-oriented. It owns its upstream Torch stack and never shares a
-venv with Demucs, WhisperX, Z-Image, or the core application.
 
 ## index-tts (IndexTTS-2)
 
@@ -154,64 +134,6 @@ MediaConductor adds it to the tool's PATH automatically when present.
 
 Used by: `mediaconductor video` (the default engine on machines without an NVIDIA
 GPU, or when IndexTTS isn't set up), `mediaconductor video-audio`.
-
-## z-image-turbo (Z-Image Turbo image generation)
-
-Z-Image Turbo ([Tongyi-MAI/Z-Image-Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo),
-Apache-2.0) is installed as a managed environment: the installer writes an
-isolated `pyproject.toml` (torch matching your hardware, diffusers ≥ 0.36,
-transformers ≥ 4.51, accelerate, bitsandbytes on Windows/Linux), copies the
-`generate_zimage.py` adapter in, and downloads the **~33 GB** model into
-`z-image-turbo/model` at immutable revision
-`f332072aa78be7aecdf3ee76d5c247082da564a6`. `--skip-model` deliberately leaves
-the tool not ready; reinstall without that flag before production inference.
-
-```bash
-mediaconductor install-tool z-image-turbo
-mediaconductor zimage --prompt "..." --output out.png --width 1280 --height 720
-```
-
-It runs on 8–16 GB NVIDIA GPUs via automatic NF4 quantization (this is why
-bitsandbytes is a dependency), full bf16 on 16 GB+ GPUs and Apple Silicon,
-and fp32 on CPU (slow). See `docs/external-tools.md` for the strategy table
-and calling conventions.
-
-## demucs (offline vocal separation)
-
-The installer creates a dedicated uv environment for the maintained Demucs
-fork, copies `separate_demucs.py`, and downloads the exact pinned revision of
-`adefossez/HTDemucs-ft` into `models/htdemucs-ft/`. At runtime the adapter puts
-Hugging Face in offline mode and serves only the manifest and safetensors files
-from that local snapshot; it never resolves a floating Hub model.
-
-```bash
-mediaconductor install-tool demucs
-mediaconductor demucs --audio song.wav --output-dir stems
-```
-
-The output contract is always `stems/vocals.wav` and
-`stems/accompaniment.wav`. Only the provisioned fine-tuned quality model is
-exposed. If installation used `--skip-model`, Demucs intentionally fails with
-a reinstall instruction instead of downloading weights during a production
-run.
-
-## whisperx (offline English lyric timing)
-
-The isolated WhisperX setup downloads pinned local snapshots for
-`Systran/faster-whisper-large-v3` and `facebook/wav2vec2-base-960h`, plus the
-small NLTK sentence resource used by alignment. Normal English transcription
-and forced alignment therefore perform no runtime model lookup. Canonical
-lyrics are compared with the timed vocal evidence and always supply the final
-displayed spelling and line breaks.
-
-```bash
-mediaconductor install-tool whisperx
-mediaconductor whisperx --audio stems/vocals.wav --lyrics-file lyrics.txt --output-dir alignment --language en
-```
-
-Language-specific forced aligners are not interchangeable. The current
-production contract rejects non-English manifests until an appropriate pinned
-Wav2Vec2 CTC extension is added.
 
 ## Manual installs / custom locations
 

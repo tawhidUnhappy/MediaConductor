@@ -26,7 +26,7 @@ def test_plan_tools_auto_with_gpu_adds_gpu_tools():
 
 def test_plan_tools_minimal_and_skip():
     assert plan_tools("minimal", gpu=True, skip=set()) == []
-    assert "z-image-turbo" not in plan_tools("auto", gpu=True, skip={"z-image-turbo"})
+    assert "deepseek-ocr2" not in plan_tools("auto", gpu=True, skip={"deepseek-ocr2"})
 
 
 # ── download helpers ────────────────────────────────────────────────────────
@@ -113,29 +113,67 @@ def test_narration_check_clean(item):
     assert check_item(item)["ok"]
 
 
-def test_narration_check_flags_all_defect_classes(item):
+def test_narration_check_flags_empty_text(item):
     (item / "narration.json").write_text(json.dumps([
-        {"image": "a.jpg", "narration": "  "},       # empty text
-        {"image": "ghost.jpg", "narration": "hi"},   # dangling image
-    ]))                                              # b.jpg uncovered
+        {"image": "a.jpg", "narration": "  "},
+        {"image": "b.jpg", "narration": "hi"},
+    ]))
     report = check_item(item)
     assert not report["ok"]
-    # Uncovered panels are a WARNING, not a problem: skipping credits/banner
-    # panels is the documented correct workflow, and treating them as errors
-    # used to fail every correctly-produced project.
-    assert report["uncovered_panels"] == ["b.jpg"]
-    assert len(report["warnings"]) == 1
-    assert len(report["problems"]) == 2
+    assert any("non-empty text" in problem for problem in report["problems"])
 
 
-def test_narration_check_uncovered_alone_still_passes(item):
+def test_narration_check_flags_dangling_image(item):
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "ghost.jpg", "narration": "hi"},
+    ]))
+    report = check_item(item)
+    assert not report["ok"]
+    assert any("panel image not found" in problem for problem in report["problems"])
+
+
+def test_narration_check_fails_on_a_panel_nobody_decided_about(item):
+    """An un-narrated panel used to be an unfalsifiable warning.
+
+    "confirm none is a story panel" recorded nothing, so a dropped story panel
+    and a skipped credits page looked identical in every report.
+    """
     (item / "narration.json").write_text(json.dumps([
         {"image": "a.jpg", "narration": "one"},
-    ]))                                              # b.jpg uncovered only
+    ]))                                              # b.jpg unaccounted for
     report = check_item(item)
-    assert report["ok"]
+    assert not report["ok"]
     assert report["uncovered_panels"] == ["b.jpg"]
-    assert report["warnings"] and not report["problems"]
+    assert any("deliberate omission" in problem for problem in report["problems"])
+
+
+def test_narration_check_passes_once_the_omission_is_recorded(item):
+    from mediaconductor.panel_decisions import record_decisions
+
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "one"},
+    ]))
+    record_decisions(item, ["b.jpg"], reason="credit", reviewer="sam")
+    report = check_item(item)
+    assert report["ok"], report["problems"]
+    assert report["uncovered_panels"] == []
+    assert report["omitted_panels"][0]["reason"] == "credit"
+
+
+def test_recorded_omission_is_invalidated_when_the_panel_changes(item):
+    from mediaconductor.panel_decisions import record_decisions
+
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "one"},
+    ]))
+    record_decisions(item, ["b.jpg"], reason="decorative", reviewer="sam")
+    assert check_item(item)["ok"]
+
+    # A re-crop replaces the pixels the decision was made about.
+    (item / "panels" / "b.jpg").write_bytes(b"different art entirely")
+    report = check_item(item)
+    assert not report["ok"]
+    assert any("changed after the omission decision" in p for p in report["problems"])
 
 
 def test_narration_check_intro_json_is_covered_separately(item):
@@ -160,22 +198,29 @@ def test_narration_check_flags_intro_narration_overlap(item):
     ]))
     report = check_item(item)
     assert not report["ok"]
-    assert any("both intro.json and narration.json" in p for p in report["problems"])
+    assert any("duplicate image" in p for p in report["problems"])
 
 
-def test_narration_check_rejects_duplicate_image_and_audio_stem(item):
-    (item / "panels" / "a.png").write_bytes(b"x")
+def test_narration_check_rejects_duplicate_image(item):
     (item / "narration.json").write_text(json.dumps([
         {"image": "a.jpg", "narration": "one"},
         {"image": "a.jpg", "narration": "duplicate"},
-        {"image": "a.png", "narration": "same audio stem"},
     ]))
-
     report = check_item(item)
-
     assert not report["ok"]
     assert any("duplicate image" in problem for problem in report["problems"])
-    assert any("audio is keyed by image stem" in problem for problem in report["problems"])
+
+
+def test_narration_check_rejects_shared_audio_stem(item):
+    """Audio is `<stem>.wav`, so a.jpg and a.png would fight over one file."""
+    (item / "panels" / "a.png").write_bytes(b"x")
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "one"},
+        {"image": "a.png", "narration": "same audio stem"},
+    ]))
+    report = check_item(item)
+    assert not report["ok"]
+    assert any("<stem>.wav" in problem for problem in report["problems"])
 
 
 def test_narration_check_intro_overlap_uses_audio_stem(item):
@@ -190,7 +235,18 @@ def test_narration_check_intro_overlap_uses_audio_stem(item):
     report = check_item(item)
 
     assert not report["ok"]
-    assert any("both intro.json and narration.json" in p for p in report["problems"])
+    assert any("<stem>.wav" in p for p in report["problems"])
+
+
+def test_narration_check_reports_style_findings_as_warnings(item):
+    """Repetition is editorial: reported, but never a blocking problem."""
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "The panel shows him drawing his blade."},
+        {"image": "b.jpg", "narration": "He steps back into the rain, watching the gate."},
+    ]))
+    report = check_item(item)
+    assert report["ok"], report["problems"]
+    assert any("describes the artwork" in warning for warning in report["warnings"])
 
 
 # ── series batching ─────────────────────────────────────────────────────────

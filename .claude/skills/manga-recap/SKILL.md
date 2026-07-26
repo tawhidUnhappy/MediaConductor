@@ -28,13 +28,13 @@ generated output only with `video-clean-*` (everything else auto-archives to
 
 **Run long steps in the background, then wait — don't burn compute polling.**
 `download`, `page-split`/`webtoon-split`, `panel-transcript`, `video`,
-`zimage`, and `youtube-upload` each run for minutes to tens of minutes. Launch
+and `youtube-upload` each run for minutes to tens of minutes. Launch
 each as a background job and stop; let the harness's completion notification
 wake you instead of sleeping or re-checking in a loop. No harness backgrounding
-(e.g. MCP-only)? Use the built-in runner: `mediaconductor job-start <command>
-[args…]` returns a job id instantly; poll `mediaconductor job-status <id> --json`
+(e.g. MCP-only)? Use the built-in runner: `mediaconductor job-start --tool
+<tool> --arguments-json <object>` returns a job id instantly; poll `mediaconductor job-status <id> --json`
 (status/progress/result; reports `orphaned` if the machine slept). GPU tools
-(MAGI, DeepSeek-OCR, IndexTTS, Z-Image) block-buffer stdout, so their logs look
+(MAGI, DeepSeek-OCR, IndexTTS) block-buffer stdout, so their logs look
 empty until the end — judge health from filesystem signals (growing
 panel/transcript counts, output files appearing, `nvidia-smi`), not by tailing
 the log. Only foreground the quick `--json`/validation commands.
@@ -276,15 +276,15 @@ Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
 
 ## 6. Thumbnail (1280×720)
 
-1. Generate key art (style rules and the platform-safe prompt shape are in
-   `docs/thumbnail.md` — visibly adult, fully clothed, suggestive-ceiling,
-   no text in the image):
-   `mediaconductor zimage --prompt-file thumb_prompt.txt --output thumb.png
-   --width 1280 --height 720 --count 4`
-2. Open all variants, pick the best (faces and hands intact).
+1. Pick base art from the **approved source panels** (selection rules in
+   `docs/thumbnail.md`). Generated key art is not used: it promises art the
+   video does not contain. The panel must be listed in `rights.json` under
+   `thumbnail_sources`.
+2. Compose 2-3 candidates, open each at mobile size, pick the best (faces and
+   speech bubbles intact, nothing clipped by the frame edge).
 3. Add text furniture — 1–3 blocks, 3–5 punchy words each, highlighting one
    shocking fact from the batch:
-   `mediaconductor thumbnail-compose --base thumb_03.png --output final_thumb.png
+   `mediaconductor thumbnail-compose --base <approved-panel>.jpg --output final_thumb.png
    --text "HE ATE A GOD?!" --text "CH 1-12"`
    (full control via `--spec` JSON: blocks/arrows/border). Make the markup
    read hand-placed: tilt the big hook block (`"rotate": -3…-5`), use the

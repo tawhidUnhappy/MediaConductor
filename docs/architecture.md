@@ -32,9 +32,8 @@ The default workspace root is the current working directory. Set
 
 ## External tools
 
-Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2, and Z-Image Turbo can each keep their
-own Python, CUDA, Torch, and Transformers dependencies as isolated `uv`
-projects:
+Kokoro, IndexTTS, MAGI, and DeepSeek-OCR 2 can each keep their own Python,
+CUDA, Torch, and Transformers dependencies as isolated `uv` projects:
 
 ```text
 <install folder>/.mangaeasy/tools/
@@ -42,7 +41,6 @@ projects:
   index-tts/
   magi-v3/
   deepseek-ocr2/
-  z-image-turbo/
 ```
 
 This avoids dependency conflicts while still allowing full GPU acceleration.

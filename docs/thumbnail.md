@@ -1,46 +1,75 @@
 # Thumbnail Guide
 
-Use **Z-Image Turbo** for generated manga/manhwa recap thumbnails. It installs
-as an isolated tool and auto-selects the best strategy for the detected
-hardware (CUDA, Apple Silicon MPS, or CPU):
+Thumbnails are composed from **approved source panels**, not from generated
+art. That is the same rule the video follows: the channel's value is the actual
+comic, and a generated cover promises art the video does not contain — which is
+both a thumbnail-policy problem and a straightforward disappointment for the
+viewer who clicks.
 
 ```bash
-mediaconductor install-tool z-image-turbo
-mediaconductor zimage --prompt-file thumb_prompt.txt --output thumbnail_base.png \
-    --width 1280 --height 720 --count 4
+mediaconductor thumbnail-compose \
+  --base library/<P>/01/panels/01_014_02.jpg \
+  --output output/<P>/thumb.png \
+  --text "HE WAS THE WEAKEST" --text "UNTIL THE GATE OPENED"
 ```
 
-For the channel style, write a platform-safe, high-energy character-tension
-prompt: glossy anime/manhwa key art, visibly adult characters, expressive
-reactions, a dramatic camera angle, and a clear emotional hook. Keep it
-YouTube-safe and faithful to the source:
+`--base` must be a panel the crop review already approved, and it has to be
+listed in `rights.json` under `thumbnail_sources` — `manga-rights check` fails
+closed without it.
 
-- Every character must be visibly adult and fully clothed.
-- Suggestive fanservice is the ceiling: no nudity, transparent clothing,
-  explicit pose, sexual act, or minor-coded character.
-- Use the video's actual characters, outfits, power visuals, and setting
-  instead of a generic template.
-- Use two- or three-character tension: one shocked/flustered/blushing, one
-  calm/smug/powered-up.
-- Do not put text, logos, or watermarks in the generated image; add those
-  afterward with `mediaconductor thumbnail-compose`.
+## Composition
 
-Prompt shape:
+1280×720, built from base art + bold stroked text blocks (rotate/shadow
+supported) + fat outlined block-arrows + a thin white inset border. Prefer
+`--spec-json` for full control, inline, with no scratch file:
 
-```text
-glossy anime/manhwa key art, visibly adult [character A] blushing with wide
-sparkling eyes and a flustered expression, fully clothed form-fitting [story
-outfit], beside visibly adult [character B] calm and confident with a faint
-smirk, [actual story setting] background softly blurred, dramatic low-angle
-shot, saturated cyan and gold lighting, highly detailed, cinematic, no text,
-no logo, no nudity, no transparent clothing
+```bash
+mediaconductor thumbnail-compose --base panel.jpg --output thumb.png --spec-json '{
+  "blocks": [
+    {"text": "HE WAS THE WEAKEST", "x": 40, "y": 60, "size": 96, "rotate": -4,
+     "fill": "#FFE600", "shadow": true},
+    {"text": "UNTIL THE GATE OPENED", "x": 40, "y": 190, "size": 72}
+  ],
+  "arrows": [{"from": [520, 300], "to": [760, 380], "width": 26}]
+}'
 ```
 
-After generation, pick the best of four variants and add thumbnail furniture:
-1-3 short text blocks, black stroke, yellow/white fills, speech-tail triangles,
-one arrow if it clarifies the reveal, and a thin white inset border. Always
-inspect the final image at full size before upload, especially faces/hands,
-cropped speech bubbles, and anything that could read as explicit or minor-coded.
+Tilt the big hook block a few degrees and keep the arrows chunky, so the markup
+reads hand-placed rather than templated. The bundled `edosz.ttf` brush face is
+available as `--font` for a manga-styled block; the default candidates are
+Impact/Arial Bold/DejaVu Sans Bold.
+
+## Candidate selection is a human step
+
+Compose several candidates from approved panels and choose deliberately:
+
+- **One to three focal characters.** A crowd at 320×180 is a smudge.
+- **One clear conflict or contrast** — the thing the title promises.
+- **Two to four words maximum** if text is included, at a size that survives a
+  phone-sized render. Check it at mobile scale, not at full size.
+- **No face or text occlusion**: the duration badge sits bottom-right, so keep
+  the payload out of that corner.
+- **Title and thumbnail must agree.** A thumbnail implying a beat the video does
+  not contain is a misleading thumbnail regardless of intent.
+- **No sexual or gore emphasis**, and never a sexualized minor — most recap
+  source material has teenage leads, so this is a live constraint, not a
+  formality. `manga-rights check` requires those scans to be recorded clear.
+
+Open every candidate at full size before uploading, especially faces, cropped
+speech bubbles, and anything that could read as explicit or minor-coded.
+`mediaconductor youtube-thumbnail` replaces a thumbnail on an existing video
+without re-uploading, so an unsatisfying choice is cheap to fix — a published
+misleading one is not.
+
+## Titles
+
+Generate several truthful candidates from the approved story beats, then pick:
+
+- protagonist status → reversal or unusual power → stakes → **one** curiosity gap
+- no keyword soup, no misleading capitalization
+- every claim in the title must be supported by beats that appear in the video
 
 For the full production workflow, see
-[recap-video-playbook.md](recap-video-playbook.md#phase-9--thumbnail-1280720).
+[recap-video-playbook.md](recap-video-playbook.md#phase-9--thumbnail-1280720),
+and [manga-quality-design.md](manga-quality-design.md) for where this sits in
+the review model.

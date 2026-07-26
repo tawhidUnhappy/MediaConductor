@@ -1,6 +1,6 @@
 # Installing MediaConductor
 
-MediaConductor is a CLI and MCP server for manga video, AI story, and song
+MediaConductor is a CLI and MCP server for manga, manhwa, and webtoon recap
 video production. These are the three supported installation paths.
 
 ---
@@ -71,23 +71,22 @@ uv run pyinstaller packaging/mediaconductor.spec
 
 ## First-run setup
 
-Select one mode, then install only that mode's isolated dependencies
-(details in [setup.md](setup.md)):
+Install the isolated dependencies (details in [setup.md](setup.md)):
 
 ```bash
 mediaconductor modes
-mediaconductor setup --mode ai-story  # or manga-video / song-video
+mediaconductor setup --mode manga-video
 ```
 
 It vendors the core binaries (ffmpeg/uv/git-lfs), then installs the AI tool
-envs + models that fit the machine: Kokoro TTS always; IndexTTS, MAGI v3,
-DeepSeek-OCR 2 and Z-Image Turbo when an NVIDIA GPU is present. `--minimal`,
-`--all`, `--skip <tool>`, `--dry-run` variants; safe to re-run (resumes).
+envs + models that fit the machine: Kokoro TTS always; IndexTTS, MAGI v3, and
+DeepSeek-OCR 2 when an NVIDIA GPU is present. `--minimal`, `--all`,
+`--skip <tool>`, `--dry-run` variants; safe to re-run (resumes).
 
 Prefer picking pieces yourself?
 
 ```bash
-mediaconductor doctor --mode ai-story --json
+mediaconductor doctor --mode manga-video --json
 mediaconductor bootstrap-tools
 mediaconductor install-tool kokoro-82m
 mediaconductor install-tool index-tts
