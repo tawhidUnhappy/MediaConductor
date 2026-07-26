@@ -461,7 +461,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "run_full_pipeline": (
         "video",
         "The all-in-one pipeline: audio -> fade -> render -> optional join/BGM/final normalize -> validate. VERY "
-        "LONG-RUNNING — prefer job_start. Requires confirmed manual crop/narration review. "
+        "LONG-RUNNING — prefer job_start. Requires current crop/narration review records. "
         "Prefer the single-step tools when iterating.",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR, "items": _ITEMS,
          "tts": {"type": "string", "enum": ["auto", "kokoro", "indextts"]},
@@ -692,13 +692,13 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "manga_review": (
         "manga-review",
-        "Record and check the hash-bound human reviews production depends on. 'crop' approves "
+        "Record and check the hash-bound reviews that production depends on. 'crop' approves "
         "the exact source pages and panel crops, 'narration' approves the exact panels plus "
         "narration.json/intro.json, 'final-video' approves one exact MP4 together with the "
         "rights, voice-consent, and source-permission acknowledgements, and 'check' reports "
         "whether those records still match the current bytes. Any change to the inputs "
         "invalidates the approval — a boolean is never accepted as evidence that a review "
-        "happened.",
+        "happened. Reviews can be recorded by a human or an LLM agent.",
         {"action": {"type": "string", "enum": ["crop", "narration", "final-video", "check"],
                     "description": "Which review to record, or 'check' to verify currency."},
          "project_root": _PROJECT_ROOT, "items": _ITEMS,

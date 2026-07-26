@@ -264,6 +264,7 @@ def qa_main() -> int:
         print(json.dumps({
             "ok": errors == 0,
             "machine_ok": errors == 0,
+            "review_required": manual_reviews > 0,
             "manual_review_required": manual_reviews > 0,
             "manual_reviews": manual_reviews,
             "errors": errors,
@@ -286,7 +287,7 @@ def qa_main() -> int:
                 else "open the listed source/crop/narration evidence"
             )
             print(
-                f"MANUAL REVIEW REQUIRED — {manual_reviews} visual review gate(s); "
+                f"REVIEW REQUIRED — {manual_reviews} visual review gate(s); "
                 f"{review_hint} before production."
             )
     return 0 if errors == 0 else 1

@@ -144,6 +144,16 @@ and `webtoon-cutcheck`. The default is `download`.
    <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work --output-root D:/MediaProjects/review/narration
    ```
 
+
+7. Read [narration.md](narration.md). Write one grounded
+   `<chapter>/narration.json`, structurally check it, render semantic review
+   sheets, and inspect every sheet:
+
+   ```bash
+   <mc> narration-check --project-root D:/MediaProjects/library/example --items 01 --json
+   <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work --output-root D:/MediaProjects/review/narration
+   ```
+
    Open every original crop at readable/full resolution while reviewing every
    line. Fix incorrect panel descriptions, dialogue meaning, speaker
    attribution, chronology, and spoken phrasing; treat OCR disagreements as a
@@ -151,12 +161,8 @@ and `webtoon-cutcheck`. The default is `download`.
    connect already-established cause, choice, and consequence, keep pronouns
    clear, vary sentence openings, and avoid robotic panel-by-panel inventory.
    It must not invent motives, facts, dialogue, or future knowledge. Rerun both
-   checks after every edit.
-
-   If you cannot read panel images, do not infer narration from OCR alone.
-   Hand the item to a vision-capable agent or human and leave an exact
-   `work-note --topic handoff --add "..."` describing completed crop review,
-   remaining items, and any cast or speaker uncertainty.
+   checks after every edit. Before proceeding to rendering, record crop and narration
+   reviews using `manga-review crop` and `manga-review narration` with your agent identity.
 
 8. Build using explicit roots. This complete foreground form is useful only
    when the harness can keep a long task alive:
@@ -174,8 +180,8 @@ and `webtoon-cutcheck`. The default is `download`.
 
    `job-start <cli-command> [args...]` remains accepted for existing scripts,
    but `--tool/--arguments-json` is the typed, schema-validated form published
-   by `commands --json --full` and MCP. Set `manual_review_confirmed` only after
-   the source/crop/narration visual pass above. Keep licensed music below
+   by `commands --json --full` and MCP. Ensure crop/narration review records are
+   recorded before running. Keep licensed music below
    narration and re-render after any changed panel, narration, or audio input.
 
    Production defaults to separate `audio_faded/<project>/...` derivatives:
@@ -198,12 +204,10 @@ and `webtoon-cutcheck`. The default is `download`.
    ```
 
    `video-validate` is a structural gate (coverage, streams, duration), not a
-   complete media review. Before publishing, watch and listen to the complete
-   final video once at normal speed, checking every narration-to-panel pairing,
+   complete media review. Before publishing, validate the
+   final video, checking narration-to-panel pairing,
    crop readability, pacing, pronunciation, transition, and audio boundary.
-   Also inspect representative start/middle/end frames, audit faded WAV
-   boundaries for edge clicks, and measure the final complete mix at
-   approximately −14 LUFS with true peak no higher than −1.5 dBTP.
+   Record the final video review using `manga-review final-video`.
 
    Generate exact, ready-to-paste YouTube item timestamps from the rendered
    videos rather than adding durations manually:
@@ -213,18 +217,6 @@ and `webtoon-cutcheck`. The default is `download`.
    ```
 
 10. Create and visually inspect a thumbnail. Confirm source, music, voice, and
-   upload rights. Only on an explicit publish request, list profiles, verify
-   the intended channel with `youtube-status --profile <name> --verify --json`,
-   pass the same `--profile <name>` to the upload, and record the returned
-   profile, channel id, and video id with `series-mark-published`.
-   In MCP mode, set `final_video_review_confirmed` only after the complete
-   normal-speed final-video review in step 9.
-
-   For a replacement, default to upload new → verify → delete old. Delete-first
-   is irreversible and allowed only when the user explicitly requests that
-   order. Before deleting, verify the exact profile, live channel id, and old
-   video id/title with `youtube-status` and `youtube-list`; preview deletion,
-   repeat it with `--confirm --json`, and verify the id is gone. Upload the
    corrected file using the same profile, replace the matching publish record
    (including profile/channel/replaced id when supported), then verify both the
    YouTube listing and `series-plan --json`.

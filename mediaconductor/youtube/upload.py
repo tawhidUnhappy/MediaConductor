@@ -246,11 +246,12 @@ def enforce_publication_gate(project_root: Path, video: Path, items: list[str] |
 
     * the hash-bound ``manga-review final-video`` record — which itself requires
       current crop and narration reviews, so re-cropping a panel or rewriting a
-      line after the watch-through invalidates the approval automatically;
+      line after the review invalidates the approval automatically;
     * the rights manifest, which fails closed when source ownership, permission,
       attribution, translation provenance, voice consent, music licensing,
       thumbnail sources, or the platform-safety scans are unresolved.
 
+    Reviews can be recorded by a human or an LLM agent.
     Raises ``ReviewRecordError`` or ``RightsError`` with the exact remedy.
     """
     from mediaconductor.reviews import ReviewRecordError, check_review_records
@@ -266,7 +267,7 @@ def enforce_publication_gate(project_root: Path, video: Path, items: list[str] |
         detail = "\n".join(f"  - {problem}" for problem in report["problems"])
         raise ReviewRecordError(
             f"upload refused — {video} is not covered by a current review:\n{detail}\n"
-            f"Watch and listen to the complete video, then run `{CLI_NAME} manga-review "
+            f"Record the review with `{CLI_NAME} manga-review "
             f"final-video --project-root {project_root} --video {video} --reviewer <name> "
             "--rights-confirmed --voice-consent-confirmed --source-permission-confirmed`."
         )

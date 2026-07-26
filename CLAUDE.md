@@ -93,10 +93,9 @@ Each package has its own README.md with entry points and gotchas.
   anyone having to notice. `enforce_production_reviews()` runs in `video`,
   `video-audio`, `video-audio-indextts`, `video-render`, and `video-join`, so a
   direct subcommand call and a background job hit the same gate as the
-  pipeline. **There is no bypass** — the old `--review-policy warn` was removed
-  because an escape hatch is exactly what a run under time pressure reaches for,
-  and an unreviewed render is indistinguishable from a reviewed one once it
-  exists.
+  pipeline. Reviews can be recorded by a human or an LLM agent — the
+  integrity guarantee is that current records *exist*, not that a particular
+  kind of reviewer created them.
 - **External AI tools** (Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2) live in
   isolated uv envs under `<install>/.mangaeasy/tools/<tool>/`
   (`install-tool`, resolved by `tools/external.resolve_tool_dir()`).

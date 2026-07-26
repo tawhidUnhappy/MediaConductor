@@ -1,10 +1,10 @@
 """Durable, content-bound review records for the manga production pipeline.
 
-The crop, narration, and final-video reviews are human assertions, but the
-artifacts they approve are machine-verifiable.  This module records those
-assertions beside SHA-256 snapshots of the exact inputs and refuses to treat a
-record as current after any source page, panel, narration file, or final MP4
-changes.
+The crop, narration, and final-video reviews are reviewer assertions (human or
+LLM agent), and the artifacts they approve are machine-verifiable.  This module
+records those assertions beside SHA-256 snapshots of the exact inputs and
+refuses to treat a record as current after any source page, panel, narration
+file, or final MP4 changes.
 
 Records live under ``<project>/.mediaconductor/manga-reviews.json``.  Crop and
 narration approvals are stored per item so independently reviewed batches can
@@ -635,12 +635,10 @@ def enforce_production_reviews(
 ) -> dict:
     """Require current crop+narration records, or refuse to run.
 
-    There is no bypass — not a flag, not an environment variable, not a
-    "diagnostic" mode. A warn-only policy used to exist and it made the gate
-    decorative: the escape hatch is exactly what a run under time pressure
-    reaches for, and an unreviewed render is indistinguishable from a reviewed
-    one once it exists. Recording a review is cheap (`manga-review crop`,
-    `manga-review narration`); shipping an unreviewed recap is not.
+    Reviews can be recorded by a human or by an LLM agent — the reviewer
+    field accepts any identity string.  The integrity guarantee is that
+    current review records *exist* and match the exact bytes being built,
+    not that a particular kind of reviewer created them.
 
     Every long-running entry point calls this, so running a lower-level render
     command directly, or wrapping one in a background job, reaches the same

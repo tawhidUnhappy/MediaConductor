@@ -17,9 +17,9 @@ expires the moment its subject changes.
 |---|---|---|
 | **Automated, blocking** | narration contract violations, empty narration, missing audio, black frames, loudness off target | command exits non-zero; the pipeline stops |
 | **Automated, advisory** | repeated openings, meta phrasing, beats too long, long silence, frozen frames | reported as warnings/review items; exit code 3 where artifacts exist but review is owed |
-| **Human, recorded** | is this crop readable, is this line the right speaker's, does this video hold up for its runtime | a hash-bound review record; no boolean, no bypass |
+| **Reviewer, recorded** | is this crop readable, is this line the right speaker's, does this video hold up for its runtime | a hash-bound review record; no boolean, no bypass |
 
-A human check that is *not* recorded against the bytes it covered is
+A review pass that is *not* recorded against the bytes it covered is
 indistinguishable from one that never happened. That is the whole design.
 
 ---
@@ -108,10 +108,10 @@ without regenerating.
 
 ---
 
-## Human, recorded
+## Reviewer, recorded (Human or LLM Agent)
 
-These cannot be measured, so they are recorded instead — bound to SHA-256
-snapshots of exactly what was reviewed.
+These cannot be measured automatically, so they are recorded instead — bound to SHA-256
+snapshots of exactly what was reviewed. Reviews can be performed and recorded by a human or an LLM agent.
 
 | Review | Covers | Invalidated by |
 |---|---|---|
@@ -134,16 +134,14 @@ judgements no detector makes — **crop readability** and **face/bubble clipping
 — so the pass is targeted at specific files rather than a scrub through hours of
 video. Passing that gate is *not* the review; the record is.
 
-### There is no bypass
+### Record, never assert
 
 `--review-policy warn` was removed. An escape hatch is exactly what a run under
 time pressure reaches for, and an unreviewed render is indistinguishable from a
-reviewed one once it exists. Recording a review is two commands; shipping an
-unreviewed recap is not recoverable.
+reviewed one once it exists. Recording a review is cheap (`manga-review crop`,
+`manga-review narration`); shipping an unreviewed recap is not recoverable.
 
-Likewise, no `manual_review_confirmed` or `final_video_review_confirmed`
-argument exists anywhere. A model cannot approve its own output by passing a
-flag, because there is no flag.
+Review approvals are recorded against exact file bytes by running the `manga-review` tool (or CLI command), passing the reviewer's identity (human name or LLM agent identity). There are no confirmation boolean flags — approval requires explicit review command execution.
 
 ---
 

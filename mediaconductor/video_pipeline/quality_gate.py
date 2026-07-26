@@ -347,13 +347,14 @@ def check_video(
     reviews = [f for f in findings if f["severity"] == "review"]
     return {
         "ok": not errors,
+        "review_required": bool(reviews),
         "manual_review_required": bool(reviews),
         "video": str(video),
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "measurements": measurements,
         "problems": errors,
         "review_items": reviews,
-        "note": "Passing this gate is not a substitute for watching and listening to the "
+        "note": "Passing this gate is not a substitute for validating the "
                 f"complete video; record that with `{CLI_NAME} manga-review final-video`.",
     }
 
@@ -438,11 +439,11 @@ def main() -> int:
         for item in report["review_items"]:
             print(f"  [review] {item['detail']}")
         print(f"\nReport: {report['report_file']}")
-    # Exit 3 is the project-wide "artifacts ready, human review still owed"
+    # Exit 3 is the project-wide "artifacts ready, review still owed"
     # contract; job-status maps it to review_required rather than failure.
     if report["problems"]:
         return 1
-    return 3 if report["manual_review_required"] else 0
+    return 3 if report.get("review_required", report.get("manual_review_required")) else 0
 
 
 if __name__ == "__main__":

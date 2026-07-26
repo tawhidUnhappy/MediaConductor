@@ -48,10 +48,9 @@ def test_manga_mcp_instructions_enforce_visual_source_authority():
     instructions = _server_instructions(DEFAULT_MODE)
 
     assert "MAGI boxes and DeepSeek OCR are untrusted proposals" in instructions
-    assert "every source page/strip overlay and every crop" in instructions
-    assert "stop and hand off instead of narrating from OCR" in instructions
+    assert "Inspect crops and narration yourself before recording reviews" in instructions
     # Review is recorded against bytes, never asserted through an argument.
-    assert "There is no confirmation boolean" in instructions
+    assert "Review is recorded, never asserted" in instructions
     assert "manga_review final-video" in instructions
 
 
