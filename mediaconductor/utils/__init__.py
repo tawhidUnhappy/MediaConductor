@@ -9,9 +9,9 @@ from tempfile import NamedTemporaryFile
 
 
 def emit_result(**payload) -> None:
-    """Print the machine-parsable success marker line.
+    """Print the machine-parsable result marker line.
 
-    Generation commands end a successful run with exactly one
+    Artifact-producing commands end a completed or review-required run with one
     ``MEDIACONDUCTOR_RESULT {...json...}`` line so scripts and AI agents can find
     the produced files without scraping human log text — same family as the
     ``MEDIACONDUCTOR_PROGRESS n/m`` and ``MEDIACONDUCTOR_OPEN_URL`` markers. Keep the

@@ -150,15 +150,18 @@ until mediaconductor work-qa --project-root library/<P> --items 07 --errors-only
 done
 ```
 
-- Exit 0 = machine-clean; exit 1 = problems remain. Problems come in
-  pipeline order, so fixing the first one is always safe.
+- Exit 0 and `ok: true` mean machine-clean only; exit 1 means machine errors
+  remain. Problems come in pipeline order, so fixing the first one is safe.
+  Always inspect `manual_review_required` separately before production.
 - `--max-problems` (default 25) keeps the list inside a small context
   window; fix, re-run, the next slice appears.
-- `severity: "review"` items are the checks that need **eyes** (crop verify
-  sheets, narration review sheets). They never block the loop — resolve them
-  by Reading the sheet files listed in the problem, not by retrying.
-  Semantic narration QA (right speaker, one beat per panel) stays a
-  vision-pass job: `mediaconductor narration-review-sheets` then Read every sheet.
+- `severity: "review"` items are the checks that need **eyes** (source-page
+  overlays, full-resolution crops, and narration review sheets). They do not
+  change the machine-loop exit code. A vision-capable reviewer must open every
+  listed artifact and original panel; detector confidence, OCR agreement,
+  contact sheets, or another retry cannot approve them. Semantic narration QA
+  (right speaker, one beat per panel) stays a vision-pass job:
+  `mediaconductor narration-review-sheets`, then read every sheet and original.
 - `severity: "info"` = normal-but-worth-confirming (e.g. uncovered
   credits/banner panels).
 
@@ -180,8 +183,9 @@ Each category comes with its reuse hint — the important ones:
   overwritten takes are archived — `mediaconductor audio-takes-list` /
   `mediaconductor audio-takes-restore` bring an old take back without
   regenerating.
-- **transcripts** (`<item>/transcript.json`) mean any chapter can be
-  re-narrated without re-running OCR.
+- **transcripts** (`<item>/transcript.json`) are optional, untrusted OCR
+  cross-evidence. Reuse a row only while its `panel_sha256` still matches the
+  current crop; consumers suppress stale or legacy-unbound OCR automatically.
 - **music beds** are cached by content hash; `mediaconductor video-add-bgm`
   reuses them automatically.
 

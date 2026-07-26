@@ -63,12 +63,14 @@ MANGA_COMMANDS = frozenset({
 
 MANGA_TOOLS = frozenset({
     "library_list", "download", "style_detect", "webtoon_split",
-    "page_split", "panel_transcript", "series_plan",
+    "webtoon_cutcheck", "webtoon_override", "panels_remap",
+    "page_split", "panel_transcript", "deepseek_ocr2", "series_plan",
     "series_mark_published", "video_check", "narration_check",
+    "narration_review_sheets", "narration_edit", "audio_audit",
     "generate_audio", "render_videos", "build_long_video", "add_bgm",
     "run_full_pipeline",
     "video_validate", "video_chapters", "work_status", "work_claim", "work_note", "work_todo", "work_qa",
-    "work_artifacts", "generate_image",
+    "work_artifacts", "generate_image", "thumbnail_compose",
 })
 
 STORY_COMMANDS = frozenset({"story-init", "story-check", "story-build"})

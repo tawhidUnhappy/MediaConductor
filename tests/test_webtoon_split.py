@@ -5,10 +5,16 @@ mega-panels at quiet rows, rescuing content-bearing gaps, and manual range
 overrides. All operate on plain lists + numpy arrays — no image files needed.
 """
 
-import numpy as np
+from types import SimpleNamespace
 
+import numpy as np
+from PIL import Image
+
+import mediaconductor.panels.webtoon as webtoon_module
 from mediaconductor.panels.webtoon import (
+    _split_exit_code,
     apply_range_overrides,
+    automatic_full_source_requires_override,
     auto_split_ranges,
     band_energy,
     find_content_gaps,
@@ -191,3 +197,107 @@ def test_no_forced_flag_when_cut_lands_in_real_gutter():
         [(0, height)], band, WIDTH, target_height=2000)
     assert forced == []
     assert 2050 <= cuts[0] <= 2200
+
+
+def test_webtoon_process_report_always_requires_manual_review(tmp_path, monkeypatch):
+    item_dir = tmp_path / "project" / "01"
+    source = item_dir / "download"
+    source.mkdir(parents=True)
+    Image.new("RGB", (100, 100), "white").save(source / "001.png")
+    verify_dir = tmp_path / "work" / "webtoon_verify" / "project"
+    verify_dir.mkdir(parents=True)
+    (verify_dir / "01_sheet_99.png").write_bytes(b"stale")
+    (verify_dir / "01_strip_99.png").write_bytes(b"stale")
+    args = SimpleNamespace(
+        source_subdir="download",
+        panels_subdir="panels",
+        sort="numeric",
+        force_style=True,
+        config=None,
+        device="cpu",
+        energy_threshold=22.0,
+        max_ratio=100.0,
+        target_height=1300,
+        min_segment=20,
+        cut_window=20,
+        prefix_template="ch{item}_",
+    )
+    monkeypatch.setattr(
+        webtoon_module, "_recursive_ranges", lambda _image, _config, _device: [(0, 100)]
+    )
+
+    report = webtoon_module.process_item(item_dir, args, {}, verify_dir)
+
+    assert report["status"] == "ok"
+    assert report["review_required"] is True
+    assert report["panels"] == 0
+    assert "automatic-full-source-strip" in report["suspects"]
+    assert not (item_dir / "panels" / "ch01_001.jpg").exists()
+    assert report["verify_images"]
+    assert not (verify_dir / "01_sheet_99.png").exists()
+    assert not (verify_dir / "01_strip_99.png").exists()
+
+
+def test_webtoon_explicit_override_can_accept_true_single_panel(tmp_path, monkeypatch):
+    item_dir = tmp_path / "project" / "01"
+    source = item_dir / "download"
+    source.mkdir(parents=True)
+    Image.new("RGB", (100, 100), "white").save(source / "001.png")
+    verify_dir = tmp_path / "work" / "webtoon_verify" / "project"
+    verify_dir.mkdir(parents=True)
+    args = SimpleNamespace(
+        source_subdir="download",
+        panels_subdir="panels",
+        sort="numeric",
+        force_style=True,
+        config=None,
+        device="cpu",
+        energy_threshold=22.0,
+        max_ratio=100.0,
+        target_height=1300,
+        min_segment=20,
+        cut_window=20,
+        prefix_template="ch{item}_",
+    )
+    monkeypatch.setattr(
+        webtoon_module, "_recursive_ranges", lambda _image, _config, _device: [(0, 100)]
+    )
+
+    report = webtoon_module.process_item(
+        item_dir,
+        args,
+        {"01": {"replace": [[0, 100]]}},
+        verify_dir,
+    )
+
+    assert report["status"] == "ok"
+    assert report["review_required"] is True
+    assert report["panels"] == 1
+    assert (item_dir / "panels" / "ch01_001.jpg").is_file()
+    assert report["review_crops"] == [
+        str((item_dir / "panels" / "ch01_001.jpg").resolve())
+    ]
+    assert report["source_images"] == [
+        str((item_dir / "download" / "001.png").resolve())
+    ]
+
+
+def test_webtoon_split_exit_code_requires_review_unless_a_true_failure_occurs():
+    assert _split_exit_code([{"status": "ok", "review_required": True}]) == 3
+    assert _split_exit_code([{"status": "error", "review_required": True}]) == 1
+    assert _split_exit_code([{"status": "skipped", "review_required": True}]) == 1
+
+
+def test_full_source_threshold_and_explicit_replace_contract():
+    assert not automatic_full_source_requires_override(
+        [(0, 949)], 1000, None
+    )
+    assert automatic_full_source_requires_override(
+        [(0, 950)], 1000, None
+    )
+    assert automatic_full_source_requires_override(
+        [(25, 975)], 1000, {"split_at": [5000]}
+    )
+    assert not automatic_full_source_requires_override(
+        [(25, 975)], 1000, {"replace": [[25, 975]]}
+    )

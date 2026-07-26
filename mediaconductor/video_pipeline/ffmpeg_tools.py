@@ -122,7 +122,20 @@ def choose_h264_encoder(requested: str) -> str:
 
 def h264_encoder_args(encoder: str, preset: str, cq: int) -> list[str]:
     if encoder == "libx264":
-        return ["-c:v", "libx264", "-preset", "medium" if preset == "p1" else preset, "-crf", str(cq)]
+        # The public video commands use NVENC's p1..p7 scale so one preset can
+        # travel through encoder auto-selection. Translate that scale when the
+        # CPU fallback is libx264; native x264 preset names still pass through
+        # unchanged for callers that select one explicitly.
+        x264_preset = {
+            "p1": "ultrafast",
+            "p2": "superfast",
+            "p3": "veryfast",
+            "p4": "fast",
+            "p5": "medium",
+            "p6": "slow",
+            "p7": "veryslow",
+        }.get(preset, preset)
+        return ["-c:v", "libx264", "-preset", x264_preset, "-crf", str(cq)]
     if encoder == "h264_videotoolbox":
         return ["-c:v", encoder, "-q:v", str(max(1, min(100, cq)))]
     if encoder in {"h264_amf", "h264_qsv"}:

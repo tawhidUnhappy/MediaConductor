@@ -8,7 +8,18 @@ Your task is to create narration completely from scratch for the provided manga 
 
 ## Rules
 
-- Carefully analyze every manga panel before writing.
+- Carefully analyze every manga panel before writing. Read the complete chapter
+  in sequence once, then write each entry with that exact original crop open at
+  readable/full resolution.
+- Panel pixels, bubble tails, and the established reading sequence are the
+  source of truth. MAGI boxes and DeepSeek OCR are machine proposals only; they
+  never approve a crop or establish dialogue.
+- If you cannot inspect the images, stop and request a vision-capable
+  handoff. Never create narration from OCR alone.
+- Reject an input that is merely a complete multi-panel source page/strip or
+  an unreadable detector fallback. It must be manually cropped before
+  narration. A page/strip-sized image is allowed only when a reviewer has
+  confirmed it is a genuinely borderless single-panel splash.
 - Correctly identify who is speaking before confirming dialogue ownership.
 - Determine the correct speech type:
   - dialogue
@@ -18,11 +29,13 @@ Your task is to create narration completely from scratch for the provided manga 
   - flashback dialogue
   - off-screen speech
 - Never describe events that have not happened yet.
-- Only narrate what is visible or clearly implied in the current panel.
+- Only narrate what is visible now or established by the current and earlier
+  panels. Never use later panels to fill a gap.
 - Maintain story accuracy at all times.
 - Panels arrive already cropped and ordered in reading sequence by the toolkit (direction comes from the source language recorded in the project's manga.json). When a single crop contains several bubbles, follow the source's direction (Japanese manga: right-to-left, top-to-bottom; webtoons/manhwa/manhua: left-to-right).
 - Read all speech bubbles, narration boxes, sound effects, expressions, background details, and panel transitions carefully.
-- The narration must be written entirely from scratch, not rewritten from existing text.
+- The prose must be original and source-grounded, not a copied transcript and
+  not an invented rewrite.
 - Write like a clear, professional YouTube manga recap narrator.
 - Keep the storytelling calm, immersive, and easy to follow.
 - Keep the pacing smooth and steady.
@@ -31,6 +44,14 @@ Your task is to create narration completely from scratch for the provided manga 
 - Avoid excessive use of character names.
 - Make transitions between panels feel natural.
 - Keep the narration comfortable to listen to when converted into voice-over.
+- Write recap/explanation prose, not panel inventory or alt text. Connect an
+  already-established cause, choice, consequence, contrast, or stake when it
+  helps the listener understand why the beat matters.
+- Keep pronouns unambiguous and orient the listener when time, place, or
+  viewpoint changes.
+- Vary sentence openings and sentence shape. Do not begin several consecutive
+  lines with `"Then"`, a character name, or the same pronoun, and do not write
+  meta phrases such as `"this panel shows"` or `"we can see"`.
 
 ---
 
@@ -46,13 +67,16 @@ Your task is to create narration completely from scratch for the provided manga 
 ## Additional Instructions
 
 - Minimize narration errors and incorrect assumptions.
-- If the speaker is unclear, infer carefully based on context instead of guessing randomly.
+- If the speaker is unclear after inspecting the bubble tail and sequence, do
+  not assign a name. Use neutral attribution or omit the uncertain claim.
 - Keep sentences concise but impactful.
 - Avoid unnecessary filler.
 - Explain tension through the events and wording while keeping the narrator's
   delivery calm.
 - Do not spoil future events.
 - Do not summarize entire chapters at once; narrate panel by panel.
+- Never invent motives, identities, relationships, powers, causes, dialogue,
+  or off-panel events. Never reveal a fact or name before the story does.
 - Never write a punctuation-only line (e.g. `"?!"`) — it produces near-empty,
   unspeakable TTS audio.
 - Never end a line on a bare trailing em dash or hyphen with no closing word
@@ -113,6 +137,10 @@ watching in order.
 ## Panel Information
 
 - I will provide the manga panels, one cropped image per entry.
+- Any OCR text supplied beside a panel is an **unverified candidate reading**.
+  Compare it with the original bubble pixels. When they disagree, the pixels
+  win; when the pixels remain ambiguous, use neutral narration rather than an
+  OCR guess.
 - Panel filenames identify chapter, page, and panel:
 
 ```text
@@ -152,3 +180,6 @@ in `"narration"`. Keep delivery restrained through the wording itself.
   intensity.
 - Use natural narration flow suitable for YouTube voice-over.
 - Keep narration polished, immersive, and binge-watch friendly.
+- Before returning JSON, compare every line again with its original panel for
+  action, dialogue meaning, speaker, chronology, and reveal timing. Do not
+  approve a line merely because it agrees with OCR.

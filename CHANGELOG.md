@@ -2,6 +2,33 @@
 
 ## 2.2.4 — 2026-07-26
 
+### Added
+
+- Added `MCP_CONFIG.md` with ready-to-paste Windows MCP client blocks for a
+  source checkout or globally installed `mediaconductor` command.
+
+### Changed
+
+- Manga crop and narration review are now explicit `review_required` states
+  (exit code 3). MAGI no-detection and automatic near-full-page boxes no
+  longer become production crops; every source overlay, crop, and narration
+  pairing must be opened by a vision-capable reviewer.
+- Manga MCP build tools now require an explicit true
+  `manual_review_confirmed` assertion after that visual pass. Split reports
+  enumerate original source images and full-resolution production crops, and
+  regenerated review runs remove stale surplus artifacts.
+- Manga MCP uploads require a separate `final_video_review_confirmed` assertion
+  after watching and listening to the complete export at normal speed.
+- DeepSeek OCR is documented and surfaced as optional, unverified
+  cross-evidence. Transcript rows are SHA-256-bound to their exact crop bytes
+  so a same-name re-crop invalidates stale OCR instead of silently reusing it.
+- Strengthened manga recap authoring rules around current-panel grounding,
+  speaker attribution, causal clarity, pronouns, varied sentence openings,
+  chronology, and unsupported/future claims. Final publication now requires a
+  complete normal-speed watch/listen pass.
+- Raised production video defaults from NVENC `p1` / AAC 128 kbps to NVENC
+  `p5` / AAC 192 kbps, with valid libx264 preset mapping for CPU fallback.
+
 ### Removed
 
 - Removed the bundled Gemma 4 local-LLM runtime and its `llm`, `crop-qa`,

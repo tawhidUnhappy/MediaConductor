@@ -29,9 +29,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reencode", action="store_true")
     parser.add_argument("--copy-all", action="store_true")
     parser.add_argument("--encoder", default="auto")
-    parser.add_argument("--preset", default="p1")
+    parser.add_argument("--preset", default="p5")
     parser.add_argument("--cq", type=int, default=18)
-    parser.add_argument("--audio-bitrate", default="128k")
+    parser.add_argument("--audio-bitrate", default="192k")
     parser.add_argument("--audio-root", type=Path, default=DEFAULT_AUDIO_ROOT,
                         help="Used to strictly check every item has a matching audio file before joining.")
     parser.add_argument("--narration-dir", type=Path, default=None)

@@ -17,6 +17,7 @@ from mediaconductor.mcp_server import (
     _enforce_workspace_policy,
     _resolve_allowed_roots,
     _run_tool,
+    _server_instructions,
     _validate_arguments,
 )
 
@@ -48,6 +49,17 @@ def test_initialize_and_tools_list():
         assert tool["inputSchema"]["type"] == "object"
 
 
+def test_manga_mcp_instructions_enforce_visual_source_authority():
+    instructions = _server_instructions("manga-video")
+
+    assert "MAGI boxes and DeepSeek OCR are untrusted proposals" in instructions
+    assert "every source page/strip overlay and every crop" in instructions
+    assert "stop and hand off instead of narrating from OCR" in instructions
+    assert "Never set manual_review_confirmed=true" in instructions
+    assert "complete final video at 1x" in instructions
+    assert "never set final_video_review_confirmed=true" in instructions
+
+
 def test_where_tool_call():
     replies = mcp_session(
         {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
@@ -58,6 +70,47 @@ def test_where_tool_call():
     body = json.loads(reply["result"]["content"][0]["text"])
     assert body["exit_code"] == 0
     assert "app_root" in body["report"]
+
+
+def test_exit_three_is_review_required_not_an_mcp_error(monkeypatch):
+    def review_result(argv, **_kwargs):
+        return subprocess.CompletedProcess(
+            argv,
+            3,
+            stdout='MEDIACONDUCTOR_RESULT {"artifact":"ready"}\n',
+            stderr="",
+        )
+
+    monkeypatch.setattr(mcp_server.runtime, "run", review_result)
+    body, is_error = _run_tool("where", {})
+    report = json.loads(body)
+
+    assert is_error is False
+    assert report["exit_code"] == 3
+    assert report["review_required"] is True
+
+
+def test_job_status_nested_review_state_is_promoted_to_mcp_result(monkeypatch):
+    def review_job(argv, **_kwargs):
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            stdout=json.dumps({
+                "ok": True,
+                "status": "review_required",
+                "exit_code": 3,
+            }) + "\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(mcp_server.runtime, "run", review_job)
+    body, is_error = _run_tool("job_status", {"job_id": "review-job"})
+    report = json.loads(body)
+
+    assert is_error is False
+    assert report["exit_code"] == 0
+    assert report["review_required"] is True
+    assert report["report"]["status"] == "review_required"
 
 
 def test_unknown_tool_is_an_error():
@@ -97,6 +150,7 @@ def test_run_full_pipeline_exposes_fade_safe_audio_controls():
         "project_root": "/library/story",
         "audio_root": "/audio",
         "output_root": "/output",
+        "manual_review_confirmed": True,
         "skip_audio": True,
         "audio_source": "faded",
         "audio_fade_ms": 8.0,
@@ -104,6 +158,79 @@ def test_run_full_pipeline_exposes_fade_safe_audio_controls():
     assert "--skip-audio" in args
     assert args[args.index("--audio-source") + 1] == "faded"
     assert args[args.index("--audio-fade-ms") + 1] == "8.0"
+    assert "manual_review_confirmed" not in " ".join(args)
+
+
+@pytest.mark.parametrize(
+    "tool,arguments",
+    [
+        ("generate_audio", {"project_root": "/p", "audio_root": "/a"}),
+        (
+            "render_videos",
+            {"project_root": "/p", "audio_root": "/a", "output_root": "/o"},
+        ),
+        ("build_long_video", {"project_root": "/p", "output_root": "/o"}),
+        (
+            "run_full_pipeline",
+            {"project_root": "/p", "audio_root": "/a", "output_root": "/o"},
+        ),
+    ],
+)
+def test_manga_build_tools_require_true_manual_review_confirmation(tool, arguments):
+    with pytest.raises(ValueError, match="missing required argument"):
+        _validate_arguments(tool, arguments)
+
+    with pytest.raises(ValueError, match="must be true"):
+        _validate_arguments(tool, {**arguments, "manual_review_confirmed": False})
+
+    _validate_arguments(tool, {**arguments, "manual_review_confirmed": True})
+
+
+def test_manga_tool_catalog_exposes_manual_review_confirmation():
+    catalog = {
+        tool["name"]: tool["inputSchema"]
+        for tool in mcp_server._tools_list("manga-video")
+    }
+    for name in (
+        "generate_audio",
+        "render_videos",
+        "build_long_video",
+        "run_full_pipeline",
+    ):
+        assert catalog[name]["properties"]["manual_review_confirmed"]["type"] == "boolean"
+        assert "manual_review_confirmed" in catalog[name]["required"]
+
+    upload = catalog["youtube_upload"]
+    assert upload["properties"]["final_video_review_confirmed"]["type"] == "boolean"
+    assert "final_video_review_confirmed" in upload["required"]
+
+
+def test_final_video_review_confirmation_is_manga_upload_only():
+    story_catalog = {
+        tool["name"]: tool["inputSchema"]
+        for tool in mcp_server._tools_list("ai-story")
+    }
+    assert "final_video_review_confirmed" not in (
+        story_catalog["youtube_upload"]["properties"]
+    )
+
+    with pytest.raises(ValueError, match="complete final manga video"):
+        mcp_server._check_mode_access(
+            "youtube_upload",
+            {"video": "/v.mp4", "title": "Recap"},
+            "manga-video",
+            False,
+        )
+    mcp_server._check_mode_access(
+        "youtube_upload",
+        {
+            "video": "/v.mp4",
+            "title": "Recap",
+            "final_video_review_confirmed": True,
+        },
+        "manga-video",
+        False,
+    )
 
 
 def test_series_mark_published_exposes_replacement_provenance():

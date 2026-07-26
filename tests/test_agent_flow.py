@@ -163,6 +163,36 @@ def test_narration_check_flags_intro_narration_overlap(item):
     assert any("both intro.json and narration.json" in p for p in report["problems"])
 
 
+def test_narration_check_rejects_duplicate_image_and_audio_stem(item):
+    (item / "panels" / "a.png").write_bytes(b"x")
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "one"},
+        {"image": "a.jpg", "narration": "duplicate"},
+        {"image": "a.png", "narration": "same audio stem"},
+    ]))
+
+    report = check_item(item)
+
+    assert not report["ok"]
+    assert any("duplicate image" in problem for problem in report["problems"])
+    assert any("audio is keyed by image stem" in problem for problem in report["problems"])
+
+
+def test_narration_check_intro_overlap_uses_audio_stem(item):
+    (item / "panels" / "a.png").write_bytes(b"x")
+    (item / "narration.json").write_text(json.dumps([
+        {"image": "a.jpg", "narration": "main"},
+    ]))
+    (item / "intro.json").write_text(json.dumps([
+        {"image": "a.png", "narration": "cold open"},
+    ]))
+
+    report = check_item(item)
+
+    assert not report["ok"]
+    assert any("both intro.json and narration.json" in p for p in report["problems"])
+
+
 # ── series batching ─────────────────────────────────────────────────────────
 
 def _make_project(tmp_path, items, narrated):

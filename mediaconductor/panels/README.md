@@ -2,7 +2,9 @@
 
 The **crop** stage of the pipeline. Turns raw source images
 (`library/<Project>/<item>/download/`) into ordered panel crops
-(`.../panels/`) plus verification images a human/AI clears before narration.
+(`.../panels/`) plus verification evidence. A vision-capable reviewer opens
+every source page/strip overlay and every actual crop at readable/full
+resolution before narration; contact sheets alone never clear the gate.
 
 Start with the operator doc: [docs/operate/crop-verify-narrate.md](../../docs/operate/crop-verify-narrate.md).
 
@@ -36,10 +38,10 @@ Start with the operator doc: [docs/operate/crop-verify-narrate.md](../../docs/op
   The env pins (transformers 4.48.3, `attn_implementation="eager"`) are baked
   into that script — see [CLAUDE.md](../../CLAUDE.md) / the magi-v3 memory.
 - **Never trust detector boxes.** Both commands emit verify images
-  (`work/webtoon_verify/…`, `work/page_verify/…`) precisely so wrong crops are
-  caught before narration. `--overrides` is the correction escape hatch for
-  both (formats differ — webtoon = range ops on the stitched strip; page =
-  per-page pixel boxes).
+  (`work/webtoon_verify/…`, `work/page_verify/…`) to locate likely defects, but
+  every full-resolution crop still needs eyes. `--overrides` is the correction
+  escape hatch for both (formats differ — webtoon = range ops on the stitched
+  strip; page = per-page pixel boxes).
 - **Reading direction matters**: `rtl` for Japanese, `ltr` for Chinese/Korean.
   `page-split` takes `--reading-direction`; the default reads
   `cut_page.reading_direction` from system config.

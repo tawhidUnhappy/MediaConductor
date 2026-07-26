@@ -68,17 +68,18 @@ mediaconductor mcp --mode manga-video --allow-root D:/MediaProjects
 ```
 
 This is the mature manga/manhwa/webtoon pipeline: MangaDex acquisition,
-webtoon or paged-manga crops, visual verification sheets, OCR-grounded
-narration, Kokoro/IndexTTS, item and long-video rendering, music mixing,
-thumbnails, QA, and YouTube.
+webtoon or paged-manga crops, visual verification sheets, source-grounded
+narration with optional OCR cross-evidence, Kokoro/IndexTTS, item and
+long-video rendering, music mixing, thumbnails, QA, and YouTube.
 
 The splitters refuse a confident wrong-format run (webtoon pages into the
 paged splitter and vice versa), but crop approval and narration remain visual
-tasks. Inspect every verification sheet, write narration directly from the
-panels with OCR only as a cross-check, and run the narration checks before
-building. A text-only driver must hand those steps to a vision-capable
-agent or human; use `work-note` to preserve cast, speaker, crop, and handoff
-decisions between agents.
+tasks. Use verification sheets as indexes, then open every source page/strip
+overlay and every actual crop at readable/full resolution. Write narration
+directly from each original panel with OCR only as a cross-check, and run both
+narration gates before building. A text-only driver must hand those steps to a
+vision-capable agent or human; use `work-note` to preserve cast, speaker, crop,
+and handoff decisions between agents.
 
 See [the Manga Video skill](skills/manga-video/SKILL.md).
 
@@ -148,6 +149,9 @@ Start a small, mode-scoped stdio server:
 ```bash
 mediaconductor mcp --mode ai-story --allow-root D:/MediaProjects
 ```
+
+For ready-to-paste source-checkout and globally installed client blocks, see
+[MCP_CONFIG.md](MCP_CONFIG.md).
 
 Generic client configuration:
 

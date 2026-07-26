@@ -46,9 +46,9 @@ class VideoBuildConfig:
     height: int = 1080
     fps: int = 15
     encoder: str = "auto"
-    preset: str = "p1"
+    preset: str = "p5"
     cq: int = 18
-    audio_bitrate: str = "128k"
+    audio_bitrate: str = "192k"
     background_style: str = "blur"
     background_image: Path | None = None
     blur_sigma: float = 28.0

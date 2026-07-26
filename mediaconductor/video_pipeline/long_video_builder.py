@@ -38,9 +38,9 @@ class LongVideoConfig:
     reencode: bool = False
     copy_all: bool = False
     encoder: str = "auto"
-    preset: str = "p1"
+    preset: str = "p5"
     cq: int = 18
-    audio_bitrate: str = "128k"
+    audio_bitrate: str = "192k"
     audio_root: Path | None = None
     narration_dir: Path | None = None
     background_music: Path | None = None

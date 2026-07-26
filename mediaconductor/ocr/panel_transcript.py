@@ -2,18 +2,20 @@
 
 ``mediaconductor panel-transcript`` writes ``<item>/transcript.json`` — one entry
 per panel image, each carrying an ``ocr`` field with the bubble/caption text
-DeepSeek-OCR 2 read off that panel. It exists to *ground* narration writing:
+DeepSeek-OCR 2 proposed for that panel. It is optional, untrusted
+cross-evidence for narration writing:
 
-- the narration author works from panel image + transcript, so quoted or
-  paraphrased dialogue stays anchored to what the bubbles actually say
-  (prevents unnatural paraphrase drift);
-- speaker attribution is checked against explicit text instead of memory of
-  a 500-panel read-through;
+- the narration author reads the original panel and can compare uncertain
+  small text with an independent OCR attempt;
+- speaker attribution still comes from the artwork, bubble tails, and panel
+  sequence rather than from OCR or memory;
 - ``narration-review-sheets`` shows the transcript next to each narration
-  line for the verification pass.
+  line for the verification pass, clearly labeled as unverified.
 
-Under the hood it seeds the transcript files (preserving existing ``ocr``
-values) and runs the existing ``deepseek-ocr2`` command over them in one
+Under the hood it seeds the transcript files and binds every OCR value to the
+SHA-256 of the exact panel file bytes it was generated from. Re-cropping a panel under
+the same filename invalidates stale OCR instead of silently preserving it. It
+then runs the existing ``deepseek-ocr2`` command over pending entries in one
 subprocess, so the model loads once for all items. Requires the
 ``deepseek-ocr2`` tool env (``mediaconductor install-tool deepseek-ocr2``).
 """
@@ -21,11 +23,11 @@ subprocess, so the model loads once for all items. Requires the
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
-
-from mediaconductor import runtime
 from pathlib import Path
 
+from mediaconductor import runtime
 from mediaconductor.brand import CLI_NAME
 from mediaconductor.runtime import cli_command
 from mediaconductor.utils import emit_result
@@ -33,11 +35,62 @@ from mediaconductor.utils import emit_result
 PANEL_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
-def seed_transcript(item_dir: Path) -> tuple[Path, int, int]:
-    """Write/refresh transcript.json listing every panel; keep existing ocr."""
+def panel_sha256(path: Path) -> str:
+    """Return the content digest that binds an OCR value to one panel."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_bound_ocr(item_dir: Path) -> tuple[dict[str, str], int, int]:
+    """Return current OCR by image plus (total rows, stale rows ignored).
+
+    Consumers call this directly instead of trusting transcript filenames.
+    A row is usable only when its stored digest still matches the current panel
+    file; legacy, missing, or changed crops are suppressed even if the caller
+    forgot to run ``panel-transcript --seed-only`` after re-cropping.
+    """
+    path = item_dir / "transcript.json"
+    if not path.is_file():
+        return {}, 0, 0
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return {}, 0, 0
+    if not isinstance(entries, list):
+        return {}, 0, 0
+
+    bound: dict[str, str] = {}
+    stale = 0
+    for entry in entries:
+        if not isinstance(entry, dict) or "ocr" not in entry:
+            continue
+        image = entry.get("image")
+        if not isinstance(image, str) or not image or Path(image).name != image:
+            stale += 1
+            continue
+        panel = item_dir / "panels" / image
+        try:
+            current_digest = panel_sha256(panel)
+        except OSError:
+            stale += 1
+            continue
+        if entry.get("panel_sha256") != current_digest:
+            stale += 1
+            continue
+        value = entry.get("ocr")
+        bound[image] = value if isinstance(value, str) else str(value or "")
+    return bound, len(entries), stale
+
+
+def seed_transcript(item_dir: Path) -> tuple[Path, int, int, int]:
+    """Refresh transcript.json and keep OCR only for byte-identical panels."""
     panels = sorted(
-        (p.name for p in (item_dir / "panels").iterdir()
+        (p for p in (item_dir / "panels").iterdir()
          if p.suffix.lower() in PANEL_EXTENSIONS),
+        key=lambda panel: panel.name,
     )
     path = item_dir / "transcript.json"
     existing: dict[str, dict] = {}
@@ -48,11 +101,25 @@ def seed_transcript(item_dir: Path) -> tuple[Path, int, int]:
                     existing[entry["image"]] = entry
         except Exception:
             print(f"[{item_dir.name}] unreadable transcript.json — rebuilding")
-    entries = [existing.get(name, {"image": name}) for name in panels]
-    dropped = len(set(existing) - set(panels))
+    entries: list[dict] = []
+    invalidated = 0
+    for panel in panels:
+        digest = panel_sha256(panel)
+        previous = existing.get(panel.name)
+        if previous is not None and previous.get("panel_sha256") == digest:
+            entry = dict(previous)
+            entry["image"] = panel.name
+            entry["panel_sha256"] = digest
+        else:
+            if previous is not None and "ocr" in previous:
+                invalidated += 1
+            entry = {"image": panel.name, "panel_sha256": digest}
+        entries.append(entry)
+    panel_names = {panel.name for panel in panels}
+    dropped = len(set(existing) - panel_names)
     path.write_text(json.dumps(entries, ensure_ascii=False, indent=1) + "\n",
                     encoding="utf-8")
-    return path, len(entries), dropped
+    return path, len(entries), dropped, invalidated
 
 
 def coverage(path: Path) -> tuple[int, int]:
@@ -69,8 +136,8 @@ def parse_args() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} panel-transcript",
-        description="OCR every panel into <item>/transcript.json (DeepSeek-OCR 2) to "
-                    "ground narration writing and speaker attribution.",
+        description="Propose optional, unverified DeepSeek-OCR 2 text for every panel in "
+                    "<item>/transcript.json; original pixels and bubble tails remain authoritative.",
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
     parser.add_argument("--items", nargs="*")
@@ -109,10 +176,12 @@ def main() -> int:
         if not (item_dir / "panels").is_dir():
             print(f"[{item_dir.name}] no panels dir — skipped")
             continue
-        path, count, dropped = seed_transcript(item_dir)
+        path, count, dropped, invalidated = seed_transcript(item_dir)
         transcripts.append(path)
         print(f"[{item_dir.name}] transcript seeded: {count} panel(s)"
-              + (f", {dropped} stale entr(ies) dropped" if dropped else ""), flush=True)
+              + (f", {dropped} stale entr(ies) dropped" if dropped else "")
+              + (f", {invalidated} changed-panel OCR value(s) invalidated"
+                 if invalidated else ""), flush=True)
     if not transcripts:
         print("[FATAL] nothing to transcribe")
         return 1

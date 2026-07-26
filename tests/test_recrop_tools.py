@@ -4,8 +4,17 @@ from __future__ import annotations
 
 import time
 
+from PIL import Image, ImageChops
+
 from mediaconductor.images.thumbnail_compose import block_arrow_polygon
-from mediaconductor.panels.cutcheck import parse_forced_cuts, window_bounds
+from mediaconductor.panels.cutcheck import (
+    _cutcheck_exit_code,
+    parse_forced_cuts,
+    prune_item_artifacts,
+    stitch_pages,
+    window_bounds,
+)
+from mediaconductor.panels.gutter import collect_image_paths, stitch_images
 from mediaconductor.panels.remap import is_regular_panel, map_spans
 from mediaconductor.video_pipeline.check_items import is_speakable
 from mediaconductor.video_pipeline.item_video_builder import stale_reason
@@ -80,6 +89,39 @@ def test_parse_forced_cuts_and_window_bounds():
 
     assert window_bounds(100, 200, 5000, 650) == (0, 850)
     assert window_bounds(4900, 4950, 5000, 650) == (4250, 5000)
+
+
+def test_cutcheck_requires_review_but_preserves_true_failures():
+    assert _cutcheck_exit_code({"01": {"forced_cuts": 2}}) == 3
+    assert _cutcheck_exit_code({"01": {"error": "missing manifest"}}) == 1
+
+
+def test_cutcheck_uses_exact_splitter_stitch_geometry(tmp_path):
+    source = tmp_path / "download"
+    source.mkdir()
+    Image.new("RGB", (800, 1000), "red").save(source / "2.png")
+    Image.new("RGB", (1000, 1000), "blue").save(source / "10.png")
+
+    expected = stitch_images(collect_image_paths(source, sort_mode="numeric"))
+    actual = stitch_pages(source, sort_mode="numeric")
+
+    assert actual.size == expected.size == (800, 2000)
+    assert ImageChops.difference(actual, expected).getbbox() is None
+
+
+def test_cutcheck_prunes_only_selected_item_artifacts(tmp_path):
+    for name in (
+        "01_cut_y10.jpg",
+        "01_short_p001.jpg",
+        "01_withheld_t001.jpg",
+        "02_cut_y10.jpg",
+    ):
+        (tmp_path / name).write_bytes(b"old")
+
+    prune_item_artifacts(tmp_path, "01")
+
+    assert not list(tmp_path.glob("01_*.jpg"))
+    assert (tmp_path / "02_cut_y10.jpg").is_file()
 
 
 def test_stale_reason_detects_newer_input(tmp_path):

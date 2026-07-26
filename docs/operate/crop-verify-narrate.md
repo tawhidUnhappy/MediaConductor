@@ -10,7 +10,8 @@ audio, video, thumbnail, and upload.
 > **Golden rule of this whole loop:** *never trust a detector's boxes.* Both
 > crop commands emit verification images specifically so you can catch the
 > wrong ones before they poison the narration. Clearing every flag by eye is
-> not optional — it is the point of this doc.
+> not optional — it is the point of this doc. MAGI detections and DeepSeek OCR
+> are proposals to inspect, never approvals or ground truth.
 
 Prerequisites: a project laid out as `library/<Project>/<item>/download/`
 (raw pages), one `item` per chapter (`01`, `02`, …). See
@@ -63,6 +64,12 @@ Alongside the crops it writes `work/webtoon_verify/<Project>/<item>_ranges.json`
 — the **ranges manifest**: every final panel's `top`/`bottom` in stitched-strip
 coordinates plus the `forced_cuts` list (auto-split cuts whose quiet band was
 suspiciously energetic — the prime suspects for sliced bubbles).
+
+If automatic detection proposes one range covering nearly the entire source
+strip, the command emits no production crop and reports
+`automatic-full-source-strip`. Split it deliberately with `split_at`, or use
+an explicit `replace` range only after confirming the source is one genuinely
+borderless panel.
 
 Correct a bad item by **building the overrides file with `webtoon-override`**
 — it resolves every index against the manifest, so nobody computes merge
@@ -127,10 +134,16 @@ crops them.
 **Suspect pages** are printed in the per-item report and are where MAGI most
 often fails:
 
-- `<page> no-panels` — MAGI found nothing, so the **whole page** became one
-  crop. Usually a splash/spread page (fine) or a detection miss (fix it).
+- `<page> no-panels` — MAGI found nothing. No production crop is emitted for
+  that page; supply deliberate manual boxes before continuing.
 - `<page> full-page-box` — a single box covers most of the sheet; MAGI likely
   failed to split a multi-panel page.
+
+A complete source page must never stand in for its component panels. The only
+page-sized exception is a genuinely borderless single-panel splash or spread:
+open it at full resolution, confirm there are no separate panels or unreadable
+story bubbles, and record the explicit manual accept in a `crop-review`
+work-note. MAGI cannot grant that exception.
 
 Fix a page with `--overrides` (JSON keyed by item → page filename → pixel
 boxes that **fully replace** MAGI's boxes for that page):
@@ -149,7 +162,7 @@ MAGI env pins live in [the magi-v3 notes](../../CLAUDE.md) and are baked into
 
 ---
 
-## Step 2 — Verify **every** crop (the non-negotiable step)
+## Step 2 — Verify **every** page and crop (the non-negotiable step)
 
 For webtoons, start with the **cutcheck pass** — it exists because judging
 crops on downscaled contact sheets shipped a video with half panels, fused
@@ -159,10 +172,11 @@ panels and sliced speech bubbles that all had to be redone:
 mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-07
 ```
 
-It renders a full-resolution window (±650 px of context) around **every
-forced cut and every short panel** from the ranges manifests, montaged into
-review sheets under `work/cutcheck/<Project>/`. Read every sheet and give
-each flagged location a verdict on the actual art:
+It renders a source-resolution window (±650 px of context) around **every
+forced cut and every short panel** from the ranges manifests, plus preview
+sheets under `work/cutcheck/<Project>/`. Use the sheets as an index, then open
+every individual window at full resolution and give each flagged location a
+verdict on the actual art:
 
 - **FIX** (add a `merge`, or a merge + repositioned `split_at`): the cut
   passes through a figure or a speech bubble; a short panel is a bubble/SFX
@@ -177,7 +191,10 @@ Collect all fixes into one overrides file, re-run `webtoon-split`, then re-run
 already exists for the old crops, do **not** re-narrate — see
 "Re-cropping after narration exists" below.
 
-Then check the standard verification images, per page/strip:
+Then open every source page/strip overlay and every resulting crop itself at
+readable/full resolution. Contact sheets are navigation aids only; their
+thumbnails cannot prove that small bubble text, faces, or borders survived.
+Check, per page/strip:
 
 1. **Coverage** — every panel has a box; nothing important is in a dropped
    (red) region. On webtoons, a red gap that still shows art/text is a miss —
@@ -188,6 +205,9 @@ Then check the standard verification images, per page/strip:
    then top→bottom for `rtl`; left→right for `ltr`), including across landscape
    spreads.
 4. **No clipped bubbles** — a speech bubble cut at a box edge loses story text.
+5. **No full-source-page stand-ins** — a multi-panel page must be represented
+   by deliberate panel crops. A genuine borderless splash is the only
+   page-sized exception and needs an explicit manual accept note.
 
 Every suspect / `content_drop` / `no-panels` / `full-page-box` flag must be
 either (a) confirmed benign or (b) fixed with an override and re-cropped.
@@ -244,16 +264,17 @@ mediaconductor panel-transcript --project-root library/<Project> --item-range 01
 ```
 
 This OCRs every panel into `<item>/transcript.json`, which the review sheets
-then show beside each narration line. **Optional — the narrating agent
-chooses.** A vision agent writing each line with the panel open in front of it
-already reads the bubble text; for that workflow the transcript is a second
-opinion (useful for tiny/dense text or pinning name spellings), not a
-requirement, and every downstream gate works without it. What is NOT optional
-is the discipline the transcript used to backstop: write each line **from the
-panel itself, one beat per panel**, never from memory of a 500-panel
-read-through. Real viewer feedback on a shipped recap that narrated from
-memory: speakers misattributed, several panels summarized over one image,
-paraphrases that drifted from what the character actually said.
+then show beside each narration line as an **unverified candidate reading**.
+It is optional. Panel pixels, bubble tails, and established sequence remain
+authoritative; DeepSeek can hallucinate, omit, or misread stylized text. A
+vision agent writing each line with the panel open already reads the bubbles,
+so OCR is only a second opinion for tiny/dense text or name spellings. If the
+agent cannot open the images, stop and hand off to a vision-capable agent or
+human — never substitute OCR-only narration. What is not optional is writing
+each line **from the panel itself, one beat per panel**, never from memory of a
+500-panel read-through. Real viewer feedback on a shipped recap that narrated
+from memory: speakers misattributed, several panels summarized over one image,
+and paraphrases that drifted from what the character actually said.
 
 ---
 
@@ -273,13 +294,22 @@ feedback):
 - **One beat per panel.** The line describes what is visible in THAT panel
   only. Story summary belongs across consecutive panels' lines, never inside
   one panel's line while the viewer stares at a different image.
-- **Anchor dialogue to the transcript.** Paraphrase freely for voice and
-  pacing, but the meaning must match the OCR text of that panel's bubbles;
-  when a paraphrase reads awkward, quoting the bubble (trimmed) is better.
+- **Anchor dialogue to the visible bubbles.** Paraphrase freely for voice and
+  pacing, but the meaning must match the original panel pixels. OCR is
+  unverified cross-evidence only; a disagreement means re-open the original,
+  not copy DeepSeek's guess.
 - **Attribute speakers from the panel, not from memory.** Who is on-panel?
   Whose bubble is it (tail direction)? If the speaker isn't visible or
   certain, narrate the line without naming ("someone snarls from the
   crowd...") rather than guessing.
+- **Write a causal recap, not an inventory or transcript.** Connect cause,
+  choice, consequence, contrast, or stakes only when the current or earlier
+  panels establish them. Keep pronouns clear, orient scene changes, vary
+  sentence openings, and avoid repeated `"Then he..."` lines or meta wording
+  such as `"the panel shows"`.
+- **No invention or future knowledge.** Do not add motives, identities,
+  relationships, powers, causes, dialogue, or off-panel events that have not
+  been established at that point in the sequence.
 - **Say it aloud.** TTS reads exactly what you write — punctuation-only
   entries like `"?!"` produce a ~0.03 s WAV (`video-check` flags these as
   "unspeakable"); give reaction panels a real line.
@@ -342,11 +372,14 @@ are right. That pass is:
 mediaconductor narration-review-sheets --project-root library/<Project> --item-range 01-07
 ```
 
-Each sheet pairs a panel image with the narration line that will be spoken
-over it and the panel's OCR transcript. Read **every** sheet and check the
-four grounding rules above (this-panel-only, dialogue matches OCR, speaker
-right, reads naturally aloud). Fix each bad line with one command — no JSON
-editing, and the stale WAV is pruned so the next audio run regenerates it:
+Each sheet pairs a panel preview with the narration line that will be spoken
+over it and an optional, explicitly unverified OCR candidate. Read **every**
+sheet and open every corresponding original crop at readable/full resolution.
+Check the rules above against panel pixels, bubble tails, and sequence:
+this-panel-only, dialogue meaning faithful to the visible bubble, speaker
+right, no unsupported/future claim, clear varied recap prose, and natural
+speech. Fix each bad line with one command — no JSON editing, and the stale WAV
+is pruned so the next audio run regenerates it:
 
 ```bash
 mediaconductor narration-edit --project-root library/<Project> --item 01 \
@@ -379,6 +412,6 @@ the video** (audio → render → join → BGM → thumbnail → upload).
 | `narration-edit` | upsert/delete narration lines + prune stale WAVs | [video_pipeline/narration_edit.py](../../mediaconductor/video_pipeline/narration_edit.py) |
 | `panels-remap` | carry narration + audio across a re-crop | [panels/remap.py](../../mediaconductor/panels/remap.py) |
 | `page-split` | crop paged manga (MAGI v3) + verify sheets | [panels/page.py](../../mediaconductor/panels/page.py) |
-| `panel-transcript` | OCR every panel to ground narration/speakers | [ocr/panel_transcript.py](../../mediaconductor/ocr/panel_transcript.py) |
-| `narration-review-sheets` | panel + narration + OCR sheets for semantic QA | [video_pipeline/narration_sheets.py](../../mediaconductor/video_pipeline/narration_sheets.py) |
+| `panel-transcript` | optional unverified OCR cross-check for every panel | [ocr/panel_transcript.py](../../mediaconductor/ocr/panel_transcript.py) |
+| `narration-review-sheets` | panel + narration + unverified OCR sheets for semantic QA | [video_pipeline/narration_sheets.py](../../mediaconductor/video_pipeline/narration_sheets.py) |
 | `video-check` | validate item inputs before building (incl. unspeakable text) | [video_pipeline/check_items.py](../../mediaconductor/video_pipeline/check_items.py) |

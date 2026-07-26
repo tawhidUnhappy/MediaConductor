@@ -9,7 +9,7 @@ nvidia-smi" was the documented workaround. This module replaces that:
     mediaconductor job-start video --project-root library/X --items 01-12
     -> {"ok": true, "job_id": "20260714-153000-video-a1b2c3d4", ...}   (returns instantly)
     mediaconductor job-status 20260714-153000-video-a1b2c3d4 --json
-    -> status running/succeeded/failed/orphaned, exit code, last
+    -> status running/succeeded/review_required/failed/orphaned, exit code, last
        MEDIACONDUCTOR_PROGRESS marker, parsed MEDIACONDUCTOR_RESULT, log tail
     mediaconductor jobs --json
     -> every job, newest first
@@ -195,6 +195,15 @@ def _effective_status(state: dict) -> str:
     return status
 
 
+def _status_for_exit_code(exit_code: int) -> str:
+    """Map the stable CLI contract onto a background-job state."""
+    if exit_code == 0:
+        return "succeeded"
+    if exit_code == 3:
+        return "review_required"
+    return "failed"
+
+
 # ── job-start ────────────────────────────────────────────────────────────────
 
 def start_main() -> int:
@@ -331,7 +340,7 @@ def run_main() -> int:
         rc = child.wait()
 
     _progress, result = _scan_log_markers(log_path)
-    state["status"] = "succeeded" if rc == 0 else "failed"
+    state["status"] = _status_for_exit_code(rc)
     state["exit_code"] = rc
     state["finished_at"] = _now_iso()
     if result is not None:
@@ -351,7 +360,7 @@ def _status_report(state_file: Path, tail: int) -> dict:
     log_path = state_file.with_suffix(".log")
     progress, result = _scan_log_markers(log_path)
     report = {
-        "ok": status == "succeeded" or status == "running" or status == "starting",
+        "ok": status in {"succeeded", "review_required", "running", "starting"},
         "id": state.get("id"),
         "command": state.get("command"),
         "args": state.get("args"),

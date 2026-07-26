@@ -34,6 +34,14 @@ def test_router_and_scoped_mcp_catalogs_are_isolated():
     assert not ({"song_init", "download", "run_full_pipeline"} & story)
     assert not ({"story_init", "download", "run_full_pipeline"} & song)
     assert not {"crop_qa", "characters", "narrate_auto", "manga_auto"} & manga
+    assert {
+        "webtoon_cutcheck",
+        "webtoon_override",
+        "panels_remap",
+        "narration_review_sheets",
+        "narration_edit",
+        "audio_audit",
+    } <= manga
 
 
 def test_mode_rejects_hidden_tools_and_job_escape():

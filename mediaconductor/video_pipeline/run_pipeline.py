@@ -153,10 +153,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--duck-attack", type=float, default=20.0)
     parser.add_argument("--duck-release", type=float, default=350.0)
     parser.add_argument("--duck-threshold", type=float, default=0.08)
-    parser.add_argument("--audio-bitrate", default="128k")
+    parser.add_argument("--audio-bitrate", default="192k")
     parser.add_argument("--render-mode", choices=("segments", "concat-images"), default="segments")
     parser.add_argument("--encoder", default="auto")
-    parser.add_argument("--video-preset", default="p1")
+    parser.add_argument("--video-preset", default="p5")
     parser.add_argument("--cq", type=int, default=18)
     parser.add_argument("--fps", type=int, default=15)
     parser.add_argument("--video-workers", type=int, default=3,

@@ -20,7 +20,9 @@ biggest compute saver on a full run. GPU tools block-buffer stdout (their logs
 stay empty until they exit), so check progress from the filesystem (crops /
 `transcript.json` filling in, output files appearing) rather than tailing the
 log. Transcripts and crops land per chapter, so you can start writing narration
-for a finished chapter while the GPU works through the rest.
+for a chapter only after its source page/strip overlays and every crop have been
+opened at readable/full resolution and manually approved, while the GPU works
+through the rest.
 
 ---
 
@@ -96,19 +98,27 @@ verification images in `work/webtoon_verify/<Project>/`:
 - `NN_strip_K.png` — the downscaled strip with green panel boxes, blue
   auto-cut lines, and red dropped rows.
 
-**Clear every flag visually before writing narration — on full-resolution
-windows, not contact sheets.** A shipped recap had to be fully redone because
-its crops were judged on downscaled sheets (half panels, fused stuck-together
-panels, sliced speech bubbles). The pass that catches them:
+One automatic range covering nearly the whole source strip is withheld rather
+than copied into production. Resolve `automatic-full-source-strip` with a
+deliberate split, or accept an explicit `replace` range only after opening the
+source and confirming it is one genuinely borderless panel.
+
+**Visually clear every page and crop before writing narration — open the
+source/strip overlays and every crop at readable/full resolution, not just
+contact sheets.** A shipped recap had to be fully redone because its crops were
+judged on downscaled sheets (half panels, fused stuck-together panels, sliced
+speech bubbles). This full-crop pass is mandatory; the following focused pass
+additionally catches risky cut locations:
 
 ```bash
 mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-19
 ```
 
 It reads the `<item>_ranges.json` manifests webtoon-split wrote and renders a
-±650 px full-res window around every forced auto-split cut and every short
-panel, montaged into sheets under `work/cutcheck/<Project>/`. Read every
-sheet; verdicts: **FIX** when a cut passes through a figure or speech bubble
+±650 px source-resolution window around every forced auto-split cut and every
+short panel, plus preview sheets under `work/cutcheck/<Project>/`. Use the
+sheets as an index, then open every individual window at full resolution.
+Verdicts: **FIX** when a cut passes through a figure or speech bubble
 or a short panel is a bubble/SFX fragment (merge it toward its bubble-mate);
 **ACCEPT** for background/effect-art cuts, bordered thin scenery panels and
 scanlator banners (skip those in narration). Production-verified benign
@@ -202,7 +212,7 @@ fix with `uv pip install` *into the magi-v3 env*:
 4 of 61 pages: two pages with vertically merged panels, one box covering
 the whole page, one missed mini-column on a two-page spread. Wrong crops
 poison everything downstream (narration written against images the viewer
-never sees correctly).
+never sees correctly). MAGI output is a proposal, not approval.
 
 Crop with the same reading-order algorithm the app uses
 (`_manga_reading_order()` in `mediaconductor/panels/ai.py` — RTL band-overlap
@@ -266,7 +276,9 @@ for page_name in sorted(detections):
     img = Image.open(DOWNLOAD_DIR / page_name).convert("RGB")
     boxes = [b for raw in overrides.get(page_name, detections[page_name]["panels"])
              if (b := clamp_box(raw, *img.size))]
-    boxes = reading_order(boxes or [{"x1": 0, "y1": 0, "x2": img.width, "y2": img.height}])
+    if not boxes:
+        raise SystemExit(f"{page_name}: MAGI found no usable boxes; add a manual override")
+    boxes = reading_order(boxes)
     for old in PANELS_DIR.glob(f"{CHAPTER:02d}_{page_no:02d}_*.png"): old.unlink()
     overlay = img.copy(); draw = ImageDraw.Draw(overlay)
     for k, b in enumerate(boxes, 1):
@@ -275,18 +287,27 @@ for page_name in sorted(detections):
         draw.rectangle([b["x1"], b["y1"], b["x2"], b["y2"]], outline=(255, 0, 0), width=8)
         draw.text((b["x1"] + 14, b["y1"] + 10), str(k), fill=(255, 0, 0), font=font,
                   stroke_width=4, stroke_fill=(255, 255, 255))
-    overlay.thumbnail((900, 900)); overlay.save(SCRATCH / "overlays" / f"{Path(page_name).stem}.png")
+    overlay.save(SCRATCH / "overlays" / f"{Path(page_name).stem}.png")
     print(f"{page_name}: {len(boxes)} panels", flush=True)
 ```
 
-Then the non-negotiable step: **open and look at every overlay sheet**,
-page by page. For each page check (a) every panel has a box, (b) no two
-panels share a box, (c) the numbers follow manga reading order
+Then the non-negotiable step: **open every source page/strip overlay and every
+resulting crop at readable/full resolution**, page by page. Contact sheets are
+navigation aids, not proof that small text, faces, and borders survived. For
+each page check (a) every panel has a box, (b) no two panels share a box, (c)
+the numbers follow manga reading order
 (right→left inside a row, top→bottom across rows — including landscape
 spreads), (d) no speech bubble is clipped at a box edge. Fix bad pages by
 writing pixel boxes into `overrides.json` and re-running the script with
 just those page names. **Overlapping override boxes are fine and often
 correct** — for diagonal panel borders, overlap beats clipping a bubble.
+
+A complete source page is forbidden as a stand-in for multiple panels. A
+no-detection fallback or near-full-page box must be manually replaced. The
+only page-sized exception is a genuinely borderless single-panel splash or
+spread; inspect it yourself, confirm it remains readable in the 16:9 video
+frame, and record an explicit `crop-review` work-note. MAGI cannot grant that
+exception.
 
 Panel naming convention (everything downstream keys on it):
 `{chapter:02d}_{page:02d}_{panel:02d}.png` in
@@ -314,13 +335,16 @@ mediaconductor panel-transcript --project-root library/<Project> --item-range 01
 
 Writes `<item>/transcript.json` — every panel's bubble/caption text, shown as
 a cross-check column on `narration-review-sheets`. **This step is optional and
-the narrating agent decides.** Honest cost/benefit from production use: a
-vision agent reads the bubbles directly off the panel crops while writing each
-line, so the transcript adds no new information most of the time, costs a long
-GPU run, and its output on stylized SFX/calligraphy is noisy enough that
-disagreements usually resolve in favor of the panel. Run it when bubble text
-is small/dense/blurry, when character-name spellings need pinning down, or
-when whoever writes narration cannot see images; skip it otherwise. The
+the narrating agent decides.** DeepSeek output is an unverified proposal, never
+ground truth. Panel pixels, bubble tails, and established sequence are
+authoritative. A vision agent reads the bubbles directly off the panel crops
+while writing each line, so the transcript adds no new information most of the
+time, costs a long GPU run, and its output on stylized SFX/calligraphy is noisy
+enough that disagreements resolve by re-reading the original panel. Run it
+when bubble text is small/dense/blurry or character-name spellings need a
+second opinion; skip it otherwise. If the narrator cannot open the images,
+stop and hand off to a vision-capable agent or human — never narrate from OCR
+alone. The
 narration-quality incidents this phase historically fixed (wrong speakers,
 multi-panel summaries, paraphrase drift) were actually fixed by the **per-panel
 writing discipline + review-sheet pass** in Phases 4–5 — not by the OCR file
@@ -329,15 +353,18 @@ with or without `transcript.json`; only a transcript that exists but is
 half-filled is flagged, as an interrupted run to finish or delete.
 
 **After any re-crop, sync existing transcripts before narration review.** The
-cheap seed-only pass preserves OCR for panel filenames that survived and
-drops entries for panels that no longer exist; it does not load DeepSeek:
+cheap seed-only pass preserves OCR only when the surviving filename still has
+the same SHA-256-bound crop bytes, drops removed panels, and invalidates changed
+crops without loading DeepSeek:
 
 ```bash
 mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07 --seed-only
 ```
 
-Skipping this step leaves plausible-looking stale rows in `transcript.json`,
-which makes panel-count audits and dialogue cross-checks unreliable.
+Skipping this step leaves the transcript out of sync until the next normal
+`panel-transcript` run. Invalidated rows are automatically reprocessed on that
+run; `--force` is only needed to replace still-hash-matched OCR. You may also
+leave OCR absent and read the panel directly.
 
 ## Phase 5 — Write `narration.json`
 
@@ -347,16 +374,26 @@ Format (`library/<Project>/<item>/narration.json`):
 [{"image": "01_04_01.png", "narration": "One sentence or three. Present tense."}]
 ```
 
-**Grounding rules (each traces to real viewer complaints):**
+**Source-first grounding rules (each traces to real viewer complaints):**
 
+- Read the whole chapter in sequence once, then write each line with that exact
+  original crop open at readable/full resolution.
 - **One beat per panel** — the line covers what is visible in THAT panel.
   Spread story summary across consecutive lines, never smear it over one
   panel the viewer is staring at.
-- **Anchor paraphrase to the transcript** — reword for voice and pacing, but
-  the meaning must match that panel's OCR text; when the paraphrase reads
-  awkward, a trimmed quote is better.
+- **Anchor paraphrase to the visible bubble pixels** — reword for voice and
+  pacing, but preserve what the source actually means. OCR is unverified
+  cross-evidence only and never overrules the image.
 - **Attribute speakers from the panel** — who is on-panel, whose bubble
   (tail) is it? Unsure → don't name the speaker, narrate around it.
+- **Write a causal recap, not alt text or a transcript** — connect cause,
+  choice, consequence, contrast, or stakes only when the current or earlier
+  panels establish them. Keep pronouns clear, orient scene changes, vary
+  sentence openings, and avoid robotic `"Then he..."` inventory or `"the
+  panel shows"` meta prose.
+- **No invention or future knowledge** — never add motives, identities,
+  relationships, abilities, causes, dialogue, or off-panel events that have
+  not been established at that point.
 - **Punctuation-only lines are unspeakable** — `"?!"` becomes a ~0.03 s WAV;
   give reaction panels a real line (`video-check` flags these).
 
@@ -417,9 +454,13 @@ audio-related — missing audio for a *referenced* entry; see Phase 7.)
 mediaconductor narration-review-sheets --project-root library/<Project> --item-range 01-07
 ```
 
-Read every sheet (panel + narration + OCR side by side) and verify the four
-grounding rules above per panel. Fix each bad line in one command (no JSON
-editing; the stale WAV is pruned so the next audio run regenerates it):
+Read every sheet and open every corresponding original crop at readable/full
+resolution. Verify every line against panel pixels, bubble tails, and sequence.
+The OCR column is explicitly unverified and may be wrong. Check action,
+dialogue meaning, speaker, chronology, reveal timing, clear pronouns, causal
+flow, varied/non-robotic phrasing, and natural speech. Fix each bad line in one
+command (no JSON editing; the stale WAV is pruned so the next audio run
+regenerates it):
 
 ```bash
 mediaconductor narration-edit --project-root library/<Project> --item 01 \
@@ -543,6 +584,10 @@ problems.
 
 Then verify the actual MP4:
 
+- Watch and listen to the **complete final video once at normal speed** before
+  publication. Check every narration-to-panel pairing, crop readability,
+  pronunciation, pause, transition, and panel boundary. Spot checks and a clean
+  `video-validate` result do not replace this pass.
 - `ffprobe` duration/streams (expect 1920×1080, h264 + aac).
 - Extract frames near the start / middle / end (`ffmpeg -ss <t> -i <mp4>
   -frames:v 1 out.png`) and **look at them**.
@@ -779,12 +824,18 @@ mediaconductor youtube-upload --profile <profile> \
 
 ## Final checklist
 
-- [ ] Every overlay sheet visually verified; bad pages overridden and re-cropped
+- [ ] Every source page/strip overlay and every crop opened at readable/full
+      resolution; bad pages overridden and re-cropped
+- [ ] No complete multi-panel source page used as a panel; every genuine
+      page-sized splash exception explicitly reviewed and recorded
 - [ ] Whole chapter actually read; unsafe panels listed and excluded
+- [ ] Every narration line checked against its original pixels/bubble tail;
+      OCR treated only as an unverified cross-check
 - [ ] Hook = 4-ish late-chapter shock panels as renamed copies; CTA outro present
 - [ ] `mediaconductor video-check --json` ok before building
 - [ ] Faded per-panel derivatives audited; raw TTS unchanged; no edge clicks
-- [ ] Final MP4: duration/timing sane, frames spot-checked, ≈ −14 LUFS and ≤ −1.5 dBTP
+- [ ] Complete final MP4 watched and listened at 1x; duration/timing sane,
+      frames spot-checked, ≈ −14 LUFS and ≤ −1.5 dBTP
 - [ ] Timestamps recomputed from the *current* WAVs; total matches duration
 - [ ] Thumbnail rendered, viewed, no unsafe bubble text; if generated with
       Z-Image, all variants checked against the prompt-writing safety rules

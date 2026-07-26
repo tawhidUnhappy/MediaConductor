@@ -117,8 +117,10 @@ def style_guard(source_dir: Path, expected: str) -> tuple[bool, str]:
     splitter on a vertical strip (or vice versa) never produces usable panels,
     and in production a small agent burned a full crop+narration pass on
     exactly that mistake before a human caught it. "uncertain" and unreadable
-    sources stay allowed (the verify sheets catch those), and ``--force-style``
-    on the splitters bypasses the guard for deliberate mixed-format items.
+    sources stay allowed only for a vision-capable reviewer to resolve from
+    the original pages; verification sheets alone cannot establish the format.
+    ``--force-style`` on the splitters bypasses the guard for deliberate
+    mixed-format items.
     """
     opposite = {"webtoon": "paged", "paged": "webtoon"}[expected]
     stats = measure_item(source_dir)
@@ -138,7 +140,8 @@ def style_guard(source_dir: Path, expected: str) -> tuple[bool, str]:
     if verdict == "uncertain":
         return True, (
             f"style guard: uncertain format ({detail}) — proceeding, but visually "
-            f"confirm the verify sheets extra carefully: {', '.join(stats['sample_images'])}"
+            f"open the original sample pages and confirm every resulting crop: "
+            f"{', '.join(stats['sample_images'])}"
         )
     return True, f"style guard: confirmed {verdict} ({detail})"
 

@@ -62,9 +62,12 @@ and `webtoon-cutcheck`. The default is `download`.
    correct command; `--force-style` overrides only for deliberate
    mixed-format items.
 
-4. Inspect every returned verification sheet at full readable resolution.
-   Apply `webtoon-override` fixes and repeat the split until every crop is
-   approved. Never infer approval only from a command's exit code.
+4. Treat the splitter output as a proposal, not an approval. Open every source
+   page overlay and every returned crop itself at readable/full resolution;
+   contact sheets are an index and cannot prove that small text, faces, or
+   borders survived. Apply `webtoon-override` or paged-manga box fixes and
+   repeat the split until every crop is approved. Never infer approval from a
+   command's exit code, MAGI confidence, a contact sheet, or file existence.
 
    If a split is repeated after `transcript.json` exists, immediately sync the
    affected transcript skeleton before reviewing or writing narration:
@@ -73,14 +76,21 @@ and `webtoon-cutcheck`. The default is `download`.
    <mc> panel-transcript --project-root D:/MediaProjects/library/example --items 01 --seed-only
    ```
 
-   This keeps OCR already attached to surviving panel names and drops rows for
-   panels the re-crop removed, without loading the OCR model. Then re-run the
-   narration checks and review sheets; changed panel/narration inputs require
-   regenerated audio and an overwritten render.
+   This keeps OCR only when a surviving panel filename still has the same
+   SHA-256-bound crop bytes, drops rows for removed panels, and invalidates OCR
+   whose crop bytes changed, without loading the model. A normal
+   `panel-transcript` rerun fills those invalidated rows; alternatively, skip
+   OCR and read the panel directly. Then re-run narration checks and review
+   sheets; changed panel/narration inputs require regenerated audio and an
+   overwritten render.
 
    A crop must fully contain its panel — never a partial edge, and never the
-   whole page standing in when the panel has its own border. Frame for the
-   16:9 landscape video frame the crop will be composited into: a squarish
+   whole source page/strip standing in for multiple panels or for a panel with
+   its own border. A no-detection fallback, near-full-page MAGI box, or
+   automatic near-full-source-strip range must be manually replaced. The only
+   exception is a genuinely borderless single-panel splash; inspect it against
+   the source and record an explicit manual accept before using it. Frame for
+   the 16:9 landscape video frame the crop will be composited into: a squarish
    (1:1-ish) crop reads fine, but a box far taller than it is wide usually
    swallowed blank gutter above/below the art rather than hugging it, and
    shrinks to an unreadable sliver once fit to 16:9. `page-split` reports
@@ -98,12 +108,15 @@ and `webtoon-cutcheck`. The default is `download`.
 
 5. Optionally OCR the panels before writing narration. The narrating agent
    reads bubble text from the panel images themselves; `panel-transcript` adds
-   an independent OCR reading that shows up as a cross-check column on the
-   review sheets. Run it when text is small/dense, names are uncertain, or the
-   narrator cannot see images — skip it freely otherwise (every later gate
-   works without `transcript.json`; only a half-finished transcript is flagged
-   as an interrupted run). Because it is long-running, use the typed detached
-   wrapper and poll the returned id:
+   an independent, unverified DeepSeek reading that shows up as a cross-check
+   column on the review sheets. Panel pixels, bubble tails, and established
+   reading sequence remain authoritative. Run OCR when text is small/dense or
+   a name spelling needs a second opinion; skip it freely otherwise (every
+   later gate works without `transcript.json`; only a half-finished transcript
+   is flagged as an interrupted run). OCR never substitutes for image access:
+   if the narrator cannot see the images, stop and use the handoff in step 7.
+   Because it is long-running, use the typed detached wrapper and poll the
+   returned id:
 
    ```bash
    <mc> job-start --tool panel_transcript --arguments-json '{"project_root":"D:/MediaProjects/library/example","items":["01"],"device":"auto"}'
@@ -131,8 +144,14 @@ and `webtoon-cutcheck`. The default is `download`.
    <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work --output-root D:/MediaProjects/review/narration
    ```
 
-   Fix incorrect panel descriptions, dialogue, speaker attribution, and spoken
-   phrasing; rerun both checks after every edit.
+   Open every original crop at readable/full resolution while reviewing every
+   line. Fix incorrect panel descriptions, dialogue meaning, speaker
+   attribution, chronology, and spoken phrasing; treat OCR disagreements as a
+   reason to re-read the pixels, not to overwrite them. Recap prose should
+   connect already-established cause, choice, and consequence, keep pronouns
+   clear, vary sentence openings, and avoid robotic panel-by-panel inventory.
+   It must not invent motives, facts, dialogue, or future knowledge. Rerun both
+   checks after every edit.
 
    If you cannot read panel images, do not infer narration from OCR alone.
    Hand the item to a vision-capable agent or human and leave an exact
@@ -149,14 +168,15 @@ and `webtoon-cutcheck`. The default is `download`.
    Prefer the equivalent typed detached job in an ordinary agent session:
 
    ```bash
-   <mc> job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/example","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output","items":["01"],"tts":"auto","build_long_video":true,"normalize_audio":true,"no_background_music":true}'
+   <mc> job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/example","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output","items":["01"],"manual_review_confirmed":true,"tts":"auto","build_long_video":true,"normalize_audio":true,"no_background_music":true}'
    <mc> job-status <job-id> --json
    ```
 
    `job-start <cli-command> [args...]` remains accepted for existing scripts,
    but `--tool/--arguments-json` is the typed, schema-validated form published
-   by `commands --json --full` and MCP. Keep licensed music below narration and
-   re-render after any changed panel, narration, or audio input.
+   by `commands --json --full` and MCP. Set `manual_review_confirmed` only after
+   the source/crop/narration visual pass above. Keep licensed music below
+   narration and re-render after any changed panel, narration, or audio input.
 
    Production defaults to separate `audio_faded/<project>/...` derivatives:
    every panel WAV gets a symmetric 8 ms fade-in and fade-out while the raw TTS
@@ -178,10 +198,12 @@ and `webtoon-cutcheck`. The default is `download`.
    ```
 
    `video-validate` is a structural gate (coverage, streams, duration), not a
-   complete media review. Also inspect representative start/middle/end frames,
-   check narration-to-panel timing, audit faded WAV boundaries for edge clicks,
-   and measure the final complete mix at approximately −14 LUFS with true peak
-   no higher than −1.5 dBTP.
+   complete media review. Before publishing, watch and listen to the complete
+   final video once at normal speed, checking every narration-to-panel pairing,
+   crop readability, pacing, pronunciation, transition, and audio boundary.
+   Also inspect representative start/middle/end frames, audit faded WAV
+   boundaries for edge clicks, and measure the final complete mix at
+   approximately −14 LUFS with true peak no higher than −1.5 dBTP.
 
    Generate exact, ready-to-paste YouTube item timestamps from the rendered
    videos rather than adding durations manually:
@@ -195,6 +217,8 @@ and `webtoon-cutcheck`. The default is `download`.
    the intended channel with `youtube-status --profile <name> --verify --json`,
    pass the same `--profile <name>` to the upload, and record the returned
    profile, channel id, and video id with `series-mark-published`.
+   In MCP mode, set `final_video_review_confirmed` only after the complete
+   normal-speed final-video review in step 9.
 
    For a replacement, default to upload new → verify → delete old. Delete-first
    is irreversible and allowed only when the user explicitly requests that

@@ -1,8 +1,9 @@
-# mangaeasy/ocr — optional panel text OCR
+# MediaConductor OCR — optional, untrusted panel text cross-evidence
 
-Optional OCR that reads the text in panels and writes it into narration JSON as
-an `ocr` field, so a narration-writing agent has the source dialogue/captions
-to work from. Not required by the core pipeline.
+DeepSeek-OCR 2 can propose text readings for manga panels. Its output may omit,
+misread, or invent stylized text, so panel pixels, bubble tails, and established
+reading order remain authoritative. OCR is optional and must never replace a
+vision-capable reviewer opening the original panel.
 
 ## Files
 
@@ -10,15 +11,19 @@ to work from. Not required by the core pipeline.
   runs **inside the isolated `deepseek-ocr2` tool env** and adds an `ocr` field
   to each entry of the target narration JSON files. Driven by the
   `deepseek-ocr2` CLI command (dispatched via
-  [`mangaeasy/tools/deepseek_ocr2.py`](../tools/deepseek_ocr2.py), which resolves
+  [`mediaconductor/tools/deepseek_ocr2.py`](../tools/deepseek_ocr2.py), which resolves
   the tool env and shells into it).
+- [`panel_transcript.py`](panel_transcript.py) — creates optional
+  `<item>/transcript.json` records and SHA-256-binds OCR to the exact panel
+  bytes, invalidating stale OCR after a re-crop.
 
 ## Gotchas
 
 - Needs the tool env: `mediaconductor install-tool deepseek-ocr2`. Like all external
   models it runs in its own `uv` env with pinned Torch/Transformers (see
-  [`mangaeasy/tools/`](../tools/README.md)); this package only holds the
+  [`mediaconductor/tools/`](../tools/README.md)); this package only holds the
   in-env pipeline logic.
-- `--force` replaces existing `ocr` fields; otherwise they're left as-is.
+- `panel-transcript --force` replaces hash-matched `ocr` fields; changed panel
+  bytes are invalidated and reprocessed without forcing.
 - Item selection uses the same `--items 01 02` / `--item-range` tokens as the
   rest of the CLI.

@@ -55,6 +55,34 @@ _INLINE_TEXT_BRIDGES = {
     "song_init": ("lyrics", "lyrics_file"),
 }
 
+_TRUE_CONFIRMATION_ARGUMENTS = {
+    "generate_audio": ("manual_review_confirmed",),
+    "render_videos": ("manual_review_confirmed",),
+    "build_long_video": ("manual_review_confirmed",),
+    "run_full_pipeline": ("manual_review_confirmed",),
+}
+
+
+def _server_instructions(mode: str | None) -> str:
+    instructions = (
+        f"{PRODUCT_NAME} MCP in {mode or 'router'} mode. "
+        "Run long operations through job_start and poll job_status. "
+        "Filesystem arguments are confined to the server's --allow-root policy."
+    )
+    if mode == "manga-video":
+        instructions += (
+            " Manga quality gate: MAGI boxes and DeepSeek OCR are untrusted proposals, "
+            "never approvals. A vision-capable reviewer must open every source page/strip "
+            "overlay and every crop at readable resolution before narration. Never use an "
+            "automatic whole source page or strip in place of panels on multi-panel art. "
+            "If you cannot inspect "
+            "images, stop and hand off instead of narrating from OCR. Compare every narration "
+            "line with its original panel. Never set manual_review_confirmed=true from reports "
+            "or model confidence alone. Watch/listen to the complete final video at 1x before "
+            "any upload, and never set final_video_review_confirmed=true without that pass."
+        )
+    return instructions
+
 # Backwards-compatible alias (tests and external references).
 _JSON_COMMANDS = JSON_COMMANDS
 
@@ -150,6 +178,15 @@ def _validate_arguments(tool: str, arguments: dict) -> None:
     missing = [name for name in required if arguments.get(name) in (None, "", [])]
     if missing:
         raise ValueError(f"missing required argument(s): {', '.join(missing)}")
+    false_confirmations = [
+        name for name in _TRUE_CONFIRMATION_ARGUMENTS.get(tool, ())
+        if arguments.get(name) is not True
+    ]
+    if false_confirmations:
+        names = ", ".join(false_confirmations)
+        raise ValueError(
+            f"{names} must be true only after the required manual visual review"
+        )
     if tool in _EXCLUSIVE_TOOL_ARGS:
         left, right = _EXCLUSIVE_TOOL_ARGS[tool]
         if bool(arguments.get(left)) == bool(arguments.get(right)):
@@ -541,6 +578,15 @@ def _check_mode_access(tool: str, arguments: dict, mode: str | None, all_tools: 
         from mediaconductor.tools.setup import MODE_TOOLS
         if arguments.get("name") not in MODE_TOOLS[mode]:
             raise ValueError(f"tool '{arguments.get('name')}' is outside MCP mode '{mode}'")
+    if (
+        mode == "manga-video"
+        and tool == "youtube_upload"
+        and arguments.get("final_video_review_confirmed") is not True
+    ):
+        raise ValueError(
+            "final_video_review_confirmed must be true only after watching and listening "
+            "to the complete final manga video at normal speed"
+        )
     if tool == "job_start" and not all_tools:
         target = str(arguments.get("tool", ""))
         if target not in _allowed_tools(mode, all_tools):
@@ -612,20 +658,30 @@ def _run_tool(
                     pass
                 break
 
-    body: dict = {"exit_code": proc.returncode}
+    body: dict = {
+        "exit_code": proc.returncode,
+        "review_required": proc.returncode == 3,
+    }
     if result_payload is not None:
         body["result"] = _bounded_json_value(result_payload)
     if cli_name in JSON_COMMANDS:
         report = _parse_json_report(stdout)
         if report is not None:
             body["report"] = _bounded_json_value(report)
+            if isinstance(report, dict) and (
+                report.get("review_required") is True
+                or report.get("manual_review_required") is True
+                or report.get("status") == "review_required"
+                or report.get("exit_code") == 3
+            ):
+                body["review_required"] = True
         else:
             body["output"] = _clip(stdout, MAX_OUTPUT_CHARS)
     else:
         body["output"] = _clip(stdout, MAX_OUTPUT_CHARS)
     if stderr:
         body["stderr"] = _clip(stderr, 2000)
-    return json.dumps(body, ensure_ascii=False, indent=2), proc.returncode != 0
+    return json.dumps(body, ensure_ascii=False, indent=2), proc.returncode not in (0, 3)
 
 
 def _tools_list(mode: str | None = None, all_tools: bool = False) -> list[dict]:
@@ -635,6 +691,12 @@ def _tools_list(mode: str | None = None, all_tools: bool = False) -> list[dict]:
         if name not in allowed:
             continue
         scoped_props = copy.deepcopy(props)
+        scoped_required = list(required)
+        if name == "youtube_upload":
+            if mode == "manga-video":
+                scoped_required.append("final_video_review_confirmed")
+            else:
+                scoped_props.pop("final_video_review_confirmed", None)
         if mode and name == "install_tool":
             from mediaconductor.tools.setup import MODE_TOOLS
             scoped_props["name"]["enum"] = MODE_TOOLS[mode]
@@ -650,7 +712,7 @@ def _tools_list(mode: str | None = None, all_tools: bool = False) -> list[dict]:
         result.append({
             "name": name,
             "description": desc,
-            "inputSchema": {"type": "object", "properties": scoped_props, "required": required,
+            "inputSchema": {"type": "object", "properties": scoped_props, "required": scoped_required,
                             "additionalProperties": False},
         })
         if name in _EXCLUSIVE_TOOL_ARGS:
@@ -696,11 +758,7 @@ def _handle(
             "protocolVersion": client_version,
             "capabilities": {"tools": {}},
             "serverInfo": {"name": MCP_SERVER_NAME, "version": __version__},
-            "instructions": (
-                f"{PRODUCT_NAME} MCP in {mode or 'router'} mode. "
-                "Run long operations through job_start and poll job_status. "
-                "Filesystem arguments are confined to the server's --allow-root policy."
-            ),
+            "instructions": _server_instructions(mode),
         })
         return
     if msg_id is None:

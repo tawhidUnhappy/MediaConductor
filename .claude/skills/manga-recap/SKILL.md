@@ -17,8 +17,9 @@ same engine). Full reference: `docs/manga-video-guide.md`; discover any command'
 flags with `mediaconductor commands --json --full` (schemas + `long_running`
 markers — no per-command `--help` needed). Machine contract: every `--json`
 command prints one JSON object; generation commands end with a
-`MEDIACONDUCTOR_RESULT {...}` line; exit 0 = ok, 1 = failure, 2 = usage error;
-nothing ever prompts for input.
+`MEDIACONDUCTOR_RESULT {...}` line; exit 0 = complete, 1 = failure, 2 = usage
+error, and 3 = artifacts generated but mandatory manual review remains
+(`review_required`, not approval); nothing ever prompts for input.
 
 **Hard safety rules** — never delete/rename anything inside `library/`
 source items; edit narration via `narration-edit`, not by hand; clear
@@ -54,9 +55,10 @@ names the unclaimed actionable tasks, `work-claim` leases an item+stage (and
 character names/speaker conventions between narrators, `work-todo` is the
 shared plan-level checklist (batch scope, redo requests, things to confirm)
 that outlives any one context window, and `mediaconductor work-qa` is the
-fix-until-clean gate — loop `work-qa → apply the listed fix → work-qa` until
-exit 0. `work-artifacts` lists what already exists for reuse before you
-regenerate anything. All of it is plain files under
+machine fix-until-clean gate — loop `work-qa → apply the listed fix → work-qa`
+until exit 0, then separately clear every reported manual visual review.
+`work-artifacts` lists what already exists for reuse before you regenerate
+anything. All of it is plain files under
 `library/<Project>/.workboard/`, not chat state, so any agent on any model
 reads the exact same picture. Set `MEDIACONDUCTOR_AGENT` (e.g. `claude-fable`,
 `gpt-5.6`) so claims/notes/todos show which model did what.
@@ -112,17 +114,21 @@ mediaconductor webtoon-split --project-root library/<Project> --item-range 01-12
 ```
 
 **The crop double-verify loop** (details: `docs/operate/crop-verify-narrate.md`):
-the result lists per-item `suspects` / `content_drops` and the exact
-`verify_images`. For webtoons, then run the full-resolution pass — judging
-crops on downscaled sheets alone has shipped sliced bubbles before:
+MAGI and gutter detection produce crop proposals, never approvals. The result
+lists per-item `suspects` / `content_drops` and the exact `verify_images`.
+Open every source page/strip overlay and every resulting crop at readable/full
+resolution; a contact sheet or successful exit code is not a visual review.
+For webtoons, then run the full-resolution pass — judging crops on downscaled
+sheets alone has shipped sliced bubbles before:
 
 ```bash
 mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-12
 ```
 
-Read EVERY sheet it writes; FIX any cut through a figure/speech bubble and
-any bubble/SFX-fragment short panel by adding the fix with `webtoon-override`
-(never compute merge indices by hand — it resolves them from the manifest):
+Read EVERY sheet and original crop; FIX any cut through a figure/speech bubble
+and any bubble/SFX-fragment short panel by adding the fix with
+`webtoon-override` (never compute merge indices by hand — it resolves them from
+the manifest):
 
 ```bash
 mediaconductor webtoon-override --file work/overrides.json \
@@ -136,6 +142,13 @@ banners. Re-run the split with `--overrides work/overrides.json`, then
 re-run cutcheck to confirm. Do not proceed to narration with unresolved
 suspects.
 
+For paged manga, a no-detection fallback or a near-full-source-page box is not
+usable when the page contains several panels: create manual boxes and re-crop.
+For webtoons, an automatic near-full-source-strip crop is equally invalid.
+The only page-sized exception is a genuinely borderless single-panel splash.
+Inspect that page and crop yourself and record the exact manual accept with
+`work-note --topic crop-review`; never infer the exception from MAGI output.
+
 **Re-cropping after narration exists?** Never re-narrate: `mediaconductor
 panels-remap --project-root library/<Project> --item-range 01-12` (dry run,
 then `--apply`) carries narration texts and WAVs to the new numbering, then
@@ -144,12 +157,12 @@ review its `shift`/`merge` list with `narration-review-sheets
 
 ## 4. Write narration grounded in the panels, then verify it
 
-Narration is written by YOU, from the panel images — Read every panel of the
-chapter and take the bubble text from what you see. OCR is **optional**: if
-you want a second, independent reading (small/dense text, doubtful names, or
-a non-vision agent doing the narrating), run panel-transcript first (needs
-`install-tool deepseek-ocr2`) and its text appears as a cross-check column on
-the review sheets:
+Narration is written by YOU, from the panel images — read the whole chapter in
+sequence once, then write each line with that exact original crop open at
+readable/full resolution. OCR is **optional**: if you want an unverified second
+reading for small/dense text or doubtful names, run panel-transcript first
+(needs `install-tool deepseek-ocr2`) and its text appears as a cross-check
+column on the review sheets:
 
 ```bash
 mediaconductor panel-transcript --project-root library/<Project> --item-range 01-12
@@ -157,7 +170,10 @@ mediaconductor panel-transcript --project-root library/<Project> --item-range 01
 
 Skipping it skips nothing else — every gate below works with or without
 `transcript.json` (a *half-finished* transcript is flagged by work-qa as an
-interrupted run: finish it or delete it). Write
+interrupted run: finish it or delete it). DeepSeek output is a proposal, not
+ground truth: panel pixels, bubble tails, and established reading sequence win
+every disagreement. If you cannot see the images, stop and hand off to a
+vision-capable agent or human; never narrate from OCR alone. Write
 `library/<Project>/<item>/narration.json`
 (`[{"image": "<panel file>", "narration": "..."}]`) from the **panel image**
 (+ transcript when present) — style rules in
@@ -172,11 +188,18 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
 
 - **one beat per panel** — the line describes THAT panel, never a summary of
   several panels smeared over one image;
-- **paraphrase anchored to the bubble text** — reword freely, but the meaning
-  must match what the panel actually says (use the OCR transcript as
-  cross-evidence when it exists);
+- **paraphrase anchored to the visible bubble text** — reword freely, but the
+  meaning must match what the panel pixels actually say; OCR is only
+  cross-evidence and never overrules the image;
 - **speakers attributed from the panel** (who is on-panel, whose bubble
   tail) — if unsure, narrate without naming;
+- **recap, do not inventory or transcribe** — connect cause, decision,
+  consequence, contrast, or stakes only when established by the current or
+  earlier panels; keep pronouns clear, orient scene changes, vary sentence
+  openings, and avoid repetitive `"Then he..."` lines or `"the panel shows"`
+  meta prose;
+- **no invention or future knowledge** — do not add motives, facts, dialogue,
+  identities, relationships, or events that the story has not established yet;
 - **no punctuation-only lines** (`"?!"` → near-empty TTS audio; video-check
   flags these as unspeakable); never end on a bare em dash/hyphen with no
   closing word (`"...Ah—"`) — finish the sentence, or use an ellipsis for a
@@ -206,8 +229,10 @@ Verify in two passes:
    from narrated panels). Confirm the uncovered list is exactly those skips,
    not a story beat you forgot.
 2. **Semantic** — `mediaconductor narration-review-sheets --project-root
-   library/<Project> --item-range 01-12`, then Read EVERY sheet (panel +
-   narration + OCR side by side) and check the grounding rules above.
+   library/<Project> --item-range 01-12`, then read EVERY sheet and open every
+   corresponding original crop at readable/full resolution. Check the
+   grounding rules above against panel pixels and bubble tails. The OCR column
+   is labeled unverified and may be wrong.
    Fix each bad line with one command (stale WAV pruned automatically):
    `mediaconductor narration-edit --project-root library/<Project> --item 01
    --set <image> "<new line>" --prune-audio`. Use `--delete <image>`,
@@ -242,6 +267,11 @@ After the run:
 `mediaconductor video-validate --project-root library/<Project> ... --json` —
 `warnings` (unnarrated panels, orphan audio) are informational; anything in
 `errors` blocks upload.
+That structural result is not publication approval. Before any upload, watch
+and listen to the complete final video once at normal speed, checking every
+panel/narration pairing, crop readability, speaker/name pronunciation, pacing,
+transition, and audio boundary. Fix and rebuild on any defect; spot checks do
+not replace the complete pass.
 Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
 
 ## 6. Thumbnail (1280×720)

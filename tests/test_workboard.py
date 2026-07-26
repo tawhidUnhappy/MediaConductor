@@ -5,6 +5,7 @@ import json
 from datetime import timedelta
 
 from mediaconductor.qa_loop import qa_item
+from mediaconductor.ocr.panel_transcript import panel_sha256
 from mediaconductor.workboard import (
     _iso,
     _utcnow,
@@ -32,7 +33,16 @@ def make_item(root, name="01", *, panels=2, ocr=True, narration=True):
         for i in range(panels):
             (item / "panels" / f"{name}_00{i}_01.png").write_bytes(PNG)
     if ocr:
-        entries = [{"image": f"{name}_00{i}_01.png", "ocr": "SOME TEXT"} for i in range(panels)]
+        entries = [
+            {
+                "image": f"{name}_00{i}_01.png",
+                "panel_sha256": panel_sha256(
+                    item / "panels" / f"{name}_00{i}_01.png"
+                ),
+                "ocr": "SOME TEXT",
+            }
+            for i in range(panels)
+        ]
         (item / "transcript.json").write_text(json.dumps(entries), encoding="utf-8")
     if narration:
         entries = [{"image": f"{name}_00{i}_01.png", "narration": f"Line {i}."} for i in range(panels)]
@@ -65,7 +75,12 @@ def test_stage_derivation_walks_the_pipeline(tmp_path):
     (item / "transcript.json").write_text(json.dumps([{"image": "01_000_01.png"}]), encoding="utf-8")
     assert item_status(item, *args)["next_stage"] == "transcribe"
 
-    (item / "transcript.json").write_text(json.dumps([{"image": "01_000_01.png", "ocr": "HI"}]), encoding="utf-8")
+    panel = item / "panels" / "01_000_01.png"
+    (item / "transcript.json").write_text(json.dumps([{
+        "image": panel.name,
+        "panel_sha256": panel_sha256(panel),
+        "ocr": "HI",
+    }]), encoding="utf-8")
     assert item_status(item, *args)["next_stage"] == "narrate"
 
     (item / "narration.json").write_text(json.dumps([{"image": "01_000_01.png", "narration": "Hi."}]), encoding="utf-8")
@@ -89,12 +104,28 @@ def test_textless_ocr_entry_counts_as_processed(tmp_path):
     # OCR cleanup deliberately stores an empty string for art-only panels.
     # The key's presence distinguishes this from an unprocessed seed entry.
     (item / "transcript.json").write_text(
-        json.dumps([{"image": "01_000_01.png", "ocr": ""}]),
+        json.dumps([{
+            "image": "01_000_01.png",
+            "panel_sha256": panel_sha256(item / "panels" / "01_000_01.png"),
+            "ocr": "",
+        }]),
         encoding="utf-8",
     )
     status = item_status(item, *args)
     assert status["transcript"] == {"filled": 1, "total": 1}
     assert status["next_stage"] == "narrate"
+
+
+def test_changed_crop_makes_hash_bound_ocr_incomplete_without_seed_rerun(tmp_path):
+    root = tmp_path / "proj"
+    item = make_item(root, panels=1, narration=False)
+    args = ("proj", tmp_path / "audio", tmp_path / "out")
+
+    (item / "panels" / "01_000_01.png").write_bytes(b"changed crop bytes")
+    status = item_status(item, *args)
+
+    assert status["transcript"] == {"filled": 0, "total": 1}
+    assert status["next_stage"] == "transcribe"
 
 
 def test_stale_render_detected_after_narration_edit(tmp_path):
@@ -198,6 +229,31 @@ def test_qa_clean_item_has_no_errors(tmp_path):
     video.write_bytes(b"mp4")
     problems = qa_item(item, "proj", root, tmp_path / "audio", tmp_path / "out", tmp_path / "work")
     assert [p for p in problems if p["severity"] == "error"] == []
+
+
+def test_qa_finds_actual_webtoon_and_narration_review_layouts(tmp_path):
+    root = tmp_path / "proj"
+    item = make_item(root)
+    add_audio(tmp_path, "proj", "01", ["01_000_01", "01_001_01"])
+    video = tmp_path / "out" / "proj" / "items" / "item_01.mp4"
+    video.parent.mkdir(parents=True)
+    video.write_bytes(b"mp4")
+    work = tmp_path / "work"
+    webtoon = work / "webtoon_verify" / "proj"
+    webtoon.mkdir(parents=True)
+    (webtoon / "01_sheet_1.png").write_bytes(PNG)
+    (webtoon / "01_strip_1.png").write_bytes(PNG)
+    narration = work / "narration_review" / "proj" / "01"
+    narration.mkdir(parents=True)
+    (narration / "review_001.jpg").write_bytes(b"jpeg")
+
+    problems = qa_item(item, "proj", root, tmp_path / "audio", tmp_path / "out", work)
+    kinds = {problem["kind"] for problem in problems}
+
+    assert "crop:visual-review" in kinds
+    assert "narration:visual-review" in kinds
+    assert "crop:review-artifacts-missing" not in kinds
+    assert "narration:review-sheets-missing" not in kinds
 
 
 def test_todo_lifecycle_add_start_done_reopen(tmp_path):

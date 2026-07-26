@@ -50,6 +50,25 @@ _PROJECT_ROOT = {
     "type": "string",
     "description": "Absolute path to the folder containing the item folders (usually library/<project>).",
 }
+_MANUAL_REVIEW_CONFIRMED = {
+    "type": "boolean",
+    "x-mcp-only": True,
+    "description": (
+        "Must be true. Set it only after a vision-capable reviewer has opened every original "
+        "page/strip overlay and every final crop at readable resolution, resolved all withheld "
+        "or uncertain crops, and compared every narration line with its original panel. MAGI-v3 "
+        "and DeepSeek-OCR2 output cannot satisfy this confirmation."
+    ),
+}
+_FINAL_VIDEO_REVIEW_CONFIRMED = {
+    "type": "boolean",
+    "x-mcp-only": True,
+    "description": (
+        "Manga-video upload gate. Must be true only after a reviewer has watched and listened "
+        "to the complete final video at normal speed, checking every crop, narration-to-panel "
+        "pairing, transition, pronunciation, audio boundary, pacing, and final mix."
+    ),
+}
 
 # MCP tool name -> (cli command, description, {property: schema}, [required], {property: flag spec})
 TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
@@ -111,8 +130,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "webtoon_split": (
         "webtoon-split",
         "Crop webtoon items into panels (gutter detection + auto-split + gap rescue) and write "
-        "verify sheets. The result lists per-item suspects and verify_images — inspect those "
-        "images and clear every flag before narrating; fix misses via the overrides file.",
+        "verify sheets. Exit 3 means crops were generated but are NOT approved. A vision-capable "
+        "reviewer must open every verify image and full-resolution crop, resolve suspects, "
+        "forced cuts, content drops, and any withheld automatic full-source result against the "
+        "source art, then re-split any fixes.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
          "work_dir": {**_STR, "description": "Work dir for verify sheets (default: work)."},
@@ -128,9 +149,12 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "webtoon_cutcheck": (
         "webtoon-cutcheck",
         "Render full-resolution review windows around every forced auto-split cut and short "
-        "panel from webtoon-split's ranges manifests, montaged into sheets. Read EVERY sheet "
-        "and judge each flagged location on the art (FIX = cut through figure/speech bubble; "
-        "ACCEPT = background/effect art, banners, bordered thin panels) before narrating.",
+        "panel from webtoon-split's ranges manifests, montaged into sheets. Exit 3 means the "
+        "review artifacts are ready but not approved. Use sheets only as an index, then open "
+        "EVERY image listed in emitted review_windows at full resolution and judge the art "
+        "(FIX = cut through "
+        "figure/speech bubble; ACCEPT = "
+        "background/effect art, banners, bordered thin panels) before narrating.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
          "work_dir": {**_STR, "description": "Work dir holding webtoon_verify manifests (default: work)."}},
@@ -181,8 +205,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "page_split": (
         "page-split",
         "Crop paged manga into panels with MAGI v3 detection (needs install-tool magi-v3; "
-        "LONG-RUNNING — prefer job_start) and write verify overlays. Inspect the result's "
-        "verify_images and clear every suspect before narrating.",
+        "LONG-RUNNING — prefer job_start) and write verify overlays. MAGI boxes are proposals: "
+        "automatic no-detection/full-page results are withheld for manual boxes. Exit 3 means "
+        "a vision-capable reviewer must inspect every page overlay and every actual crop at "
+        "full resolution, including full/tall boxes and reading-order numbers, before narration.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
          "work_dir": {**_STR, "description": "Work dir for verify sheets (default: work)."},
@@ -199,18 +225,19 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "narration_check": (
         "narration-check",
         "Validate narration.json/intro.json structure per item: files parse, every entry's image "
-        "exists, every panel is covered, no empty narration. Run before generating audio. "
-        "(Semantic accuracy and speaker attribution still need an agent reading the panels.)",
+        "exists, image/audio stems are unique, and no narration is empty. Deliberately omitted "
+        "panels are warnings. Semantic accuracy and speaker attribution still require a "
+        "vision-capable reviewer reading the original panels.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS},
         ["project_root"],
         {"project_root": ("--project-root", "value"), "items": ("--items", "list")},
     ),
     "panel_transcript": (
         "panel-transcript",
-        "OCR every panel into <item>/transcript.json with DeepSeek-OCR 2 (needs install-tool "
-        "deepseek-ocr2; LONG-RUNNING — prefer job_start). Run BEFORE writing narration: the "
-        "transcript grounds dialogue paraphrase and speaker attribution, and "
-        "narration-review-sheets shows it next to each narration line during verification.",
+        "Optionally OCR panels into <item>/transcript.json with DeepSeek-OCR 2 (needs "
+        "install-tool deepseek-ocr2; LONG-RUNNING — prefer job_start). OCR is an untrusted "
+        "cross-check, never a substitute for reading panel pixels/bubble tails. Values are "
+        "SHA-256-bound to each crop so re-cropping invalidates stale text.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "force": {**_BOOL, "description": "Re-OCR panels that already have an ocr value."},
          "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]},
@@ -243,9 +270,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "narration_review_sheets": (
         "narration-review-sheets",
         "Render sheets pairing every narration entry's panel image with the narration text and "
-        "the panel's OCR transcript. Read EVERY sheet and verify per panel: the line describes "
-        "THAT panel only, dialogue matches the OCR column, the speaker attribution is right, "
-        "and the line reads naturally aloud. This is the semantic half narration-check skips.",
+        "an optional UNVERIFIED OCR hint. Exit 3 means the review artifacts are ready but not "
+        "approved. Read EVERY sheet and open every original panel: pixels, bubble tails, and "
+        "sequence are authoritative. Verify one current beat, speaker attribution, factual "
+        "grounding, natural causal prose, and spoken flow.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "work_dir": {**_STR, "description": "Scratch root (default: work)."},
          "output_root": {**_STR, "description": "Review-sheet output root."},
@@ -385,32 +413,36 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "video-audio",
         "Generate per-panel narration audio with Kokoro TTS (CPU-friendly). LONG-RUNNING — "
         "prefer job_start. Existing audio is skipped unless overwrite=true (old takes are "
-        "archived, never lost).",
+        "archived, never lost). Blocked until manual crop/narration review is confirmed.",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "project_name": _STR, "items": _ITEMS,
-         "overwrite": _BOOL},
-        ["project_root", "audio_root"],
+         "overwrite": _BOOL, "manual_review_confirmed": _MANUAL_REVIEW_CONFIRMED},
+        ["project_root", "audio_root", "manual_review_confirmed"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "project_name": ("--project-name", "value"), "items": ("--items", "list"),
          "overwrite": ("--overwrite", "flag")},
     ),
     "render_videos": (
         "video-render",
-        "Render one video per item from panels + audio. Needs audio to exist (run generate_audio/audio_audit first).",
+        "Render one video per item from panels + audio after confirmed manual crop/narration "
+        "review. Needs audio to exist (run generate_audio/audio_audit first).",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR,
-         "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL},
-        ["project_root", "audio_root", "output_root"],
+         "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL,
+         "manual_review_confirmed": _MANUAL_REVIEW_CONFIRMED},
+        ["project_root", "audio_root", "output_root", "manual_review_confirmed"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "project_name": ("--project-name", "value"),
          "items": ("--items", "list"), "overwrite": ("--overwrite", "flag")},
     ),
     "build_long_video": (
         "video-join",
-        "Join rendered item videos into one long video (no background music — use add_bgm afterward).",
+        "Join manually reviewed item videos into one long video (no background music — use "
+        "add_bgm afterward).",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR,
          "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL,
+         "manual_review_confirmed": _MANUAL_REVIEW_CONFIRMED,
          "allow_gaps": {**_BOOL, "description": "Skip chapters genuinely missing from the source "
                         "instead of failing (never use it to paper over a failed render)."}},
-        ["project_root", "output_root"],
+        ["project_root", "output_root", "manual_review_confirmed"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "project_name": ("--project-name", "value"),
          "items": ("--items", "list"), "overwrite": ("--overwrite", "flag"),
@@ -433,8 +465,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "run_full_pipeline": (
         "video",
         "The all-in-one pipeline: audio -> fade -> render -> optional join/BGM/final normalize -> validate. VERY "
-        "LONG-RUNNING — prefer job_start. Prefer the single-step tools when iterating.",
+        "LONG-RUNNING — prefer job_start. Requires confirmed manual crop/narration review. "
+        "Prefer the single-step tools when iterating.",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR, "items": _ITEMS,
+         "manual_review_confirmed": _MANUAL_REVIEW_CONFIRMED,
          "tts": {"type": "string", "enum": ["auto", "kokoro", "indextts"]},
          "speaker_wav": {**_STR, "description": "IndexTTS speaker reference WAV (defaults to "
                          "config.system.json -> tts.speaker_wav)."},
@@ -460,7 +494,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "no_background_music": _BOOL,
          "background_music": _STR,
          "music_volume_db": _NUM},
-        ["project_root", "audio_root", "output_root"],
+        ["project_root", "audio_root", "output_root", "manual_review_confirmed"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "items": ("--items", "list"),
          "tts": ("--tts", "value"), "speaker_wav": ("--speaker-wav", "value"),
@@ -507,7 +541,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "description": _STR,
          "tags": {**_STR, "description": "Comma-separated tags, e.g. 'manga,recap'."},
          "privacy": {"type": "string", "enum": ["private", "unlisted", "public"]},
-         "thumbnail": _STR, "made_for_kids": _BOOL, "contains_synthetic_media": _BOOL},
+         "thumbnail": _STR, "made_for_kids": _BOOL, "contains_synthetic_media": _BOOL,
+         "final_video_review_confirmed": _FINAL_VIDEO_REVIEW_CONFIRMED},
         ["video", "title"],
         {"profile": ("--profile", "value"), "auto_auth": ("--no-auto-auth", "no-flag"),
          "video": ("--video", "value"), "title": ("--title", "value"),
@@ -651,8 +686,9 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "work_qa": (
         "work-qa",
         "Aggregated machine-checkable QA gate over generated crops/narration/audio/renders. "
-        "Each problem includes the exact fix command — loop qa->fix->qa until ok=true. "
-        "review-severity items point at sheets that need a vision pass.",
+        "Each problem includes the exact fix command. ok=true means machine-clean only; "
+        "manual_review_required and review-severity items identify original-page/crop/narration "
+        "evidence a vision-capable reviewer must inspect before production approval.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "errors_only": {**_BOOL, "description": "Hide review/info items."},
          "max_problems": {**_INT, "description": "Cap list for small context windows (default 25)."}},
@@ -819,8 +855,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "job_status": (
         "job-status",
-        "Status of one background job: running/succeeded/failed, exit code, progress markers, "
-        "parsed MEDIACONDUCTOR_RESULT payload, and the tail of its log.",
+        "Status of one background job: running/succeeded/review_required/failed/orphaned, exit "
+        "code, progress markers, parsed MEDIACONDUCTOR_RESULT payload, and the tail of its log.",
         {"job_id": {**_STR, "description": "Id returned by job_start."},
          "tail": {**_INT, "description": "Log tail lines to include (default 20)."}},
         ["job_id"],
@@ -868,6 +904,8 @@ def cli_args_schema(cli_name: str, mode: str | None = None) -> dict | None:
     _cli, _desc, props, required, flags = TOOLS[tool]
     schema: dict = {}
     for prop, prop_schema in props.items():
+        if prop_schema.get("x-mcp-only"):
+            continue
         flag, kind = flags.get(prop, (None, "value"))
         schema[prop] = {
             **prop_schema,

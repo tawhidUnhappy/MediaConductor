@@ -28,6 +28,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from mediaconductor.brand import CLI_NAME
+from mediaconductor.panels.gutter import collect_image_paths, stitch_images
 from mediaconductor.utils import emit_result
 
 RED = (255, 0, 0)
@@ -46,28 +47,23 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def _numeric_key(path: Path) -> list:
-    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", path.stem)]
-
-
-def stitch_pages(source_dir: Path) -> Image.Image:
+def stitch_pages(source_dir: Path, sort_mode: str = "numeric") -> Image.Image:
     """Stitch an item's raw pages into one strip, same geometry as webtoon-split."""
-    pages = sorted(
-        (p for p in source_dir.iterdir()
-         if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}),
-        key=_numeric_key,
-    )
+    pages = collect_image_paths(source_dir, sort_mode=sort_mode)
     if not pages:
         raise FileNotFoundError(f"no source pages under {source_dir}")
-    imgs = [Image.open(p).convert("RGB") for p in pages]
-    width = max(im.width for im in imgs)
-    heights = [round(im.height * width / im.width) for im in imgs]
-    strip = Image.new("RGB", (width, sum(heights)), "white")
-    y = 0
-    for im, h in zip(imgs, heights, strict=True):
-        strip.paste(im.resize((width, h)) if im.size != (width, h) else im, (0, y))
-        y += h
-    return strip
+    return stitch_images(pages)
+
+
+def prune_item_artifacts(out_dir: Path, item: str) -> None:
+    """Remove only review files owned by this item before regenerating them."""
+    for pattern in (
+        f"{item}_cut_*.jpg",
+        f"{item}_short_*.jpg",
+        f"{item}_withheld_*.jpg",
+    ):
+        for stale in out_dir.glob(pattern):
+            stale.unlink(missing_ok=True)
 
 
 def parse_forced_cuts(manifest: dict) -> list[int]:
@@ -113,7 +109,7 @@ def render_window(strip: Image.Image, top: int, bottom: int, thumb_width: int,
         ly = y - top
         draw.line([(0, ly), (win.width, ly)], fill=color, width=5)
         draw.text((10, min(max(0, ly + 6), win.height - 30)), label, fill=color, font=font)
-    if win.width > thumb_width:
+    if thumb_width > 0 and win.width > thumb_width:
         win = win.resize((thumb_width, round(win.height * thumb_width / win.width)))
     return win
 
@@ -131,6 +127,11 @@ def montage(windows: list[tuple[str, Image.Image]], columns: int, pad: int = 14,
         draw.text((x + 4, pad), name, fill=(255, 230, 0), font=font)
         sheet.paste(im, (x, pad + header_h))
     return sheet
+
+
+def _cutcheck_exit_code(per_item: dict[str, dict]) -> int:
+    """Return review-required unless artifact generation actually failed."""
+    return 1 if any("error" in report for report in per_item.values()) else 3
 
 
 def parse_args() -> argparse.Namespace:
@@ -157,8 +158,9 @@ def parse_args() -> argparse.Namespace:
                         help="Rows of context above/below each flagged location (default 650).")
     parser.add_argument("--short-height", type=int, default=460,
                         help="Panels shorter than this get a review window (default 460).")
-    parser.add_argument("--thumb-width", type=int, default=650,
-                        help="Width each window is scaled to inside sheets (default 650).")
+    parser.add_argument("--thumb-width", type=int, default=960,
+                        help="Width of each sheet preview (default 960); individual "
+                             "review windows remain at source resolution.")
     parser.add_argument("--columns", type=int, default=3, help="Windows per sheet (default 3).")
     return parser.parse_args()
 
@@ -176,53 +178,97 @@ def main() -> int:
     verify_dir = (args.verify_root or args.work_dir / "webtoon_verify" / project_root.name).resolve()
     out_dir = (args.output_root or args.work_dir / "cutcheck" / project_root.name).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+    for stale in out_dir.glob("sheet_*.jpg"):
+        stale.unlink(missing_ok=True)
 
     windows: list[tuple[str, Image.Image]] = []
+    review_windows: list[str] = []
     per_item: dict[str, dict] = {}
     for i, item_dir in enumerate(selected, 1):
         print(f"MEDIACONDUCTOR_PROGRESS {i}/{len(selected)}", flush=True)
         item = item_dir.name
+        prune_item_artifacts(out_dir, item)
         manifest_path = verify_dir / f"{item}_ranges.json"
         if not manifest_path.is_file():
             print(f"[{item}] no ranges manifest at {manifest_path} — run webtoon-split first")
             per_item[item] = {"error": "missing manifest"}
             continue
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        strip = stitch_pages(item_dir / args.source_subdir)
+        sort_mode = str(manifest.get("sort") or "numeric")
+        if sort_mode not in {"numeric", "lex"}:
+            sort_mode = "numeric"
+        source_dir = item_dir / args.source_subdir
+        source_images = collect_image_paths(source_dir, sort_mode=sort_mode)
+        strip = stitch_pages(source_dir, sort_mode=sort_mode)
         cuts = parse_forced_cuts(manifest)
         shorts = [p for p in manifest.get("final", [])
                   if p.get("height", 0) < args.short_height]
         for y in cuts:
             top, bottom = window_bounds(y, y, strip.height, args.window)
             name = f"{item}_cut_y{y}"
-            win = render_window(strip, top, bottom, args.thumb_width,
+            win = render_window(strip, top, bottom, 0,
                                 [(y, RED, f"CUT y={y}")])
-            win.save(out_dir / f"{name}.jpg", quality=88)
-            windows.append((name, win))
+            window_path = out_dir / f"{name}.jpg"
+            win.save(window_path, quality=95, subsampling=0)
+            review_windows.append(str(window_path))
+            windows.append((name, render_window(
+                strip, top, bottom, args.thumb_width, [(y, RED, f"CUT y={y}")],
+            )))
         for panel in shorts:
             top, bottom = window_bounds(panel["top"], panel["bottom"], strip.height, args.window)
             name = f"{item}_short_p{panel['index']:03d}"
-            win = render_window(strip, top, bottom, args.thumb_width, [
+            marks = [
                 (panel["top"], GREEN, f"#{panel['index']} top y={panel['top']}"),
                 (panel["bottom"], ORANGE, f"#{panel['index']} bottom y={panel['bottom']}"),
-            ])
-            win.save(out_dir / f"{name}.jpg", quality=88)
-            windows.append((name, win))
-        per_item[item] = {"forced_cuts": len(cuts), "short_panels": len(shorts)}
-        print(f"[{item}] windows: {len(cuts)} cut(s), {len(shorts)} short panel(s)", flush=True)
+            ]
+            win = render_window(strip, top, bottom, 0, marks)
+            window_path = out_dir / f"{name}.jpg"
+            win.save(window_path, quality=95, subsampling=0)
+            review_windows.append(str(window_path))
+            windows.append((name, render_window(
+                strip, top, bottom, args.thumb_width, marks,
+            )))
+        withheld_tiles: list[str] = []
+        if manifest.get("withheld_reason"):
+            for tile_index, top in enumerate(range(0, strip.height, 4000), 1):
+                bottom = min(strip.height, top + 4000)
+                name = f"{item}_withheld_t{tile_index:03d}"
+                tile = render_window(strip, top, bottom, 0, [])
+                tile_path = out_dir / f"{name}.jpg"
+                tile.save(tile_path, quality=95, subsampling=0)
+                withheld_tiles.append(str(tile_path))
+                review_windows.append(str(tile_path))
+                windows.append((
+                    name,
+                    render_window(strip, top, bottom, args.thumb_width, []),
+                ))
+        per_item[item] = {
+            "forced_cuts": len(cuts),
+            "short_panels": len(shorts),
+            "withheld_reason": manifest.get("withheld_reason"),
+            "withheld_source_tiles": withheld_tiles,
+            "source_images": [str(path.resolve()) for path in source_images],
+        }
+        print(
+            f"[{item}] windows: {len(cuts)} cut(s), {len(shorts)} short panel(s), "
+            f"{len(withheld_tiles)} withheld-source tile(s)",
+            flush=True,
+        )
 
     sheets = []
     for n in range(0, len(windows), args.columns):
         sheet = montage(windows[n:n + args.columns], args.columns)
         sheet_path = out_dir / f"sheet_{n // args.columns + 1:02d}.jpg"
-        sheet.save(sheet_path, quality=88)
+        sheet.save(sheet_path, quality=95, subsampling=0)
         sheets.append(str(sheet_path))
     print(f"{len(windows)} window(s) -> {len(sheets)} sheet(s) under {out_dir}")
-    print("Read every sheet at full size; judge each flagged location on the art "
+    print("Use the sheets as an index, then open EVERY individual window at full "
+          "source resolution; judge each flagged location on the art "
           "(FIX = figure/bubble cut; ACCEPT = background/banner/bordered thin panel).")
     emit_result(command="webtoon-cutcheck", output_dir=out_dir, windows=len(windows),
-                sheets=sheets, items=per_item)
-    return 0
+                review_windows=review_windows, sheets=sheets, items=per_item,
+                review_required=True)
+    return _cutcheck_exit_code(per_item)
 
 
 if __name__ == "__main__":

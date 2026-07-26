@@ -155,6 +155,11 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
   `narration.json`/`intro.json` content edits the user asked for (prefer
   `narration-edit` over hand-editing). The project-level `manga.json` and
   `publish.json` are machine-managed — read them freely, don't hand-edit them.
+- MAGI boxes and DeepSeek OCR are unverified proposals, never approvals or
+  ground truth. A vision-capable reviewer must open every source page/strip overlay,
+  every crop, and every original panel used by narration. Multi-panel source
+  pages cannot be used as production stand-ins; only a manually confirmed,
+  genuinely borderless splash may remain page-sized.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
@@ -184,9 +189,10 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 - Production manga renders default to `--audio-source faded` with a symmetric
   8 ms fade-in and fade-out per panel. Use `--audio-source raw` only as an
   intentional diagnostic comparison; never destructively process raw TTS.
-- `video-validate` is structural validation, not final media approval.
-  Separately inspect start/middle/end frames, check narration-to-panel timing,
-  audit faded WAV boundaries for clicks, and measure the final complete mix.
+- `video-validate` is structural validation, not final media approval. Before
+  publishing, watch and listen to the complete final video once at normal
+  speed, checking every crop, narration-to-panel pairing, transition,
+  pronunciation, and audio boundary. Also measure the final complete mix.
 
 ## 4. Background jobs (how to run anything long)
 
@@ -197,10 +203,11 @@ completion notifications, use those; otherwise (or from MCP) use the built-in
 job runner — it works everywhere, including frozen installs:
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/example","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output","items":["01-12"],"tts":"auto","build_long_video":true,"normalize_audio":true,"no_background_music":true}'
+uv --project D:/MediaConductor run mediaconductor job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/example","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output","items":["01-12"],"manual_review_confirmed":true,"tts":"auto","build_long_video":true,"normalize_audio":true,"no_background_music":true}'
 # -> {"ok": true, "job_id": "20260714-153000-video-a1b2c3d4", "poll": "mediaconductor job-status ..."}
 uv --project D:/MediaConductor run mediaconductor job-status 20260714-153000-video-a1b2c3d4 --json
-# -> status running/succeeded/failed/orphaned, exit_code, last MEDIACONDUCTOR_PROGRESS,
+# -> status running/succeeded/review_required/failed/orphaned, exit_code,
+#    last MEDIACONDUCTOR_PROGRESS,
 #    parsed MEDIACONDUCTOR_RESULT, log tail
 uv --project D:/MediaConductor run mediaconductor jobs --json
 ```
@@ -209,6 +216,10 @@ The typed `--tool/--arguments-json` form is schema-validated and is what
 `commands --json --full` publishes. The positional compatibility form
 `uv --project D:/MediaConductor run mediaconductor job-start video [video flags...]`
 remains available to existing scripts.
+
+For typed or MCP manga build tools, set `manual_review_confirmed` to true only
+after a vision-capable reviewer has opened every source overlay, actual crop,
+and panel/narration pairing. It is not a machine-confidence flag.
 
 Pass only the generated id to `job-status`. To use a non-default state folder,
 select it with `--jobs-dir`; direct JSON paths and traversal segments are
@@ -224,9 +235,11 @@ block-buffer stdout, so an empty log tail on a running job is normal; trust
 
 ## 5. Machine-output contract
 
-- **Exit codes**: `0` success · `1` runtime failure (bad inputs, missing
+- **Exit codes**: `0` complete · `1` runtime failure (bad inputs, missing
   tool, generation error — stderr/stdout has the reason, possibly as a
-  traceback) · `2` usage error (bad flags; argparse message on stderr).
+  traceback) · `2` usage error (bad flags; argparse message on stderr) · `3`
+  artifacts generated but mandatory manual review is still required. Exit 3
+  is a successful terminal job state named `review_required`, not approval.
 - **`--json` commands** print exactly one JSON object on stdout:
   `commands`, `where`, `doctor`, `tools`, `library-list`, `video-check`,
   `video-validate`, `video-audio-audit`, `audio-takes-list`,
@@ -236,11 +249,11 @@ block-buffer stdout, so an empty log tail on a running job is normal; trust
 - **Marker lines** inside human output (grep for them, ignore the rest):
   - `MEDIACONDUCTOR_PROGRESS <n>/<total> [label]` — progress ticks.
   - `MEDIACONDUCTOR_RESULT {"outputs": ["<abs path>", ...]}` — final line of a
-    successful generation command (`video`, `video-render`, `video-join`,
+    generation command (`video`, `video-render`, `video-join`,
     `video-add-bgm`, `video-normalize-audio`, `download`, `webtoon-split`,
     `page-split`, `thumbnail-compose`, `setup`); tells you exactly what was
-    produced (the split commands also list per-item `verify_images` to
-    inspect).
+    produced. Split/review commands also set `review_required` and list the
+    evidence a vision-capable reviewer must inspect.
 - Output is UTF-8 on every platform, including piped stdout on Windows.
 - Long-running commands stream plain log lines; `\r`-style progress
   redraws may appear when a TTY is attached — safe to ignore in pipes.
@@ -278,10 +291,9 @@ series start to end — politely, resumably — `--chapter N` / `--chapters
 several scanlations share a number), `style-detect` (webtoon vs paged
 verdict + sample pages to eyeball), `webtoon-split` (vertical strips),
 `page-split` (paged manga, MAGI v3), `gutter-split` (low-level engine),
-`panel-transcript` (optional OCR cross-evidence — the narrating agent may
-read bubbles directly from panels instead), `narration-check` (structural
-validation),
-and `narration-review-sheets` (panel/text/OCR semantic review). The
+`panel-transcript` (optional, unverified OCR cross-evidence; original panels
+remain authoritative), `narration-check` (structural validation), and
+`narration-review-sheets` (panel/text/unverified-OCR semantic review). The
 crop → verify → narrate loop is documented in
 [operate/crop-verify-narrate.md](operate/crop-verify-narrate.md).
 
@@ -312,11 +324,13 @@ uv --project D:/MediaConductor run mediaconductor download --url "<mangadex url>
 uv --project D:/MediaConductor run mediaconductor series-plan --project-root "$PROJ" --json
 uv --project D:/MediaConductor run mediaconductor style-detect --project-root "$PROJ" --source-subdir download --json
 uv --project D:/MediaConductor run mediaconductor webtoon-split --project-root "$PROJ" --item-range 01-12 --source-subdir download --work-dir "$WORK"
-# inspect verify_images, clear every suspect, re-split with --overrides if needed
-# OCR panels, author grounded narration.json, then inspect every review sheet:
+# Exit 3 is expected: open every source overlay and every crop at readable
+# resolution, clear every suspect, and re-split with --overrides if needed.
+# OCR is optional cross-evidence. Read the original panel for every line:
 uv --project D:/MediaConductor run mediaconductor panel-transcript --project-root "$PROJ" --item-range 01-12
 uv --project D:/MediaConductor run mediaconductor narration-check --project-root "$PROJ" --item-range 01-12 --json
 uv --project D:/MediaConductor run mediaconductor narration-review-sheets --project-root "$PROJ" --item-range 01-12 --work-dir "$WORK"
+# Exit 3 is expected again: manually approve every panel/narration pairing.
 uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" --work-dir "$WORK" \
     --item-range 01-12 --tts auto --build-long-video --normalize-audio \
     --background-music <music>
@@ -469,6 +483,13 @@ parsed `report` (for `--json` commands), parsed `result` (the
 immediately) + `job_status` / `job_list` polling — a blocking `tools/call`
 that runs for minutes to hours will hit the MCP client's timeout. The
 descriptions of the long tools say so explicitly.
+
+Manga MCP audio/render/join/pipeline calls require
+`manual_review_confirmed=true` after the complete source/crop/narration visual
+pass. The manga `youtube_upload` call separately requires
+`final_video_review_confirmed=true` after a full normal-speed watch/listen
+review. Neither assertion may be inferred from detector/OCR confidence,
+generated sheets, or structural QA.
 
 `--allow-root` is repeatable and confines direct paths, nested typed jobs, and
 manifest-linked files. If omitted, the startup directory is the only allowed

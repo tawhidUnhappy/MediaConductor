@@ -2,7 +2,8 @@
 
 ``mediaconductor narration-check`` verifies the *shape* of each item's narration
 before audio generation: files parse, every entry references a panel image
-that exists, every panel image has an entry, and no narration is empty. It
+that exists, image/audio stems are unique, and no narration is empty. Panels
+may be deliberately omitted after visual review. It
 covers ``intro.json`` too (checked separately, since its errors need fixing
 in a different file) — and flags any panel listed in *both* ``intro.json`` and
 ``narration.json``, because the intro is prepended at render time so such a
@@ -31,6 +32,8 @@ _IMAGE_EXTS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 def _check_entries(entries, panels_dir: Path, label: str, problems: list[str]) -> list[str]:
     """Validate one file's entry list; return the images it references, in order."""
     images: list[str] = []
+    seen_images: set[str] = set()
+    seen_stems: dict[str, str] = {}
     if not isinstance(entries, list):
         problems.append(f"{label}: must be a JSON array")
         return images
@@ -47,6 +50,20 @@ def _check_entries(entries, panels_dir: Path, label: str, problems: list[str]) -
             images.append(image)
             if not (panels_dir / image).is_file():
                 problems.append(f"{where}: image '{image}' not found in panels/")
+            image_key = image.casefold()
+            stem_key = Path(image).stem.casefold()
+            if image_key in seen_images:
+                problems.append(
+                    f"{where}: duplicate image '{image}' would render the same panel twice "
+                    "and reuse one audio file"
+                )
+            elif stem_key in seen_stems:
+                problems.append(
+                    f"{where}: image stem '{Path(image).stem}' collides with "
+                    f"'{seen_stems[stem_key]}'; audio is keyed by image stem"
+                )
+            seen_images.add(image_key)
+            seen_stems.setdefault(stem_key, image)
         if not isinstance(narration, str) or not narration.strip():
             problems.append(f"{where}: missing/empty 'narration'"
                             + (f" (image '{image}')" if isinstance(image, str) else ""))
@@ -83,10 +100,14 @@ def check_item(item_dir: Path) -> dict:
     # beat that then shows again in-context. Almost always an authoring slip;
     # the cold open should use panels the chapter's narration.json omits.
     narration_set = set(narration_images)
-    overlap = [img for img in dict.fromkeys(intro_images) if img in narration_set]
+    narration_stems = {Path(image).stem.casefold() for image in narration_images}
+    overlap = [
+        image for image in dict.fromkeys(intro_images)
+        if Path(image).stem.casefold() in narration_stems
+    ]
     if overlap:
         problems.append(
-            f"{len(overlap)} panel(s) are in both intro.json and narration.json and "
+            f"{len(overlap)} panel stem(s) are in both intro.json and narration.json and "
             "will render twice (the cold-open replays them; give the intro panels the "
             "chapter's narration.json does not use): "
             + ", ".join(overlap[:5]) + ("…" if len(overlap) > 5 else ""))

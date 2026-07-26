@@ -69,7 +69,9 @@ streams, and duration only), `video-audio-audit`
 joiner's item selection, probes video-stream durations, and prints cumulative
 YouTube timestamps without accumulating AAC container padding. After any re-crop,
 run `panel-transcript --seed-only` for those items before narration review; it
-removes stale transcript rows while preserving OCR for unchanged panel names.
+removes stale transcript rows while preserving OCR only for unchanged,
+SHA-256-matched crop bytes. Consumers also suppress mismatched OCR if this sync
+step is accidentally missed.
 
 `video-validate` is necessary but does not certify a production upload.
 Separately inspect representative frames, confirm narration/panel timing,

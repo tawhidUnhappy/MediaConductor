@@ -81,7 +81,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "work-claim":           ("mediaconductor.workboard",                            "claim_main",  "Multi-agent",      "Atomically claim an item+stage or a shared --resource (e.g. gpu) with a TTL lease so agents never collide."),
     "work-note":            ("mediaconductor.workboard",                            "note_main",   "Multi-agent",      "Append/read the project's shared notebook (characters, speakers, tone, decisions) for agent handoff."),
     "work-todo":            ("mediaconductor.workboard",                            "todo_main",   "Multi-agent",      "Shared session todo list (batch scope, redo requests, things to confirm) that survives a switch to a different LLM/vendor mid-project."),
-    "work-qa":              ("mediaconductor.qa_loop",                              "qa_main",     "Multi-agent",      "Aggregated QA gate over crops/narration/audio/renders; every problem carries its fix command — loop until exit 0."),
+    "work-qa":              ("mediaconductor.qa_loop",                              "qa_main",     "Multi-agent",      "Machine QA gate with fix commands; exit 0 does not waive reported manual visual reviews."),
     "work-artifacts":       ("mediaconductor.qa_loop",                              "artifacts_main", "Multi-agent",   "Inventory of reusable generated artifacts (renders, audio takes, transcripts, sheets, music beds) with reuse hints."),
 
     # ── General item-based video pipeline (the recommended workflow) ──────────
@@ -93,7 +93,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "video-add-bgm":        ("mediaconductor.video_pipeline.add_long_video_bgm",    "main",        "Video pipeline",   "Mix background music into an already-joined long video, without rebuilding it from item clips."),
     "video-check":          ("mediaconductor.video_pipeline.check_items",           "main",        "Video pipeline",   "Validate item inputs (panels + narration.json)."),
     "narration-check":      ("mediaconductor.video_pipeline.narration_check",       "main",        "Video pipeline",   "Validate narration.json/intro.json structure: coverage, dangling images, empty text (--json)."),
-    "narration-review-sheets": ("mediaconductor.video_pipeline.narration_sheets",   "main",        "Video pipeline",   "Render panel + narration + OCR sheets for semantic and speaker verification."),
+    "narration-review-sheets": ("mediaconductor.video_pipeline.narration_sheets",   "main",        "Video pipeline",   "Render panel + narration + unverified-OCR sheets for mandatory visual review."),
     "narration-edit":       ("mediaconductor.video_pipeline.narration_edit",        "main",        "Video pipeline",   "Upsert/delete/list narration entries from the CLI (optionally pruning stale WAVs)."),
     "video-validate":       ("mediaconductor.video_pipeline.validate_generation",   "main",        "Video pipeline",   "Check generated audio/videos against the inputs."),
     "video-chapters":       ("mediaconductor.video_pipeline.chapter_timestamps",    "main",        "Video pipeline",   "Generate ready-to-paste YouTube chapter timestamps from rendered item videos (--json)."),
@@ -145,7 +145,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "webtoon-override":     ("mediaconductor.panels.overrides_tool",                "main",        "Manga: acquire",   "Add merge/split fixes to an overrides file; indices resolved from the manifest."),
     "panels-remap":         ("mediaconductor.panels.remap",                         "main",        "Manga: acquire",   "After a re-crop, carry narration + audio from the archived old panels to the new ones."),
     "page-split":           ("mediaconductor.panels.page",                          "main",        "Manga: acquire",   "Split paged manga into panels with MAGI v3 detection and verify sheets."),
-    "panel-transcript":     ("mediaconductor.ocr.panel_transcript",                 "main",        "Manga: acquire",   "OCR every panel into <item>/transcript.json (grounds narration + speaker attribution)."),
+    "panel-transcript":     ("mediaconductor.ocr.panel_transcript",                 "main",        "Manga: acquire",   "Add optional SHA-bound, unverified OCR cross-evidence to <item>/transcript.json."),
 
     # ── Image export & AI context ─────────────────────────────────────────────
     "to-pdf":               ("mediaconductor.images.pdf",                           "main",        "Manga: export",    "Export chapter images to a PDF."),

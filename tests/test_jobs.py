@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-from mediaconductor.jobs import _effective_status, _save_state
+from mediaconductor.jobs import _effective_status, _save_state, _status_for_exit_code
 
 
 def run_cli(*args: str, cwd=None) -> subprocess.CompletedProcess:
@@ -142,6 +142,12 @@ def test_dead_supervisor_reports_orphaned():
     state = {"status": "running", "supervisor_pid": 999_999_999}
     assert _effective_status(state) == "orphaned"
     assert _effective_status({"status": "succeeded", "supervisor_pid": None}) == "succeeded"
+
+
+def test_review_required_exit_is_a_successful_terminal_job_state():
+    assert _status_for_exit_code(0) == "succeeded"
+    assert _status_for_exit_code(3) == "review_required"
+    assert _status_for_exit_code(1) == "failed"
 
 
 def test_state_save_retries_transient_windows_replace_race(tmp_path, monkeypatch):

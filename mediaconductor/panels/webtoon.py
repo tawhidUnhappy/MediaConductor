@@ -16,10 +16,11 @@ and adds the production hardening that recap sessions kept needing:
 - a per-item report line (suspects / rescued / content_drops) plus the
   standard MEDIACONDUCTOR_PROGRESS / MEDIACONDUCTOR_RESULT markers
 
-Every flagged suspect and content_drop should be visually cleared against the
-verify images before writing narration — known-benign patterns are scanlator
-credit banners and end-of-chapter recruiting notices, but the flags exist
-because sometimes it *is* story content.
+Every source strip overlay and every actual crop must be opened at
+readable/full resolution before narration; contact sheets are only an index.
+Flagged suspects and content drops require special attention. Known-benign
+patterns are scanlator credit banners and end-of-chapter recruiting notices,
+but the flags exist because sometimes it *is* story content.
 """
 
 from __future__ import annotations
@@ -54,6 +55,7 @@ DEFAULT_CUT_WINDOW = 380       # search +/- this around even split points
 DEFAULT_ENERGY_THRESHOLD = 22.0  # row-std above this counts as "real content"
 MIN_RESCUE_GAP = 40            # gaps shorter than this are plain gutters
 MAX_RESCUE_GAP = 700           # gaps taller than this are handled as drops to review
+FULL_SOURCE_STRIP_FRAC = 0.95   # automatic near-whole-strip output is not a crop
 
 
 def row_energy(combined: Image.Image) -> Tuple[np.ndarray, np.ndarray]:
@@ -264,6 +266,8 @@ def write_contact_sheets(
     suspect_min_height: int = 140,
 ) -> int:
     """Numbered thumbnail grid per item; suspects get a red '!!' label."""
+    for stale in verify_dir.glob(f"{item}_sheet_*.png"):
+        stale.unlink(missing_ok=True)
     font, _ = _load_fonts()
     thumb_w, thumb_h, cols, pad = 240, 340, 7, 10
     label_h = 36
@@ -304,6 +308,8 @@ def write_strip_overlay(
     ranges: List[Range],
     verify_dir: Path,
     cut_rows: Sequence[int] = (),
+    *,
+    review_message: str = "MANUAL VISUAL REVIEW REQUIRED",
 ) -> None:
     """Downscaled strip: panel boxes (green), auto-cuts (blue), drops (red).
 
@@ -312,8 +318,10 @@ def write_strip_overlay(
     use — so a reviewer can turn "this cut is wrong" directly into a numeric
     fix without estimating positions from a scaled image.
     """
+    for stale in verify_dir.glob(f"{item}_strip_*.png"):
+        stale.unlink(missing_ok=True)
     font, _ = _load_fonts()
-    overlay_w = 420
+    overlay_w = min(combined.width, 960)
     scale = overlay_w / combined.width
     small = combined.resize((overlay_w, max(1, int(combined.height * scale))))
     draw = ImageDraw.Draw(small, "RGBA")
@@ -337,6 +345,22 @@ def write_strip_overlay(
         sy = int(ry * scale)
         draw.line([small.width - 14, sy, small.width, sy], fill=(255, 255, 0, 200), width=2)
         draw.text((small.width - 100, max(0, sy - 30)), str(ry), fill=(255, 255, 0), font=font)
+    border = max(5, small.width // 120)
+    banner_h = 72
+    framed = Image.new(
+        "RGB",
+        (small.width + 2 * border, small.height + banner_h + 2 * border),
+        (180, 0, 0),
+    )
+    framed.paste(small.convert("RGB"), (border, border + banner_h))
+    framed_draw = ImageDraw.Draw(framed)
+    framed_draw.text(
+        (border + 10, border + 8),
+        review_message,
+        fill=(255, 255, 255),
+        font=font,
+    )
+    small = framed
     tile_h = 3200
     n = 0
     for y in range(0, small.height, tile_h):
@@ -356,6 +380,8 @@ def write_ranges_manifest(
     prefix: str,
     cut_rows: Sequence[int],
     forced_cuts: Sequence[str],
+    sort_mode: str,
+    withheld_reason: str | None,
 ) -> Path:
     """Machine-readable record of this run's final crops.
 
@@ -376,7 +402,9 @@ def write_ranges_manifest(
         "item": item,
         "strip_height": strip_height,
         "prefix": prefix,
+        "sort": sort_mode,
         "overrides_applied": overrides_applied,
+        "withheld_reason": withheld_reason,
         "auto_cut_rows": list(cut_rows),
         "forced_cuts": list(forced_cuts),
         "merge_note": "merge indices are 0-based positions in `base` (the "
@@ -398,6 +426,22 @@ def write_ranges_manifest(
     path = verify_dir / f"{item}_ranges.json"
     path.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     return path
+
+
+def automatic_full_source_requires_override(
+    ranges: Sequence[Range],
+    total_height: int,
+    overrides: Dict | None,
+) -> bool:
+    """True when an automatic crop still covers at least 95% of the source."""
+    explicit_replace = isinstance(overrides, dict) and "replace" in overrides
+    return bool(
+        not explicit_replace
+        and total_height > 0
+        and len(ranges) == 1
+        and (ranges[0][1] - ranges[0][0])
+        >= FULL_SOURCE_STRIP_FRAC * total_height
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +468,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
     paths = collect_image_paths(source_dir, sort_mode=args.sort) if source_dir.is_dir() else []
     if not paths:
         print(f"[{item}] SKIP: no images in {source_dir}", flush=True)
-        return {"item": item, "status": "skipped"}
+        return {"item": item, "status": "skipped", "review_required": True}
 
     if not args.force_style:
         from mediaconductor.panels.style_detect import style_guard
@@ -432,7 +476,12 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         ok, guard_message = style_guard(source_dir, "webtoon")
         print(f"[{item}] {guard_message}", flush=True)
         if not ok:
-            return {"item": item, "status": "error", "reason": "style_mismatch"}
+            return {
+                "item": item,
+                "status": "error",
+                "reason": "style_mismatch",
+                "review_required": True,
+            }
 
     combined = stitch_images(paths)
     cfg = load_gutter_config(Path(args.config)) if args.config else GutterConfig()
@@ -450,34 +499,55 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
     ranges = apply_range_overrides(ranges, item_overrides, combined.height)
     if not ranges:
         print(f"[{item}] ERROR: no panel ranges detected", flush=True)
-        return {"item": item, "status": "error"}
+        return {"item": item, "status": "error", "review_required": True}
+    crop_ranges = ranges
+    suspects: List[str] = []
+    review_message = "MANUAL VISUAL REVIEW REQUIRED"
+    withheld_reason = None
+    if automatic_full_source_requires_override(
+        ranges, combined.height, item_overrides
+    ):
+        crop_ranges = []
+        withheld_reason = "automatic-full-source-strip"
+        suspects.append(withheld_reason)
+        review_message = "AUTOMATIC FULL-SOURCE CROP WITHHELD - MANUAL OVERRIDE REQUIRED"
 
     archived = _archive_existing_panels(panels_dir)
     panels_dir.mkdir(parents=True, exist_ok=True)
     prefix = args.prefix_template.format(item=item)
     crops: List[Tuple[int, Image.Image]] = []
-    suspects: List[str] = []
-    for i, (top, bottom) in enumerate(ranges, 1):
+    review_crops: List[str] = []
+    for i, (top, bottom) in enumerate(crop_ranges, 1):
         panel = combined.crop((0, top, combined.width, bottom)).convert("RGB")
-        panel.save(panels_dir / f"{prefix}{i:03d}.jpg", "JPEG", quality=95, optimize=True)
+        crop_path = panels_dir / f"{prefix}{i:03d}.jpg"
+        panel.save(crop_path, "JPEG", quality=95, optimize=True)
+        review_crops.append(str(crop_path.resolve()))
         crops.append((i, panel))
         ratio = panel.height / panel.width
         if ratio > 2.4 or panel.height < 140:
             suspects.append(f"#{i} {panel.width}x{panel.height}")
 
     content_drops = find_content_gaps(
-        ranges, raw_std, combined.height, energy_threshold=args.energy_threshold)
+        crop_ranges, raw_std, combined.height, energy_threshold=args.energy_threshold)
     write_contact_sheets(item, crops, verify_dir)
-    write_strip_overlay(item, combined, ranges, verify_dir, cut_rows)
+    write_strip_overlay(
+        item,
+        combined,
+        crop_ranges,
+        verify_dir,
+        cut_rows,
+        review_message=review_message,
+    )
     manifest = write_ranges_manifest(
-        item, verify_dir, strip_height=combined.height, ranges=ranges,
+        item, verify_dir, strip_height=combined.height, ranges=crop_ranges,
         base_ranges=base_ranges, overrides_applied=bool(item_overrides),
         prefix=prefix, cut_rows=cut_rows, forced_cuts=forced_cuts,
+        sort_mode=args.sort, withheld_reason=withheld_reason,
     )
 
-    dropped = combined.height - sum(b - t for t, b in ranges)
+    dropped = combined.height - sum(b - t for t, b in crop_ranges)
     print(
-        f"[{item}] pages={len(paths)} strip_h={combined.height} panels={len(ranges)} "
+        f"[{item}] pages={len(paths)} strip_h={combined.height} panels={len(crop_ranges)} "
         f"dropped_rows={dropped} ({100 * dropped / combined.height:.1f}%) "
         f"suspects={suspects if suspects else 'none'} "
         f"forced_cuts={forced_cuts if forced_cuts else 'none'} "
@@ -489,7 +559,8 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
     return {
         "item": item,
         "status": "ok",
-        "panels": len(ranges),
+        "review_required": True,
+        "panels": len(crop_ranges),
         "suspects": suspects,
         # Auto-split cuts that found no true gutter band — each slices
         # through content by necessity; verify every one on the overlay.
@@ -497,12 +568,20 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         "rescued": rescued,
         "content_drops": content_drops,
         "ranges_manifest": str(manifest),
-        # The exact images an agent must open to clear the flags above.
+        "source_images": [str(path.resolve()) for path in paths],
+        # Sheets/overlays are indexes. The full-resolution crops below are the
+        # actual production pixels a reviewer must open one by one.
+        "review_crops": review_crops,
         "verify_images": sorted(
             str(p) for pattern in (f"{item}_sheet_*.png", f"{item}_strip_*.png")
             for p in verify_dir.glob(pattern)
         ),
     }
+
+
+def _split_exit_code(reports: Sequence[dict]) -> int:
+    """Exit 3 after artifact generation; reserve exit 1 for true failures."""
+    return 1 if any(report.get("status") != "ok" for report in reports) else 3
 
 
 def parse_args() -> argparse.Namespace:
@@ -582,14 +661,14 @@ def main() -> int:
         print(f"MEDIACONDUCTOR_PROGRESS {i}/{len(selected)}", flush=True)
         reports.append(process_item(item_dir, args, overrides, verify_dir))
 
-    failed = [r["item"] for r in reports if r["status"] == "error"]
     emit_result(
         command="webtoon-split",
         project=project_root.name,
         verify_dir=verify_dir,
         items=reports,
+        review_required=True,
     )
-    return 1 if failed else 0
+    return _split_exit_code(reports)
 
 
 if __name__ == "__main__":

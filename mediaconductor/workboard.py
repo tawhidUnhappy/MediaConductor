@@ -59,6 +59,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from mediaconductor.brand import CLI_NAME
+from mediaconductor.ocr.panel_transcript import load_bound_ocr
 from mediaconductor.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem
 from mediaconductor.video_pipeline.common import (
     DEFAULT_AUDIO_ROOT,
@@ -136,17 +137,8 @@ def _transcript_progress(item_dir: Path) -> tuple[int, int]:
     An empty ``ocr`` value is a valid processed result for a textless panel.
     Seeded-but-unprocessed entries are distinguished by having no ``ocr`` key.
     """
-    path = item_dir / "transcript.json"
-    if not path.is_file():
-        return 0, 0
-    try:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception:  # noqa: BLE001 — a corrupt transcript reads as "redo OCR"
-        return 0, 0
-    if not isinstance(data, list):
-        return 0, 0
-    filled = sum(1 for e in data if isinstance(e, dict) and "ocr" in e)
-    return filled, len(data)
+    bound, total, _stale = load_bound_ocr(item_dir)
+    return len(bound), total
 
 
 def _narration_entries(item_dir: Path) -> list[dict]:
