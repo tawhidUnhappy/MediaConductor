@@ -304,7 +304,6 @@ def test_story_video_contract_covers_fps_tts_narration_and_voice_inputs():
         lambda data: data["production"].update({"tts": "kokoro"}),
         lambda data: data["scenes"][0].update({"narration": "A corrected spoken line."}),
         lambda data: data["scenes"][0].update({"speaker": "ari"}),
-        lambda data: data["scenes"][0].update({"emotion": "urgent"}),
     ):
         changed = json.loads(json.dumps(baseline))
         mutate(changed)

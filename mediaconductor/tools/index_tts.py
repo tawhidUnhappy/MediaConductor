@@ -16,7 +16,7 @@ def print_help() -> None:
     print("Arguments pass through to the batch pipeline (audio/tts_pipeline.py):")
     print("  --project-root DIR   (required)  --speaker-wav WAV  (required)")
     print("  --audio-root DIR  --project-name NAME  --items ...  --item-range A-B")
-    print("  --overwrite  --resume  --emo-alpha F  --no-emotion")
+    print("  --overwrite  --resume")
     print(f"The command reads {PRODUCT_NAME} config.json/config.system.json from the current project root.")
     print()
     print("Environment overrides:")

@@ -108,12 +108,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lang", default="a")
     parser.add_argument("--speed", type=float, default=1.0)
     parser.add_argument("--device", choices=("auto", "cuda", "mps", "cpu"), default="auto")
-    parser.add_argument("--emo-alpha", type=float, default=None,
-                        help="IndexTTS only: strength of per-entry narration 'emotion' fields "
-                             "(default 0.6; 0 disables). Kokoro ignores emotion fields.")
-    parser.add_argument("--no-emotion", action="store_true",
-                        help="IndexTTS only: synthesize in a plain neutral delivery. The "
-                             "calm-policy preflight still rejects invalid emotion fields.")
     parser.add_argument("--build-long-video", action="store_true")
     parser.add_argument("--allow-gaps", action="store_true",
                         help="When joining the long video, skip chapters that are genuinely missing "
@@ -258,10 +252,6 @@ def main() -> int:
         )
         if args.speaker_wav is not None:
             audio_cmd += ["--speaker-wav", str(args.speaker_wav)]
-        if args.emo_alpha is not None:
-            audio_cmd += ["--emo-alpha", str(args.emo_alpha)]
-        if args.no_emotion:
-            audio_cmd.append("--no-emotion")
     else:
         audio_cmd = cli_command(
             "video-audio",

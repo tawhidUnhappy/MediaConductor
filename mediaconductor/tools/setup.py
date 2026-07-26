@@ -37,13 +37,10 @@ from mediaconductor.utils import emit_result
 # Installed on every machine — the pipeline always has a working TTS engine.
 BASE_TOOLS = ["kokoro-82m"]
 # Installed when an NVIDIA GPU is detected (or forced with --all).
-GPU_TOOLS = ["index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo", "gemma-4"]
+GPU_TOOLS = ["index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"]
 
 MODE_TOOLS = {
-    # gemma-4 (the local LLM behind crop-qa / characters / narrate-auto /
-    # manga-auto) is CPU-capable, so manga setups get it even without a GPU.
-    "manga-video": ["kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo",
-                    "gemma-4"],
+    "manga-video": ["kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2", "z-image-turbo"],
     "ai-story": ["kokoro-82m", "index-tts", "z-image-turbo"],
     "song-video": ["ace-step", "demucs", "whisperx", "z-image-turbo"],
 }

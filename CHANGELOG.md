@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.4 — 2026-07-26
+
+### Removed
+
+- Removed the bundled Gemma 4 local-LLM runtime and its `llm`, `crop-qa`,
+  `characters`, `narrate-auto`, and `manga-auto` command/MCP surfaces. Manga
+  crop review and narration now remain explicit visual-review tasks, with
+  `work-note` carrying cast, speaker, crop, and handoff decisions between
+  agents.
+- Removed per-entry TTS emotion modulation and the `--emo-alpha` /
+  `--no-emotion` CLI and MCP controls. Legacy `emotion` keys in narration JSON
+  are now inert metadata; use `--overwrite-audio` to replace previously
+  generated takes when needed.
+
 ## 2.2.3 — 2026-07-21
 
 ### Added
@@ -90,8 +104,7 @@
   `mediaconductor llm` (text + images, JSON-schema-constrained output,
   batch manifests). Installed by default with `setup --mode manga-video`.
 - **Assist commands** (`mediaconductor/assist/`) so small or text-only driver
-  agents can still produce correct manga videos — see
-  [docs/local-llm.md](docs/local-llm.md):
+  agents could produce vision-grounded manga drafts in that release:
   - `crop-qa` — Gemma-vision review of every flagged crop location (webtoon
     forced cuts/short panels, paged page overlays); prints the exact
     `webtoon-override` / `--overrides` fix per FIX verdict; exit 3 until clean.

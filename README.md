@@ -72,13 +72,13 @@ webtoon or paged-manga crops, visual verification sheets, OCR-grounded
 narration, Kokoro/IndexTTS, item and long-video rendering, music mixing,
 thumbnails, QA, and YouTube.
 
-Small or text-only driver agents get an assist layer powered by a local
-Gemma 4 model (`mediaconductor install-tool gemma-4`): `manga-auto`
-orchestrates download → format detection → the correct splitter → automated
-crop QA → OCR → a cast registry and grounded narration draft, stopping at
-explicit review gates (exit 3). The splitters themselves refuse a
-wrong-format run (webtoon pages into the paged splitter and vice versa). See
-[docs/local-llm.md](docs/local-llm.md).
+The splitters refuse a confident wrong-format run (webtoon pages into the
+paged splitter and vice versa), but crop approval and narration remain visual
+tasks. Inspect every verification sheet, write narration directly from the
+panels with OCR only as a cross-check, and run the narration checks before
+building. A text-only driver must hand those steps to a vision-capable
+agent or human; use `work-note` to preserve cast, speaker, crop, and handoff
+decisions between agents.
 
 See [the Manga Video skill](skills/manga-video/SKILL.md).
 
@@ -231,7 +231,6 @@ three paths are explicitly documented as non-reproducible follow-ups.
 | WhisperX 3.8.6 | vocal timing | pinned source plus local HF faster-whisper and English Wav2Vec2 alignment snapshots |
 | MAGI v3 | manga panel detection | pinned optional source clone; remote-code model resolves on first use |
 | DeepSeek-OCR 2 | panel OCR | pinned source commit and HF model revision |
-| Gemma 4 E4B | local LLM (crop QA, cast registry, narration drafts) | pinned llama.cpp release binary + pinned HF GGUF revision |
 
 Install or inspect one tool:
 

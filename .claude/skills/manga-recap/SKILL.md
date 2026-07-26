@@ -193,12 +193,7 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
   repeated words. `work-qa` rejects these as `narration:fluency` and the
   TTS/render preflight refuses to build until they are fixed;
 - **no name before the story gives it** — if the hero names a dragon on page
-  14, earlier lines say "the dragon"; naming it sooner spoils the scene;
-- **optional `"emotion"` field** on the few lines that earn it: the value must
-  be **exactly** `"calm"`, `"neutral"`, `"slightly sad"`, or `"slightly happy"`
-  — IndexTTS2 renders anything stronger as an actual shouted performance, so
-  high-intensity hints are rejected by QA. Most lines carry no field at all;
-  full rules in `mediaconductor/assets/prompts/narration.md`.
+  14, earlier lines say "the dragon"; naming it sooner spoils the scene.
 
 Verify in two passes:
 

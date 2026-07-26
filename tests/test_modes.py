@@ -25,6 +25,7 @@ def test_router_and_scoped_mcp_catalogs_are_isolated():
     assert {tool["name"] for tool in _tools_list()} == COMMON_TOOLS
     story = {tool["name"] for tool in _tools_list("ai-story")}
     song = {tool["name"] for tool in _tools_list("song-video")}
+    manga = {tool["name"] for tool in _tools_list("manga-video")}
     assert {"story_init", "story_check", "story_build"} <= story
     assert {"song_init", "song_check", "song_build"} <= song
     assert {"youtube_profiles", "youtube_status", "youtube_upload", "youtube_list",
@@ -32,6 +33,7 @@ def test_router_and_scoped_mcp_catalogs_are_isolated():
     assert "youtube_upload" not in COMMON_TOOLS
     assert not ({"song_init", "download", "run_full_pipeline"} & story)
     assert not ({"story_init", "download", "run_full_pipeline"} & song)
+    assert not {"crop_qa", "characters", "narrate_auto", "manga_auto"} & manga
 
 
 def test_mode_rejects_hidden_tools_and_job_escape():

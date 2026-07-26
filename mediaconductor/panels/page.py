@@ -77,7 +77,7 @@ FULL_PAGE_AREA_FRAC = 0.85
 # sliver in the middle of it once fit to that frame — a square (1:1) crop
 # still reads fine, this only flags crops well past that. Informational, not
 # a suspect: many panels are legitimately tall (a full-body action shot), so
-# this is a hint for the crop reviewer (crop-qa / a human) to check whether
+# this is a hint for a human or vision-capable crop reviewer to check whether
 # the excess is trimmable gutter, not an automatic failure.
 TALL_PANEL_ASPECT_RATIO = 2.2
 

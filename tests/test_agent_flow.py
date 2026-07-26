@@ -8,7 +8,7 @@ import pytest
 from PIL import Image
 
 from mediaconductor.download.mangadex import _chapter_sort_key, _slugify_project_name
-from mediaconductor.panels.style_detect import measure_item, verdict_from_stats
+from mediaconductor.panels.style_detect import measure_item, style_guard, verdict_from_stats
 from mediaconductor.series_plan import build_plan, load_publish_json, mark_main, save_publish_json
 from mediaconductor.tools.setup import BASE_TOOLS, GPU_TOOLS, plan_tools
 from mediaconductor.video_pipeline.narration_check import check_item
@@ -60,6 +60,37 @@ def test_style_detect_webtoon_and_paged(tmp_path):
 def test_style_detect_empty_dir_returns_none(tmp_path):
     (tmp_path / "empty").mkdir()
     assert measure_item(tmp_path / "empty") is None
+
+
+def test_sliced_webtoon_detected_despite_page_shaped_ratios(tmp_path):
+    """Shared-width webtoon slices must not be mistaken for page scans."""
+    heights = [1561, 1174, 1078, 1519, 1168, 1564, 1034, 1158, 1381, 993]
+    source = tmp_path / "download"
+    _make_images(source, [(800, height) for height in heights])
+    stats = measure_item(source)
+    assert stats["paged_fraction"] >= 0.6
+    assert verdict_from_stats(stats) == "webtoon"
+    ok, message = style_guard(source, "paged")
+    assert not ok and "webtoon-split" in message
+
+
+def test_uniform_page_scans_still_detect_as_paged(tmp_path):
+    source = tmp_path / "download"
+    _make_images(source, [(1000, 1500 + (index % 3)) for index in range(10)])
+    assert verdict_from_stats(measure_item(source)) == "paged"
+
+
+def test_style_guard_allows_matching_and_uncertain(tmp_path):
+    source = tmp_path / "download"
+    _make_images(source, [(1000, 1500)] * 4)
+    ok, _ = style_guard(source, "paged")
+    assert ok
+    ok, message = style_guard(source, "webtoon")
+    assert not ok and "page-split" in message
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    ok, message = style_guard(empty, "webtoon")
+    assert ok and "no readable pages" in message
 
 
 # ── narration structural checks ─────────────────────────────────────────────

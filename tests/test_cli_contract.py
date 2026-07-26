@@ -31,6 +31,7 @@ def test_full_catalog_describes_typed_job_wrapper_and_source_layout(capsys):
     assert main(["commands", "--mode", "manga-video", "--json", "--full"]) == 0
     data = json.loads(capsys.readouterr().out)
     commands = {entry["name"]: entry for entry in data["commands"]}
+    assert not {"llm", "crop-qa", "characters", "narrate-auto", "manga-auto"} & set(commands)
 
     job_args = commands["job-start"]["args"]
     assert job_args["tool"]["flag"] == "--tool"
@@ -44,6 +45,8 @@ def test_full_catalog_describes_typed_job_wrapper_and_source_layout(capsys):
     assert chapters["item_range"]["flag"] == "--item-range"
     assert chapters["allow_gaps"]["flag"] == "--allow-gaps"
     assert commands["video"]["args"]["validate"]["flag"] == "--no-validate"
+    assert "emo_alpha" not in commands["video"]["args"]
+    assert "no_emotion" not in commands["video"]["args"]
     sheets = commands["narration-review-sheets"]["args"]
     assert sheets["output_root"]["flag"] == "--output-root"
 
@@ -63,7 +66,7 @@ def test_tools_json(capsys):
     assert "tools_home" in data
     assert set(data["tools"]) == {
         "ace-step", "demucs", "whisperx", "kokoro-82m", "index-tts",
-        "magi-v3", "deepseek-ocr2", "z-image-turbo", "gemma-4",
+        "magi-v3", "deepseek-ocr2", "z-image-turbo",
     }
 
 

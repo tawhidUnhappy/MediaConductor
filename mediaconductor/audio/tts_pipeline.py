@@ -31,7 +31,6 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from mediaconductor.config import HF_CACHE_DIR
 from mediaconductor.utils import LazyArchiveRunDir, archive_into_run
-from mediaconductor.audio.emotion import DEFAULT_EMO_ALPHA, indextts_kwargs, narration_emotion
 from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
 from mediaconductor.video_pipeline.common import (
     item_dirs,
@@ -131,12 +130,6 @@ def parse_args() -> argparse.Namespace:
                         help="Delete the most recently generated audio file plus the previous 5 before "
                              "generating, in case the last run was interrupted mid-write, then continue "
                              "with anything still missing.")
-    parser.add_argument("--emo-alpha", type=float, default=DEFAULT_EMO_ALPHA,
-                        help="How strongly a narration entry's optional 'emotion' field colors the "
-                             "voice (0 disables, ~0.6 keeps the cloned voice recognizable).")
-    parser.add_argument("--no-emotion", action="store_true",
-                        help="Synthesize in a plain neutral delivery. The calm-policy preflight "
-                             "still rejects invalid emotion fields.")
     return parser.parse_args()
 
 
@@ -196,13 +189,13 @@ def main() -> int:
                 flush=True,
             )
 
-    per_chapter: list[list[tuple[str, str | None, Path]]] = []
+    per_chapter: list[list[tuple[str, Path]]] = []
     for item_dir in selected:
         item_audio_dir = audio_root / name / item_dir.name
         item_audio_dir.mkdir(parents=True, exist_ok=True)
         narrations = load_narration(item_dir)
         print(f"\n[{item_dir.name}] {len(narrations)} narration item(s) -> {item_audio_dir}", flush=True)
-        jobs_for_item: list[tuple[str, str | None, Path]] = []
+        jobs_for_item: list[tuple[str, Path]] = []
         for item in narrations:
             image_name = item.get("image")
             text = (item.get("narration") or item.get("text") or "").strip()
@@ -213,8 +206,7 @@ def main() -> int:
                 if not args.overwrite:
                     continue
                 archive_into_run(dst, archive_run_dir.dir, subdir=item_dir.name)
-            emotion = None if args.no_emotion else narration_emotion(item)
-            jobs_for_item.append((text, emotion, dst))
+            jobs_for_item.append((text, dst))
         per_chapter.append(jobs_for_item)
 
     if archive_run_dir.allocated is not None:
@@ -242,32 +234,16 @@ def main() -> int:
     failures: list[Path] = []
     i = 0
     for chapter_idx, (item_dir, jobs_for_item) in enumerate(zip(selected, per_chapter, strict=False), start=1):
-        for text, emotion, dst in jobs_for_item:
+        for text, dst in jobs_for_item:
             i += 1
-            tag = f"  (emotion: {emotion})" if emotion else ""
-            print(f"  [{i}/{len(to_generate)}] {dst.parent.name}/{dst.name}{tag}", flush=True)
+            print(f"  [{i}/{len(to_generate)}] {dst.parent.name}/{dst.name}", flush=True)
             try:
-                extra = indextts_kwargs(emotion, args.emo_alpha) if args.emo_alpha > 0 else {}
-                try:
-                    tts.infer(
-                        spk_audio_prompt=str(speaker_wav),
-                        text=text,
-                        output_path=str(dst),
-                        verbose=False,
-                        **extra,
-                    )
-                except TypeError:
-                    # Older IndexTTS2 builds without emo_text support: emotion
-                    # degrades to neutral delivery instead of failing the run.
-                    if not extra:
-                        raise
-                    print("[warn] this IndexTTS2 build has no emo_text support - generating without emotion", flush=True)
-                    tts.infer(
-                        spk_audio_prompt=str(speaker_wav),
-                        text=text,
-                        output_path=str(dst),
-                        verbose=False,
-                    )
+                tts.infer(
+                    spk_audio_prompt=str(speaker_wav),
+                    text=text,
+                    output_path=str(dst),
+                    verbose=False,
+                )
                 generated += 1
             except Exception as exc:
                 print(f"[ERROR] {dst.name}: {exc}")

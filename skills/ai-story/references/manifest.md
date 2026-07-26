@@ -81,7 +81,7 @@ Z-Image Turbo runs at `guidance_scale 0.0`, so `production.negative_prompt` is n
 
 Run `story-check --manifest <path> --json` after every edit. Fix every reported path. Contract digests come from the report/generation records; generated-file digests come from `review/reference_generation.json` and `review/scene_generation.json`. Copy both only after visually approving the matching contact sheet. A scene-generation record must also name the exact current reference artifact digest; approving new reference sheets never authorizes old scene frames. Any contract edit, regeneration, or file replacement invalidates the old approval. Seeds are deterministic when omitted; store an explicit seed only for an intentional approved variant.
 
-The video-generation record separately binds the current scene artifacts, FPS, requested and resolved TTS engine, every narration/speaker/emotion field, and the SHA-256 of an IndexTTS speaker WAV when one is used. A change to any of them requires narration/video regeneration and a fresh complete-video review. Preserve the recorded speaker WAV until publication so `story-check --for-publish` can verify that voice provenance.
+The video-generation record separately binds the current scene artifacts, FPS, requested and resolved TTS engine, every narration and speaker field, and the SHA-256 of an IndexTTS speaker WAV when one is used. A change to any of them requires narration/video regeneration and a fresh complete-video review. Preserve the recorded speaker WAV until publication so `story-check --for-publish` can verify that voice provenance.
 
 Before publishing, set `youtube.profile` to the exact named account verified
 through `youtube-profiles` and `youtube-status --profile <name> --verify`.

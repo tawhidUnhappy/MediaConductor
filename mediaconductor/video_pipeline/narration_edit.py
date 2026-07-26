@@ -59,7 +59,7 @@ def upsert(entries: list[dict], image: str, text: str) -> tuple[list[dict], str 
 def upsert_entry(entries: list[dict], new_entry: dict) -> tuple[list[dict], dict | None]:
     """Replace image's whole entry with new_entry (add or full replace);
     returns (entries, previous_entry or None). Used by --batch/--set-json so
-    optional fields like "emotion" can be set, changed, or dropped by simply
+    optional metadata fields can be set, changed, or dropped by simply
     omitting them from new_entry — the object passed IS the new entry."""
     image = new_entry["image"]
     for i, entry in enumerate(entries):

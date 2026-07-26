@@ -33,16 +33,17 @@ The detailed manga-only operating manual is
 [`manga-video-guide.md`](manga-video-guide.md). Story and song agents must not
 load it.
 
-## Small or text-only driver agents
+## Visual-review requirement
 
-If you cannot reliably read panel images, or you are a small model driving the
-CLI, use the assist layer ([`local-llm.md`](local-llm.md)): install the local
-Gemma 4 tool (`mediaconductor install-tool gemma-4`) and prefer
-`mediaconductor manga-auto` — it downloads, picks the correct splitter (the
-splitters also refuse a wrong-format run on their own), reviews crops with
-`crop-qa`, drafts the cast registry and grounded narration, and stops at exit
-3 review gates with an explicit checklist. Exit 3 always means "artifacts are
-ready — review the listed sheets", never "done".
+Manga crop approval and narration require a driver that can read the panel
+images. A text-only agent may run acquisition, splitting, OCR, and structural
+checks, but it must hand verification-sheet review and grounded narration to a
+vision-capable agent or human. OCR is only a cross-check; it cannot establish
+panel composition, speaker identity, action, or crop quality by itself.
+
+Record cast, speaker, crop, and handoff decisions with `work-note` so another
+agent can resume without guessing. Before building, inspect every crop and
+narration review sheet and rerun the corresponding checks after each fix.
 
 Always run `mediaconductor where --json` first and confirm `workspace_root` is
 the workspace you intend to fill: `library/`, `audio/`, `output/`, and `work/`

@@ -17,6 +17,7 @@ from mediaconductor.mcp_server import (
     _enforce_workspace_policy,
     _resolve_allowed_roots,
     _run_tool,
+    _validate_arguments,
 )
 
 
@@ -87,6 +88,10 @@ def test_run_full_pipeline_exposes_fade_safe_audio_controls():
     assert properties["audio_source"]["default"] == "faded"
     assert properties["audio_fade_ms"]["type"] == "number"
     assert properties["audio_fade_ms"]["default"] == 8.0
+    assert "emo_alpha" not in properties
+    assert "no_emotion" not in properties
+    with pytest.raises(ValueError, match="unknown argument"):
+        _validate_arguments("run_full_pipeline", {"emo_alpha": 0.4})
 
     args = _build_args("run_full_pipeline", {
         "project_root": "/library/story",

@@ -2,7 +2,7 @@
 
 ``mediaconductor work-qa`` aggregates every *machine-checkable* quality gate for
 the generated artifacts (crops present, OCR coverage, narration structure,
-speakability, emotion fields, audio coverage + integrity, render freshness)
+speakability, delivery safety, audio coverage + integrity, render freshness)
 into one ordered problem list — each problem carrying a concrete ``fix``
 command. That shape exists for small LLMs: the whole correction workflow
 collapses to a loop a modest model can drive without global judgment —
@@ -29,8 +29,7 @@ import json
 import sys
 from pathlib import Path
 
-from mediaconductor.audio.emotion import (
-    emotion_lint,
+from mediaconductor.audio.narration_safety import (
     narration_delivery_lint,
     narration_fluency_lint,
 )
@@ -107,7 +106,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             "(correct for credits/banners/SFX; confirm none is a story panel)",
             f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item} and READ the sheets")
 
-    # 3. Speakability + emotion lint, per entry.
+    # 3. Speakability and narration-safety lint, per entry.
     try:
         entries = load_narration(item_dir)
     except Exception:  # noqa: BLE001 — structure errors already reported above
@@ -122,11 +121,6 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
                 f"{image}: narration has no letters/digits (TTS emits near-silence): {text!r}",
                 f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
                 f"--set {image} \"<speakable line>\" --prune-audio")
-        lint = emotion_lint(entry)
-        if lint:
-            add("error", "narration:emotion", f"{image}: {lint}",
-                f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
-                f"--set-json '[{{\"image\": \"{image}\", ...}}]'  (fix or drop the emotion field)")
         delivery = narration_delivery_lint(text)
         if delivery:
             add("error", "narration:delivery", f"{image}: {delivery}",

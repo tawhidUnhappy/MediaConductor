@@ -139,9 +139,9 @@ nature — claim them without `--item`:
 
 `mediaconductor work-qa` aggregates every machine-checkable gate over the
 generated artifacts — crops exist, OCR coverage, narration structure
-(dangling images, empty text, intro/narration overlap), speakability,
-emotion-field lint, audio coverage + integrity, render freshness — into one
-ordered problem list. **Every problem carries the exact fix command.** A
+(dangling images, empty text, intro/narration overlap), speakability and
+delivery/fluency lint, audio coverage + integrity, render freshness — into
+one ordered problem list. **Every problem carries the exact fix command.** A
 small model needs no global judgment; the whole correction workflow is:
 
 ```bash
@@ -184,28 +184,6 @@ Each category comes with its reuse hint — the important ones:
   re-narrated without re-running OCR.
 - **music beds** are cached by content hash; `mediaconductor video-add-bgm`
   reuses them automatically.
-
-## Emotion-aware narration (IndexTTS2)
-
-Narration entries may carry an optional `"emotion"` field. The calm-narration
-policy accepts only `"calm"`, `"neutral"`, `"slightly sad"`, or `"slightly
-happy"`; IndexTTS2 blends that restrained hint into the cloned voice
-(`emo_text`, strength `--emo-alpha`, default 0.6):
-
-```json
-{"image": "07_013_01.png", "narration": "He quietly stops time.", "emotion": "calm"}
-```
-
-- The vocabulary and usage rules live in
-  [../mediaconductor/assets/prompts/narration.md](../mediaconductor/assets/prompts/narration.md):
-  omit it for normal lines and never use high-intensity delivery hints,
-  phonetic noises, exclamation marks, or shout-like all-caps.
-- Engine-portable: Kokoro simply ignores the field. Older IndexTTS2 builds
-  without `emo_text` fall back to neutral delivery with a warning instead of
-  failing the run.
-- Tune or disable per run: `mediaconductor video --emo-alpha 0.4` /
-  `--no-emotion`. `work-qa` blocks non-calm emotion hints and loud-delivery
-  text before audio generation.
 
 ## MCP
 

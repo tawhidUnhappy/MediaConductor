@@ -206,7 +206,6 @@ def narration_contract_digest(
             "id": scene.get("id"),
             "narration": scene.get("narration"),
             "speaker": scene.get("speaker"),
-            "emotion": scene.get("emotion"),
         })
     return _stable_digest({
         "schema_version": data.get("schema_version"),
@@ -822,9 +821,8 @@ def materialize(data: dict, project_root: Path) -> dict[str, Path | list[Path]]:
             references_dir,
         ))
         entry = {"image": f"{stem}.png", "narration": scene["narration"].strip()}
-        for key in ("emotion", "speaker"):
-            if scene.get(key):
-                entry[key] = scene[key]
+        if scene.get("speaker"):
+            entry["speaker"] = scene["speaker"]
         narration.append(entry)
     narration_path = project_root / "content" / "01" / "narration.json"
     if not atomic_write_json(narration_path, narration):

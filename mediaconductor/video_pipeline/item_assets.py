@@ -5,8 +5,7 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
-from mediaconductor.audio.emotion import (
-    emotion_lint,
+from mediaconductor.audio.narration_safety import (
     narration_delivery_lint,
     narration_fluency_lint,
 )
@@ -76,9 +75,6 @@ def validate_calm_narration(entries: list[dict], source: Path) -> None:
         fluency = narration_fluency_lint(text)
         if fluency:
             problems.append(f"{image}: {fluency}")
-        emotion = emotion_lint(entry)
-        if emotion:
-            problems.append(f"{image}: {emotion}")
     if problems:
         details = "\n".join(f"  - {problem}" for problem in problems[:20])
         more = f"\n  ... and {len(problems) - 20} more" if len(problems) > 20 else ""

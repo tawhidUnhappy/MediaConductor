@@ -19,7 +19,6 @@ TOOL_ENVS = {
     "magi-v3": ("MAGI_V3_ROOT", "MAGI_V3_DIR"),
     "deepseek-ocr2": ("DEEPSEEK_OCR2_ROOT", "DEEPSEEK_OCR2_DIR"),
     "z-image-turbo": ("Z_IMAGE_TURBO_ROOT", "Z_IMAGE_TURBO_DIR"),
-    "gemma-4": ("GEMMA_4_ROOT", "GEMMA_ROOT"),
 }
 
 TOOL_ENV = {tool_name: env_vars[0] for tool_name, env_vars in TOOL_ENVS.items()}

@@ -125,16 +125,8 @@ watching in order.
 
 Return the result as valid JSON only.
 
-Each entry may carry an optional `"emotion"` field — a short natural-language
-phrase that colors the voice for that one line (IndexTTS2 blends it into the
-delivery; other engines ignore it):
-
-- Omit it for normal lines; an absent field means neutral delivery.
-- If a subtle shift is genuinely useful, the value must be **exactly one of**:
-  `"calm"`, `"neutral"`, `"slightly sad"`, or `"slightly happy"`.
-- Never use tense, urgent, fearful, panicked, angry, furious, excited,
-  triumphant, shocked, terrified, scream, shout, or any other high-intensity
-  delivery hint. Describe the event in the text while the narrator stays calm.
+Each entry must identify its panel with `"image"` and provide the spoken prose
+in `"narration"`. Keep delivery restrained through the wording itself.
 
 ### Example
 
@@ -142,8 +134,7 @@ delivery; other engines ignore it):
 [
   {
     "image": "1_005_3.png",
-    "narration": "The young warrior goes still as the massive beast appears behind him.",
-    "emotion": "calm"
+    "narration": "The young warrior goes still as the massive beast appears behind him."
   },
   {
     "image": "1_006_1.png",

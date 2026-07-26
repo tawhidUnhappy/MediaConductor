@@ -49,9 +49,9 @@ def test_non_array_intro_rejected(tmp_path):
         load_narration(tmp_path)
 
 
-def test_calm_preflight_blocks_delivery_and_emotion_before_tts(tmp_path):
+def test_calm_preflight_blocks_unsafe_delivery_before_tts(tmp_path):
     entries = [
-        {"image": "a.png", "narration": "GHAHA!", "emotion": "excited"},
+        {"image": "a.png", "narration": "GHAHA!"},
     ]
     with pytest.raises(ValueError, match="calm-narration policy") as exc:
         validate_calm_narration(entries, tmp_path / "narration.json")
@@ -60,7 +60,7 @@ def test_calm_preflight_blocks_delivery_and_emotion_before_tts(tmp_path):
 
 def test_calm_preflight_accepts_restrained_narration(tmp_path):
     entries = [
-        {"image": "a.png", "narration": "The phoenix appears.", "emotion": "calm"},
+        {"image": "a.png", "narration": "The phoenix appears."},
         {"image": "b.png", "narration": "NASA records the event."},
     ]
     validate_calm_narration(entries, tmp_path / "narration.json")

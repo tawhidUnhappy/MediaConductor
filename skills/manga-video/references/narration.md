@@ -7,15 +7,13 @@ is optional — see the workflow reference.)
 
 Create `<project-root>/<chapter>/narration.json` as a UTF-8 JSON array in
 playback order. Each object requires an image basename that exists in the same
-chapter's `panels/` folder and non-empty text to speak. A short `emotion` phrase
-is optional for IndexTTS; Kokoro ignores it.
+chapter's `panels/` folder and non-empty text to speak.
 
 ```json
 [
   {
     "image": "ch01_001.png",
-    "narration": "At the ruined gate, Mina realizes the guards have already fled.",
-    "emotion": "slightly sad"
+    "narration": "At the ruined gate, Mina realizes the guards have already fled."
   },
   {
     "image": "ch01_002.png",
@@ -35,11 +33,7 @@ The effective schema is:
     "required": ["image", "narration"],
     "properties": {
       "image": {"type": "string", "minLength": 1},
-      "narration": {"type": "string", "minLength": 1},
-      "emotion": {
-        "type": "string",
-        "enum": ["calm", "neutral", "slightly sad", "slightly happy"]
-      }
+      "narration": {"type": "string", "minLength": 1}
     },
     "additionalProperties": true
   }
@@ -64,15 +58,10 @@ events, or visual details. Avoid narrating credits, scanlator notices, and
 purely decorative/SFX panels unless they carry story information. Keep array
 order equal to the intended reading/playback order.
 
-**Voice delivery is always restrained.** The narrator remains calm or neutral,
-with only a slight sad or slight happy shift when it materially helps. Omit the
-optional `emotion` field for neutral delivery. If used, its value must be
-exactly `"calm"`, `"neutral"`, `"slightly sad"`, or `"slightly happy"`.
-Do not use tense, urgent, fearful, panicked, angry, furious, excited, shocked,
-terrified, scream, shout, or any other high-intensity hint. Describe dramatic
-events accurately while the narrator remains a calm observer. `work-qa`
-rejects every emotion value outside the four-value allowlist, and the TTS
-adapter ignores rejected values even if QA was skipped.
+**Voice delivery is always restrained.** Describe dramatic events and
+characters' reactions accurately while the narrator remains a calm observer.
+Express the feeling as natural prose rather than a performed laugh, scream, or
+shout.
 
 **Describe sound effects and reactions in prose; never perform them
 phonetically.** IndexTTS/Kokoro pronounce real words and quiet interjections

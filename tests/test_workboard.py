@@ -4,7 +4,6 @@ and the work-qa fix-until-clean loop small models drive."""
 import json
 from datetime import timedelta
 
-from mediaconductor.audio.emotion import emotion_lint, indextts_kwargs, narration_emotion
 from mediaconductor.qa_loop import qa_item
 from mediaconductor.workboard import (
     _iso,
@@ -160,10 +159,10 @@ def test_notes_roundtrip_and_next_tasks(tmp_path):
 def test_qa_reports_problems_with_fix_commands(tmp_path):
     root = tmp_path / "proj"
     item = make_item(root)
-    # inject an unspeakable line + a bad emotion field + a dangling image
+    # Inject an unspeakable line plus a dangling image.
     entries = [
         {"image": "01_000_01.png", "narration": "?!"},
-        {"image": "01_001_01.png", "narration": "A real line.", "emotion": "   "},
+        {"image": "01_001_01.png", "narration": "A real line."},
         {"image": "missing.png", "narration": "Ghost panel."},
     ]
     (item / "narration.json").write_text(json.dumps(entries), encoding="utf-8")
@@ -172,7 +171,7 @@ def test_qa_reports_problems_with_fix_commands(tmp_path):
 
     problems = qa_item(item, "proj", root, tmp_path / "audio", tmp_path / "out", tmp_path / "work")
     kinds = {p["kind"] for p in problems}
-    assert {"narration:structure", "narration:unspeakable", "narration:emotion",
+    assert {"narration:structure", "narration:unspeakable",
             "audio:missing", "audio:corrupt"} <= kinds
     assert all(p["fix"] for p in problems)
 
@@ -181,13 +180,12 @@ def test_qa_blocks_loud_narration_delivery(tmp_path):
     root = tmp_path / "proj"
     item = make_item(root, panels=1)
     (item / "narration.json").write_text(json.dumps([
-        {"image": "01_000_01.png", "narration": "GHAHA! The phoenix is here.", "emotion": "excited"},
+        {"image": "01_000_01.png", "narration": "GHAHA! The phoenix is here."},
     ]), encoding="utf-8")
     add_audio(tmp_path, "proj", "01", ["01_000_01"])
 
     problems = qa_item(item, "proj", root, tmp_path / "audio", tmp_path / "out", tmp_path / "work")
     errors = {(problem["kind"], problem["severity"]) for problem in problems}
-    assert ("narration:emotion", "error") in errors
     assert ("narration:delivery", "error") in errors
 
 
@@ -200,22 +198,6 @@ def test_qa_clean_item_has_no_errors(tmp_path):
     video.write_bytes(b"mp4")
     problems = qa_item(item, "proj", root, tmp_path / "audio", tmp_path / "out", tmp_path / "work")
     assert [p for p in problems if p["severity"] == "error"] == []
-
-
-def test_emotion_field_contract():
-    assert narration_emotion({"emotion": " slightly sad "}) == "slightly sad"
-    assert narration_emotion({"narration": "no field"}) is None
-    assert narration_emotion({"emotion": 42}) is None
-    assert narration_emotion({"emotion": "x" * 61}) is None
-
-    assert emotion_lint({"image": "a", "narration": "b"}) is None
-    assert emotion_lint({"emotion": ""}) is not None
-    assert emotion_lint({"emotion": "x" * 61}) is not None
-
-    assert indextts_kwargs(None) == {}
-    assert indextts_kwargs("cold, menacing", 0.5) == {}
-    kwargs = indextts_kwargs("slightly happy", 0.5)
-    assert kwargs == {"emo_text": "slightly happy", "use_emo_text": True, "emo_alpha": 0.5}
 
 
 def test_todo_lifecycle_add_start_done_reopen(tmp_path):

@@ -79,19 +79,18 @@ def test_upsert_inserts_in_name_sorted_reading_order():
     assert sorted_insert_position(entries, "ch01_999_cta.jpg") == len(entries)
 
 
-def test_upsert_entry_sets_and_changes_emotion():
-    # Regression: --set-json/--batch used to drop every field except
-    # "narration", so an entry's "emotion" (e.g. a rejected "screaming")
-    # could never be fixed or cleared through the documented interface.
-    entries = [{"image": "ch01_001.jpg", "narration": "old", "emotion": "screaming"}]
+def test_upsert_entry_sets_and_changes_optional_metadata():
+    # --set-json/--batch preserves complete entries rather than dropping
+    # optional metadata fields.
+    entries = [{"image": "ch01_001.jpg", "narration": "old", "speaker": "narrator"}]
     entries, previous = upsert_entry(
-        entries, {"image": "ch01_001.jpg", "narration": "old", "emotion": "startled"})
-    assert previous == {"image": "ch01_001.jpg", "narration": "old", "emotion": "screaming"}
-    assert entries[0] == {"image": "ch01_001.jpg", "narration": "old", "emotion": "startled"}
+        entries, {"image": "ch01_001.jpg", "narration": "old", "speaker": "hero"})
+    assert previous == {"image": "ch01_001.jpg", "narration": "old", "speaker": "narrator"}
+    assert entries[0] == {"image": "ch01_001.jpg", "narration": "old", "speaker": "hero"}
 
 
-def test_upsert_entry_omitted_emotion_clears_it():
-    entries = [{"image": "ch01_001.jpg", "narration": "old", "emotion": "boisterous"}]
+def test_upsert_entry_omitted_metadata_clears_it():
+    entries = [{"image": "ch01_001.jpg", "narration": "old", "speaker": "hero"}]
     entries, _ = upsert_entry(entries, {"image": "ch01_001.jpg", "narration": "new"})
     assert entries[0] == {"image": "ch01_001.jpg", "narration": "new"}
 
@@ -99,6 +98,6 @@ def test_upsert_entry_omitted_emotion_clears_it():
 def test_upsert_entry_inserts_new_entry_in_reading_order():
     entries = [{"image": "ch01_001.jpg", "narration": "a"}]
     entries, previous = upsert_entry(
-        entries, {"image": "ch01_002.jpg", "narration": "b", "emotion": "tense"})
+        entries, {"image": "ch01_002.jpg", "narration": "b", "speaker": "hero"})
     assert previous is None
     assert [e["image"] for e in entries] == ["ch01_001.jpg", "ch01_002.jpg"]

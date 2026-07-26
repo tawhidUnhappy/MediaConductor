@@ -88,11 +88,13 @@ and `webtoon-cutcheck`. The default is `download`.
    excess really is gutter, tighten it with `--overrides` (leave it alone
    when the panel is genuinely that tall, e.g. a full-body action shot).
 
-   With the `gemma-4` tool installed, `crop-qa` performs a first automated
-   pass over every flagged location — including these framing checks — and
-   prints the exact override command per FIX verdict (exit 3 = fixes
-   proposed; loop split → crop-qa until 0). It supplements — never replaces —
-   reading the sheets yourself.
+   Review every flagged location yourself against the source art. Record
+   non-obvious accept/fix decisions so another agent does not repeat or undo
+   the review:
+
+   ```bash
+   <mc> work-note --project-root D:/MediaProjects/library/example --topic crop-review --add "01 page 003: tall box is intentional full-body art; accepted"
+   ```
 
 5. Optionally OCR the panels before writing narration. The narrating agent
    reads bubble text from the panel images themselves; `panel-transcript` adds
@@ -108,10 +110,17 @@ and `webtoon-cutcheck`. The default is `download`.
    <mc> job-status <job-id> --json
    ```
 
-6. Maintain the cast registry so speaker attribution stays consistent across
-   chapters — `<project-root>/characters.json` via `<mc> characters`
-   (`--auto-draft` drafts it with the local Gemma 4 model; review the names
-   and set `draft: false`). Use exactly these names in narration.
+6. Maintain cast and speaker notes so attribution stays consistent across
+   chapters. Read the shared notebook before narrating, and add only details
+   attested by the panels or dialogue:
+
+   ```bash
+   <mc> work-note --project-root D:/MediaProjects/library/example --topic characters
+   <mc> work-note --project-root D:/MediaProjects/library/example --topic characters --add "Ren = silver-haired swordsman; Mina names him in 01 panel 014"
+   ```
+
+   Use exactly the established names in narration. OCR may suggest a spelling,
+   but confirm it against the panel before recording it as fact.
 
 7. Read [narration.md](narration.md). Write one grounded
    `<chapter>/narration.json`, structurally check it, render semantic review
@@ -125,10 +134,10 @@ and `webtoon-cutcheck`. The default is `download`.
    Fix incorrect panel descriptions, dialogue, speaker attribution, and spoken
    phrasing; rerun both checks after every edit.
 
-   If you cannot read panel images yourself, `<mc> narrate-auto` drafts the
-   narration with the local Gemma 4 model from panels + OCR + the registry
-   and then runs both checks; its exit 3 still requires this same review of
-   every sheet before TTS.
+   If you cannot read panel images, do not infer narration from OCR alone.
+   Hand the item to a vision-capable agent or human and leave an exact
+   `work-note --topic handoff --add "..."` describing completed crop review,
+   remaining items, and any cast or speaker uncertainty.
 
 8. Build using explicit roots. This complete foreground form is useful only
    when the harness can keep a long task alive:

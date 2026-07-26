@@ -1,4 +1,4 @@
-"""mediaconductor.panels.cutcheck — full-resolution crop-QA windows ("virtual windows").
+"""mediaconductor.panels.cutcheck — full-resolution crop-review windows ("virtual windows").
 
 ``mediaconductor webtoon-cutcheck`` renders, for every forced auto-split cut and
 every short panel recorded in an item's ranges manifest (written by
