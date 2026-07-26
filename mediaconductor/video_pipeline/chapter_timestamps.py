@@ -37,7 +37,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--project-name", default=None)
     parser.add_argument("--items", nargs="*", help="Item names or ranges, for example: 01 02 05-08 9.5.")
-    parser.add_argument("--item-range", help="Convenience integer range, for example: 01-12.")
+    parser.add_argument("--item-range", help="Convenience range, for example: 01-12.")
     parser.add_argument(
         "--allow-gaps",
         action="store_true",

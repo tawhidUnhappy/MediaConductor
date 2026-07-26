@@ -99,10 +99,10 @@ def expand_item_tokens(tokens: list[str] | None, width: int = 2) -> list[str] | 
             if not token:
                 continue
 
-            range_match = re.fullmatch(r"(\d+)\s*(?:-|\.\.|:)\s*(\d+)", token)
+            range_match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:-|\.\.|:)\s*(\d+(?:\.\d+)?)", token)
             if range_match:
-                start = int(range_match.group(1))
-                end = int(range_match.group(2))
+                start = int(float(range_match.group(1)))
+                end = int(float(range_match.group(2)))
                 step = 1 if end >= start else -1
                 expanded.extend(_format_item(number, width) for number in range(start, end + step, step))
                 continue
@@ -119,6 +119,55 @@ def expand_item_tokens(tokens: list[str] | None, width: int = 2) -> list[str] | 
             seen.add(item)
             deduped.append(item)
     return deduped
+
+
+def _parse_selection_specs(selected: list[str] | None) -> tuple[list[tuple[float, float]], set[str], set[float]]:
+    intervals: list[tuple[float, float]] = []
+    wanted_names: set[str] = set()
+    wanted_values: set[float] = set()
+
+    if not selected:
+        return intervals, wanted_names, wanted_values
+
+    tokens: list[str] = []
+    for item in selected:
+        for part in item.split(","):
+            part = part.strip()
+            if part:
+                tokens.append(part)
+
+    for token in tokens:
+        range_match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:-|\.\.|:)\s*(\d+(?:\.\d+)?)", token)
+        if range_match:
+            v1 = float(range_match.group(1))
+            v2 = float(range_match.group(2))
+            lo, hi = min(v1, v2), max(v1, v2)
+            if lo <= 1.0:
+                lo = 0.0
+            intervals.append((lo, hi))
+        else:
+            wanted_names.add(token)
+            if any(ch.isdigit() for ch in token):
+                wanted_values.add(item_value(token))
+
+    int_vals = sorted({int(item_value(t)) for t in tokens if t.isdigit() or re.fullmatch(r"\d+", t)})
+    if len(int_vals) >= 2:
+        run_start = int_vals[0]
+        run_end = int_vals[0]
+        for val in int_vals[1:]:
+            if val == run_end + 1:
+                run_end = val
+            else:
+                if run_end - run_start >= 1:
+                    lo = 0.0 if run_start <= 1 else float(run_start)
+                    intervals.append((lo, float(run_end)))
+                run_start = val
+                run_end = val
+        if run_end - run_start >= 1:
+            lo = 0.0 if run_start <= 1 else float(run_start)
+            intervals.append((lo, float(run_end)))
+
+    return intervals, wanted_names, wanted_values
 
 
 def merge_item_selection(items: list[str] | None, item_range: str | None) -> list[str] | None:
@@ -232,17 +281,20 @@ def item_dirs(root: Path, selected: list[str] | None = None) -> list[Path]:
         and not path.name.startswith(".")
         and ((path / "narration.json").exists() or (path / "panels").is_dir() or any(ch.isdigit() for ch in path.name))
     ]
-    expanded = expand_item_tokens(selected)
-    if expanded:
-        wanted_names = {name.strip() for name in expanded}
-        # Match by exact name or exact numeric VALUE ("05" selects 05 or 5,
-        # never 5.5) — split chapters like 2.1 must be named explicitly
-        # (`--items 2.1`); an integer token never drags decimals along.
-        wanted_values = {item_value(name) for name in expanded if any(ch.isdigit() for ch in name)}
-        candidates = [
-            path
-            for path in candidates
-            if path.name in wanted_names
-            or (any(ch.isdigit() for ch in path.name) and item_value(path.name) in wanted_values)
-        ]
+    if selected:
+        intervals, wanted_names, wanted_values = _parse_selection_specs(selected)
+        filtered: list[Path] = []
+        for path in candidates:
+            if path.name in wanted_names:
+                filtered.append(path)
+                continue
+            if any(ch.isdigit() for ch in path.name):
+                val = item_value(path.name)
+                if val in wanted_values:
+                    filtered.append(path)
+                    continue
+                if any(lo <= val <= hi for lo, hi in intervals):
+                    filtered.append(path)
+                    continue
+        candidates = filtered
     return sorted(candidates, key=_sort_key)

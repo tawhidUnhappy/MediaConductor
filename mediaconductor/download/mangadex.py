@@ -451,23 +451,39 @@ def download_images(
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def _parse_chapter_tokens(tokens: List[str]) -> List[str]:
-    """Expand chapter tokens ("0", "7-12", "3.5") into an ordered list.
+def _chapter_val(ch: str) -> float:
+    try:
+        return float(ch)
+    except ValueError:
+        return float("inf")
 
-    Ranges only expand over integers; decimal chapters must be named
-    explicitly (MangaDex numbers them "3.5" etc.).
+
+def _parse_chapter_tokens(tokens: List[str], chapter_map: dict[str, dict] | None = None) -> List[str]:
+    """Expand chapter tokens ("0", "7-12", "3.5", "01-13") into an ordered list.
+
+    If chapter_map is available, ranges resolve against the actual chapters
+    published on MangaDex (including decimal sub-chapters like 9.1, 9.2, and 0.x).
     """
     out: List[str] = []
     for tok in tokens:
         tok = tok.strip()
         if not tok:
             continue
-        m = re.fullmatch(r"(\d+)-(\d+)", tok)
+        m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:-|\.\.|:)\s*(\d+(?:\.\d+)?)", tok)
         if m:
-            lo, hi = int(m.group(1)), int(m.group(2))
-            if hi < lo:
-                lo, hi = hi, lo
-            out.extend(str(n) for n in range(lo, hi + 1))
+            v1, v2 = float(m.group(1)), float(m.group(2))
+            lo, hi = min(v1, v2), max(v1, v2)
+            if lo <= 1.0:
+                lo = 0.0
+            if chapter_map:
+                matched = [
+                    ch for ch in chapter_map.keys()
+                    if lo <= _chapter_val(ch) <= hi
+                ]
+                matched.sort(key=_chapter_sort_key)
+                out.extend(matched)
+            else:
+                out.extend(str(n) for n in range(int(v1), int(v2) + 1))
         else:
             out.append(tok)
     seen: set[str] = set()
@@ -623,9 +639,9 @@ def _chapter_arg(value: str) -> str:
 
 
 def _chapter_token_arg(value: str) -> str:
-    if not re.fullmatch(r"\d+(?:\.\d+)?|\d+-\d+", value):
+    if not re.fullmatch(r"\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*(?:-|\.\.|:)\s*\d+(?:\.\d+)?", value):
         raise argparse.ArgumentTypeError(
-            "chapter token must be a number, decimal, or integer range such as 0-12"
+            "chapter token must be a number, decimal, or range such as 0-12 or 9.1-9.5"
         )
     return value
 
@@ -784,7 +800,9 @@ def main() -> None:
         if not chapters:
             sys.exit(1)
     elif args.chapters:
-        chapters = _parse_chapter_tokens(args.chapters)
+        if chapter_map is None:
+            chapter_map = fetch_chapter_map(sess, manga_id, lang)
+        chapters = _parse_chapter_tokens(args.chapters, chapter_map)
     elif args.chapter is not None:
         chapters = [str(args.chapter)]
     else:

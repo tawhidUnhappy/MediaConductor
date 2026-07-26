@@ -373,7 +373,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Probe rendered item videos and print cumulative, ready-to-paste YouTube chapter timestamps.",
         {"project_root": _PROJECT_ROOT, "output_root": _STR,
          "project_name": _STR, "items": _ITEMS,
-         "item_range": {**_STR, "description": "Convenience integer range, e.g. 01-24."},
+         "item_range": {**_STR, "description": "Convenience range, e.g. 01-24."},
          "allow_gaps": {**_BOOL, "description": "Skip genuinely absent integer items, matching video-join."}},
         ["project_root", "output_root"],
         {"project_root": ("--project-root", "value"), "output_root": ("--output-root", "value"),

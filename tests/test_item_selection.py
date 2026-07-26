@@ -73,3 +73,26 @@ def test_integer_token_never_selects_decimal_siblings(tmp_path):
 def test_decimal_items_sort_by_value(tmp_path):
     _mk(tmp_path, "01", "10", "2.1", "02", "9.5")
     assert [p.name for p in item_dirs(tmp_path)] == ["01", "02", "2.1", "9.5", "10"]
+
+
+def test_range_selects_decimal_chapters_in_interval(tmp_path):
+    _mk(tmp_path, "01", "02", "08", "09", "09.1", "09.2", "10", "11", "12")
+    assert [p.name for p in item_dirs(tmp_path, ["1-12"])] == [
+        "01", "02", "08", "09", "09.1", "09.2", "10", "11", "12"
+    ]
+    assert [p.name for p in item_dirs(tmp_path, ["8-10"])] == [
+        "08", "09", "09.1", "09.2", "10"
+    ]
+    assert [p.name for p in item_dirs(tmp_path, ["9.1"])] == ["09.1"]
+    assert [p.name for p in item_dirs(tmp_path, ["09.1", "09.2"])] == ["09.1", "09.2"]
+
+
+def test_range_starting_at_one_includes_zero_point_x_chapters(tmp_path):
+    _mk(tmp_path, "0.1", "0.2", "01", "02", "09", "13")
+    assert [p.name for p in item_dirs(tmp_path, ["01-13"])] == [
+        "0.1", "0.2", "01", "02", "09", "13"
+    ]
+    assert [p.name for p in item_dirs(tmp_path, ["1-13"])] == [
+        "0.1", "0.2", "01", "02", "09", "13"
+    ]
+
