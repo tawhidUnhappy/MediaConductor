@@ -49,8 +49,8 @@ uv run python scripts/release.py --check
 ```
 
 Make sure these are **not** committed (git-ignored by default): `.venv/`,
-generated output (`audio/`, `output/`, `work/`), user media (`library/`,
-`music/`, …), local `config.json`/`config.system.json`, `.mangaeasy/`, `dist/`.
+generated output (`data/audio/`, `data/output/`, `data/work/`), user media (`data/library/`,
+`music/`, …), local `config.json`/`config.system.json`, `runtime/`, `dist/`.
 
 ## How users install
 

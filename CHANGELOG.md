@@ -81,6 +81,42 @@ rather than an assertion.** Both changes are breaking.
 
 ### Changed
 
+- **One folder for everything produced, and deleting it is the fresh start.**
+  Every downloaded or generated file now lives under `<workspace>/data/`
+  (`library/`, `audio/`, `audio_faded/`, `output/`, `review/`, `work/`), and
+  the re-downloadable machinery moved to `<install>/runtime/`
+  (`tools/`, `cache/`, `state/`, `secrets/`). Before, production state landed
+  in loose top-level folders resolved against the *current directory* while
+  tool envs and caches hid in a dotted `.mangaeasy/`; "start over" meant
+  knowing which seven folders to remove and which one to spare, and running a
+  command from the wrong directory quietly started a second library tree
+  somewhere else. The split is deliberate in both directions: production state
+  must be inside `data/` or the promise is false, and the 80 GB of tool
+  environments must be outside it or a fresh start costs a re-download.
+  `mediaconductor/layout.py` is the single source of truth; `workspace-layout`
+  reports where every root actually resolved and fails `--strict` when one
+  escapes its tree. `data/README.md` explains the folder to whoever opens it
+  in a file manager.
+- **`workspace-reset`** — the scriptable version of deleting `data/`. Dry run
+  by default (prints what would go and how much space it frees), `--confirm`
+  to delete, `--keep-library` to spare the downloaded chapters, `--only` to
+  clear named subfolders. It refuses to run while a background job is still
+  writing, which is exactly when a hand-deletion produces a half-erased
+  production and an unreadable traceback. It is intentionally **not** an MCP
+  tool: an irreversible "delete every production" should not be one call away
+  from a client.
+- Persistent-root environment overrides are now namespaced only. The bare
+  `PROJECT_ROOT`, `AUDIO_ROOT`, `OUTPUT_ROOT`, and `WORK_DIR` spellings are
+  gone — names that generic already exist in plenty of shells, and a single
+  inherited `WORK_DIR` silently relocated production state out of the
+  workspace. `MEDIACONDUCTOR_DATA_ROOT` (whole tree) and `MEDIACONDUCTOR_HOME`
+  (runtime tree) are the supported relocations; pointing them at overlapping
+  trees is reported as an error, because a reset would otherwise delete the
+  tool environments.
+- `where --json` reports `data_root` and `runtime_home`; the `mangaeasy_home`
+  key is gone. YouTube credentials moved to `runtime/secrets/youtube/` so
+  clearing productions does not sign you out, and `workspace.json` to
+  `runtime/state/` so the pointer to the workspace survives a wipe of it.
 - `youtube-upload` now requires `--project-root` and refuses to send a byte
   until the final-video review matches the exact file's hash and the rights
   manifest passes. The result payload records the approved video digest, the

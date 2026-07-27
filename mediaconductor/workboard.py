@@ -5,7 +5,7 @@ Four commands let several agents (or one agent across several sessions —
 e.g. Claude runs out of budget mid-batch and GPT or another model picks the
 same project back up) produce the same video without stepping on each other,
 and resume instantly after any interruption. All state is plain JSON/JSONL
-under ``library/<project>/.workboard/`` — no vendor-specific format, no state
+under ``data/library/<project>/.workboard/`` — no vendor-specific format, no state
 tied to one chat session — so it travels with the project (including over a
 network share) and the dot-prefix keeps it invisible to item scanning:
 

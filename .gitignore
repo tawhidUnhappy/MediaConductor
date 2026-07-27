@@ -16,45 +16,25 @@ config.json
 config.system.json
 
 # Caches
-/.cache/
-/.hf_cache/
 .pytest_cache/
 .ruff_cache/
 
-# This install's self-contained data: AI tool envs, app state, HF/torch/uv caches
-/.mangaeasy/
-/.mediaconductor/
+# The two data trees this install writes (see mediaconductor/layout.py):
+#   data/    everything downloaded or generated — delete it to start fresh
+#   runtime/ AI tool envs, HF/torch/uv caches, install state, OAuth tokens
+/data/
+/runtime/
 
-# Generated runtime output
-/tmp/
-/tmp_video/
-/videos/
-/output_videos/
-/audio/
-/audio_faded/
-/output/
-/output_final/
-/work/
-/projects/
-/audio_preprocessed/
-/download_logs/
+# Generated output
 *.log
 *.err
 *.out
 
-# User content and local media
-/library/
-/manga/
-/static/
-/templates/
-/prompts/
-/music/*
-!/music/
+# User content and local media (yours, kept outside data/ so a reset spares it)
 /bgm/
 /fonts/
 /background_image/
 /vocal/
-/upscale/
 /thumbnail/
 
 # External AI tools are sibling uv projects, not vendored here

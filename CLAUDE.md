@@ -37,13 +37,13 @@ Each package has its own README.md with entry points and gotchas.
 
 | Stage | Package / module | What it does |
 |---|---|---|
-| core | `cli.py`, `command_spec.py`, `runtime.py`, `config.py`, `paths.py`, `library_scan.py`, `series_plan.py`, `mcp_server.py`, `jobs.py`, `workboard.py`, `qa_loop.py`, `workspace.py` | dispatch, shared command schemas, self-spawning, config, batch planning, MCP server, background jobs, multi-agent board, resolved-root reporting |
+| core | `cli.py`, `command_spec.py`, `runtime.py`, `config.py`, `layout.py`, `paths.py`, `library_scan.py`, `series_plan.py`, `mcp_server.py`, `jobs.py`, `workboard.py`, `qa_loop.py`, `workspace.py` | dispatch, shared command schemas, self-spawning, config, **the one on-disk folder map**, batch planning, MCP server, background jobs, multi-agent board, resolved-root reporting + `workspace-reset` |
 | gates | `reviews.py`, `panel_decisions.py`, `rights.py` | hash-bound crop/narration/final-video approvals, per-panel omission decisions, the fail-closed rights manifest |
 | acquire | `download/` | MangaDex fetch (polite, resumable, writes `manga.json`) |
 | acquire | `panels/` | crop: `webtoon-split`, `page-split` (MAGI), cutcheck, overrides, remap |
 | read | `ocr/` | DeepSeek-OCR 2 panel transcripts |
 | produce | `video_pipeline/` | narration contract, editorial timeline, audio → faded derivatives → render → join → BGM → final normalize → encoded-output quality gate |
-| produce | `audio/` | IndexTTS pipeline, narration safety/quality lints, TTS provenance |
+| produce | `data/audio/` | IndexTTS pipeline, narration safety/quality lints, TTS provenance |
 | publish | `youtube/` | OAuth, resumable upload, list/delete/thumbnail |
 | tools | `tools/` | isolated external AI tool envs + vendored ffmpeg/uv/git-lfs |
 | shared | `images/`, `utils/` | thumbnail compose, panel context packs, archive/result helpers |
@@ -82,8 +82,8 @@ Each package has its own README.md with entry points and gotchas.
   speaker WAV exist) → symmetric 8 ms per-clip fade derivatives →
   `video-render` (frame-aligned to faded audio) → optional `video-join` →
   `video-add-bgm` → one final two-pass `video-normalize-audio` (−14 LUFS,
-  −1.5 dBTP). Production defaults to `audio_faded/<project>/...`; raw TTS
-  under `audio/` is never modified and `--audio-source raw` is an explicit
+  −1.5 dBTP). Production defaults to `data/audio_faded/<project>/...`; raw TTS
+  under `data/audio/` is never modified and `--audio-source raw` is an explicit
   diagnostic override. Any BGM change invalidates final normalization, so a
   standalone re-mix must be normalized again after the music is mixed.
 - **The review gates** (`mediaconductor/reviews.py`): crop, narration, and
@@ -97,35 +97,56 @@ Each package has its own README.md with entry points and gotchas.
   integrity guarantee is that current records *exist*, not that a particular
   kind of reviewer created them.
 - **External AI tools** (Kokoro, IndexTTS, MAGI, DeepSeek-OCR 2) live in
-  isolated uv envs under `<install>/.mangaeasy/tools/<tool>/`
+  isolated uv envs under `<install>/runtime/tools/<tool>/`
   (`install-tool`, resolved by `tools/external.resolve_tool_dir()`).
-  `tool_env()` **force-pins** HF/torch/uv caches under `<data>/.mangaeasy/`
+  `tool_env()` **force-pins** HF/torch/uv caches under `<install>/runtime/`
   (opt-out: `MEDIACONDUCTOR_SHARE_CACHES=1`). `ensure_vendored_path()` at the top
   of cli.py makes bare `"ffmpeg"`-style calls resolve to vendored binaries.
 
 ## Data layout
 
-Everything persistent lives below one workspace so a production can be moved,
-backed up, or deleted as a unit. `mediaconductor workspace-layout --json`
-reports every resolved root and whether it escaped; `doctor` warns when one has.
+**Two trees, and the split is load-bearing.** Everything MediaConductor
+downloads or generates goes under `data/`; the re-downloadable machinery goes
+under `runtime/`. That is what makes "delete `data/` to start fresh" true —
+and cheap, because a fresh start does not re-download 80 GB of tool
+environments. `mediaconductor/layout.py` is the single source of truth for
+both; every persistent path in the codebase resolves through a function
+there. `workspace-layout --json` reports where each root actually landed and
+`doctor` warns when one escapes its tree.
 
 ```
-library/<project>/            source items; manga.json (machine-managed source record)
-  01/panels/ 01/narration.json [01/intro.json] [01/transcript.json]
-  01/panel_decisions.json     why each un-narrated panel is omitted (hash-bound)
-  rights.json                 source, permission basis, consent, safety scans
-  .mediaconductor/manga-reviews.json   hash-bound crop/narration/final-video approvals
-audio/<project>/<item>/*.wav  per-panel narration; each with a *.wav.json provenance sidecar
-audio_faded/<project>/<item>/*.wav  production render derivatives; raw TTS untouched
-output/<project>/             item videos + <project>_full.mp4 + quality/ reports
-work/                         scratch incl. jobs/ — video-clean-work clears it
+data/                         ← THE deletable folder. Nothing else is production state.
+  README.md                   written by ensure_data_root(); explains the folder to a human
+  library/<project>/          source items; manga.json (machine-managed source record)
+    01/panels/ 01/narration.json [01/intro.json] [01/transcript.json]
+    01/panel_decisions.json   why each un-narrated panel is omitted (hash-bound)
+    rights.json               source, permission basis, consent, safety scans
+    .mediaconductor/manga-reviews.json   hash-bound crop/narration/final-video approvals
+  audio/<project>/<item>/*.wav        per-panel narration + *.wav.json provenance sidecar
+  audio_faded/<project>/<item>/*.wav  production render derivatives; raw TTS untouched
+  output/<project>/           item videos + <project>_full.mp4 + quality/ reports
+  review/                     review sheets and evidence
+  work/                       scratch incl. jobs/ — video-clean-work clears it
+runtime/                      ← survives a reset; re-creatable with `setup`
+  tools/                      isolated AI tool envs (install-tool)
+  cache/                      hf/ torch/ uv/ uv_python/ triton/ torchinductor/ ...
+  state/workspace.json        which workspace this install points at
+  secrets/youtube/            gitignored OAuth tokens
 bgm/ vocal/                   user-owned licensed music and narrator references
-.mediaconductor/              tools/, cache/, state/, gitignored OAuth secrets
 ```
 
-Roots default from env (`MEDIACONDUCTOR_ITEMS_ROOT`/`MEDIACONDUCTOR_AUDIO_ROOT`/
-`MEDIACONDUCTOR_OUTPUT_ROOT`/`MEDIACONDUCTOR_WORK_DIR`; bare legacy names still
-honoured) but agents pass explicit `--project-root library/<P>` etc.
+`bgm/` and `vocal/` sit *outside* `data/` deliberately: they are the user's
+own licensed audio, and a fresh start must never cost someone their music
+library. Same reasoning puts OAuth tokens in `runtime/secrets/` — resetting
+productions should not sign you out.
+
+Roots come from `layout.py`, overridable per-run with `MEDIACONDUCTOR_DATA_ROOT`
+(moves the whole tree) or the individual `MEDIACONDUCTOR_ITEMS_ROOT` /
+`_AUDIO_ROOT` / `_OUTPUT_ROOT` / `_REVIEW_ROOT` / `_WORK_DIR`; agents pass
+explicit `--project-root data/library/<P>` etc. The bare unprefixed spellings
+(`PROJECT_ROOT`, `AUDIO_ROOT`, `WORK_DIR`, …) are **gone** — those names
+routinely already exist in a shell, and one inherited `WORK_DIR` silently
+relocated production state out of the workspace.
 Config: `config.json` (per-project) + `config.system.json` (machine defaults)
 via `mediaconductor/config.py` — its loaders raise `ConfigError` (the CLI
 dispatcher renders it; never `sys.exit` from library code). Note
@@ -133,10 +154,22 @@ dispatcher renders it; never `sys.exit` from library code). Note
 
 ## Invariants (each earned by a shipped failure — stories in [docs/history/incidents.md](docs/history/incidents.md))
 
+- **New persistent paths resolve through `layout.py`, never by hand**: no
+  module composes its own `PROJECT_ROOT / "something"`, and no argparse
+  default is a bare relative `Path("work")`. Relative defaults resolved
+  against the cwd, so the same command wrote to a different place depending
+  on where an agent happened to start it — the "second `library/` tree found
+  weeks later" incident. If a new root is needed, add a function to
+  `layout.py`, list it in `DATA_SUBDIRS` or `RUNTIME_SUBDIRS`, and add it to
+  `workspace.resolved_roots()` so `workspace-layout` and `doctor` can see it.
+  Production state under `data/`, machinery under `runtime/`, never mixed:
+  `test_production_gates.py` fails the build if a production root escapes
+  `data/`, because that quietly turns "delete `data/` to start fresh" into a
+  lie.
 - **Archive, never overwrite, generated output**: use
   `archive_before_overwrite()` / `archive_into_run()` from `mediaconductor/utils`
   (`old/run_NNNN/`). `audio-takes-list/-restore` browse the archives.
-  `video-clean-*` are the only sanctioned deleters and never touch `library/`.
+  `video-clean-*` are the only sanctioned deleters and never touch `data/library/`.
 - **`load_narration()` (`video_pipeline/item_assets.py`) is the only
   narration reader** — it alone knows `intro.json` prepending, and it validates
   every entry through `video_pipeline/narration_contract.py` so no consumer
@@ -158,7 +191,7 @@ dispatcher renders it; never `sys.exit` from library code). Note
   previous "confirm none is a story panel" warning recorded nothing, so a
   dropped story panel and a skipped credits page looked identical.
 - **Production manga renders use faded derivatives, not raw clip edges**:
-  `audio_faded/` contains symmetric 8 ms fade-in/fade-out copies and `audio/`
+  `data/audio_faded/` contains symmetric 8 ms fade-in/fade-out copies and `data/audio/`
   remains the recoverable TTS source. Keep `--audio-source raw` opt-in.
 - **Adaptive tail declick in `video-fade-audio`**: IndexTTS occasionally leaves
   a spurious click/pop burst a few ms before a clip's true end — real speech
@@ -233,7 +266,7 @@ dispatcher renders it; never `sys.exit` from library code). Note
 - `mediaconductor smoke-test` renders a tiny real video — the proof an env works.
 - Packaging: `packaging/mediaconductor.spec` (PyInstaller); `scripts/release.py`
   keeps the version fields in lockstep. Data-root resolution for installed
-  apps lives in `_default_frozen_root()` — never assume `~/.mangaeasy`.
+  apps lives in `_default_frozen_root()` — never assume `~/runtime`.
 
 ## Conventions
 

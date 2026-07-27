@@ -27,7 +27,7 @@ The resolver checks, in order:
    - `MAGI_V3_ROOT` (or legacy `MAGI_V3_DIR`)
    - `DEEPSEEK_OCR2_ROOT` (or `DEEPSEEK_OCR2_DIR`)
    - `Z_IMAGE_TURBO_ROOT` (or `Z_IMAGE_TURBO_DIR`)
-2. The managed tools dir: `<install folder>/.mangaeasy/tools/<name>`
+2. The managed tools dir: `<install folder>/runtime/tools/<name>`
    (override with `MEDIACONDUCTOR_TOOLS_DIR`)
 If a tool has `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Unix),
 MediaConductor uses it directly. Otherwise it falls back to `uv run --project`.
@@ -94,8 +94,8 @@ extra installed and you intentionally want in-process detection.
 Used by:
 
 ```bash
-mediaconductor deepseek-ocr2 --project-root content
-mediaconductor deepseek-ocr2 --project-root content --item-range 01-24 --device cuda
+mediaconductor deepseek-ocr2 --project-root data/library/<project>
+mediaconductor deepseek-ocr2 --project-root data/library/<project> --item-range 01-24 --device cuda
 ```
 
 Install with `mediaconductor install-tool deepseek-ocr2`. The installer creates an

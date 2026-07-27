@@ -37,14 +37,17 @@ class ConfigError(RuntimeError):
 def _registered_workspace() -> Path | None:
     """The workspace `setup` registered for this install, if still valid.
 
-    Stored as ``<data_home>/workspace.json`` so a command started from any
+    Stored as ``runtime/state/workspace.json`` so a command started from any
     directory (agents constantly run from the wrong cwd) still resolves the
-    real workspace instead of silently creating ``library/`` next to wherever
-    the shell happened to be. Returns None when unregistered or stale.
+    real workspace instead of silently creating ``data/library/`` next to
+    wherever the shell happened to be. It lives in ``runtime/`` rather than
+    ``data/`` precisely because it must survive the delete-to-start-fresh
+    wipe: it is the pointer *to* the workspace, not production state.
+    Returns None when unregistered or stale.
     """
-    from mediaconductor.tools.external import data_home
+    from mediaconductor.layout import state_root
 
-    marker = data_home() / "workspace.json"
+    marker = state_root() / "workspace.json"
     try:
         recorded = json.loads(marker.read_text(encoding="utf-8"))
         root = Path(str(recorded["workspace_root"])).expanduser().resolve()
@@ -92,12 +95,12 @@ def register_workspace(root: Path) -> Path | None:
     Only roots that look like a workspace (have ``config.json``) are recorded;
     returns the marker path on success, None when skipped/unwritable.
     """
-    from mediaconductor.tools.external import data_home
+    from mediaconductor.layout import state_root
 
     root = root.expanduser().resolve()
     if not (root / "config.json").is_file():
         return None
-    marker = data_home() / "workspace.json"
+    marker = state_root() / "workspace.json"
     try:
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(
@@ -113,10 +116,19 @@ PROJECT_ROOT: Path = _project_root()
 CONFIG_FILE:        Path = PROJECT_ROOT / "config.json"
 SYSTEM_CONFIG_FILE: Path = PROJECT_ROOT / "config.system.json"
 
-# Legacy in-workspace ML cache location. Only used as a last-resort fallback
-# by code that may run outside a tool env; tool_env() pins the real caches.
-HF_CACHE_DIR:   Path = PROJECT_ROOT / ".hf_cache"
-TORCH_HOME_DIR: Path = PROJECT_ROOT / ".cache" / "torch"
+
+
+def hf_cache_dir() -> Path:
+    """ML cache for code that may run outside a tool env.
+
+    Same ``runtime/cache/hf`` the tool envs are pinned to — it used to be a
+    separate in-workspace ``.hf_cache/``, which meant a model could be
+    downloaded twice and one copy survived a workspace wipe. A function,
+    not a constant, so MEDIACONDUCTOR_HOME still moves it.
+    """
+    from mediaconductor.layout import cache_dir
+
+    return cache_dir("hf")
 
 
 # ── Config loaders ────────────────────────────────────────────────────────────

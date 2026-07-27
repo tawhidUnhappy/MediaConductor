@@ -57,10 +57,10 @@ URL, chapter number, `translated_language`. Then:
 mediaconductor download
 ```
 
-Put/keep the raw pages in `library/<Project>/<item>/download/` (item =
+Put/keep the raw pages in `data/library/<Project>/<item>/download/` (item =
 zero-padded chapter, e.g. `01`). Page files are `01_00.jpg … 01_NN.jpg`.
 
-`download` also writes/updates `library/<Project>/manga.json` — the manga's
+`download` also writes/updates `data/library/<Project>/manga.json` — the manga's
 source record (MangaDex title URL, canonical title, per-chapter download
 info). Read it later when you need the manga's link or the official title,
 e.g. for the description's credits / "support the official release" section
@@ -75,7 +75,7 @@ gutter-separated panels). Paged manga: skip to the MAGI phases below.
 One command replaces detection + cropping + verification-sheet generation:
 
 ```bash
-mediaconductor webtoon-split --project-root library/<Project> --item-range 01-19
+mediaconductor webtoon-split --project-root data/library/<Project> --item-range 01-19
 ```
 
 Per item it stitches `download/` into one tall strip, splits it at gutters
@@ -89,7 +89,7 @@ raw gutter pass reliably needs on real webtoons:
   (scene-break captions like "ONE HOUR LATER…" sitting on gutter-colored
   background) are attached to the following panel so no story text is lost.
 
-Crops land in `library/<Project>/<item>/panels/ch<item>_###.jpg` (an
+Crops land in `data/library/<Project>/<item>/panels/ch<item>_###.jpg` (an
 existing panels folder is archived to `<item>/old/run_NNNN/` first), and
 verification images in `work/webtoon_verify/<Project>/`:
 
@@ -110,7 +110,7 @@ speech bubbles). This full-crop pass is mandatory; the following focused pass
 additionally catches risky cut locations:
 
 ```bash
-mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-19
+mediaconductor webtoon-cutcheck --project-root data/library/<Project> --item-range 01-19
 ```
 
 It reads the `<item>_ranges.json` manifests webtoon-split wrote and renders a
@@ -130,12 +130,12 @@ resolves all indices against the manifest, so never compute them by hand:
 
 ```bash
 mediaconductor webtoon-override --file work/overrides.json \
-    --project-root library/<Project> --item 07 --merge-at-cut 23140
+    --project-root data/library/<Project> --item 07 --merge-at-cut 23140
 mediaconductor webtoon-override --file work/overrides.json \
-    --project-root library/<Project> --item 12 --merge-panels 5,6
+    --project-root data/library/<Project> --item 12 --merge-panels 5,6
 # reposition a bad cut = merge across it + force the right y:
 mediaconductor webtoon-override --file work/overrides.json \
-    --project-root library/<Project> --item 02 --merge-at-cut 42186 --split-at 42394
+    --project-root data/library/<Project> --item 02 --merge-at-cut 42186 --split-at 42394
 ```
 
 (Under the hood: `merge [[i, j]]` = 0-based positions in the manifest's
@@ -310,7 +310,7 @@ exception.
 
 Panel naming convention (everything downstream keys on it):
 `{chapter:02d}_{page:02d}_{panel:02d}.png` in
-`library/<Project>/<item>/panels/`.
+`data/library/<Project>/<item>/panels/`.
 
 ## Phase 4 — Read the entire chapter before writing anything
 
@@ -329,7 +329,7 @@ you skimmed. While reading, note:
 
 ```bash
 mediaconductor install-tool deepseek-ocr2   # one-time
-mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07
+mediaconductor panel-transcript --project-root data/library/<Project> --item-range 01-07
 ```
 
 Writes `<item>/transcript.json` — every panel's bubble/caption text, shown as
@@ -357,7 +357,7 @@ the same SHA-256-bound crop bytes, drops removed panels, and invalidates changed
 crops without loading DeepSeek:
 
 ```bash
-mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07 --seed-only
+mediaconductor panel-transcript --project-root data/library/<Project> --item-range 01-07 --seed-only
 ```
 
 Skipping this step leaves the transcript out of sync until the next normal
@@ -367,7 +367,7 @@ leave OCR absent and read the panel directly.
 
 ## Phase 5 — Write `narration.json`
 
-Format (`library/<Project>/<item>/narration.json`):
+Format (`data/library/<Project>/<item>/narration.json`):
 
 ```json
 [{"image": "01_04_01.png", "narration": "One sentence or three. Present tense."}]
@@ -434,7 +434,7 @@ Rules learned in production:
 Validate inputs before burning GPU time:
 
 ```bash
-mediaconductor video-check --project-root library/<Project> --items 01 --json
+mediaconductor video-check --project-root data/library/<Project> --items 01 --json
 ```
 
 When you deliberately narrate a subset of panels (the normal case — hook/CTA
@@ -450,7 +450,7 @@ audio-related — missing audio for a *referenced* entry; see Phase 7.)
 **Then run the semantic pass — this is not optional:**
 
 ```bash
-mediaconductor narration-review-sheets --project-root library/<Project> --item-range 01-07
+mediaconductor narration-review-sheets --project-root data/library/<Project> --item-range 01-07
 ```
 
 Read every sheet and open every corresponding original crop at readable/full
@@ -462,7 +462,7 @@ command (no JSON editing; the stale WAV is pruned so the next audio run
 regenerates it):
 
 ```bash
-mediaconductor narration-edit --project-root library/<Project> --item 01 \
+mediaconductor narration-edit --project-root data/library/<Project> --item 01 \
     --set ch01_042.jpg "Rewritten line." --prune-audio
 ```
 
@@ -473,25 +473,25 @@ final whole-mix normalize:
 
 ```bash
 # IndexTTS voice clone (default, best quality; leave gpu-workers at default):
-mediaconductor video --project-root library/<Project> --items 01 \
+mediaconductor video --project-root data/library/<Project> --items 01 \
   --tts indextts --speaker-wav "<path to reference voice wav>" \
   --overwrite-audio --overwrite-video \
   --build-long-video --normalize-audio \
   --background-music "<path to music>" --music-volume-db -28
 
 # Kokoro fallback (fast, ~4x parallel on an RTX 3060 — do not exceed 4 gpu-workers):
-mediaconductor video --project-root library/<Project> --items 01 \
+mediaconductor video --project-root data/library/<Project> --items 01 \
   --tts kokoro --gpu-workers 4 \
   --build-long-video --normalize-audio \
   --background-music "<path to music>" --music-volume-db -28
 ```
 
 - Use the **default audio/output roots** (don't pass `--audio-root
-  audio/<Project>` — the project name is appended automatically and you
+  data/audio/<Project>` — the project name is appended automatically and you
   get a doubled path).
 - Production defaults to `--audio-source faded`: every panel WAV is copied to
-  the separate `audio_faded/<Project>/...` tree with a symmetric 8 ms fade-in
-  and fade-out before rendering. Raw IndexTTS/Kokoro WAVs in `audio/` stay
+  the separate `data/audio_faded/<Project>/...` tree with a symmetric 8 ms fade-in
+  and fade-out before rendering. Raw IndexTTS/Kokoro WAVs in `data/audio/` stay
   untouched. `--audio-source raw` is for an intentional diagnostic comparison,
   not a normal production render.
 - `--music-volume-db -30` (the default) is the tuned recap-channel value
@@ -561,7 +561,7 @@ mediaconductor video --project-root library/<Project> --items 01 \
 - Run it in the background and **wait for the completion notification**;
   IndexTTS for ~100 panels is a long job (see "Working style" above — don't
   sit in a poll loop). If audio state is ever in doubt:
-  `mediaconductor video-audio-audit --project-root library/<Project> --json`.
+  `mediaconductor video-audio-audit --project-root data/library/<Project> --json`.
 
 The all-in-one command reports each enabled parent stage through
 `MEDIACONDUCTOR_PROGRESS`, so `job-status` remains useful during quiet TTS
@@ -571,7 +571,7 @@ workers. It runs `video-validate` automatically as the final stage; use
 ## Phase 7 — Verify the build (measure, don't assume)
 
 ```bash
-mediaconductor video-validate --project-root library/<Project> --items 01 --json
+mediaconductor video-validate --project-root data/library/<Project> --items 01 --json
 ```
 
 This command is a structural gate, not a visual, timing, click, or loudness
@@ -611,9 +611,9 @@ paste (`00:00 Chapter 01`, and so on); JSON is available for publishing
 scripts:
 
 ```bash
-mediaconductor video-chapters --project-root library/<Project> \
+mediaconductor video-chapters --project-root data/library/<Project> \
   --output-root output --item-range 01-24
-mediaconductor video-chapters --project-root library/<Project> \
+mediaconductor video-chapters --project-root data/library/<Project> \
   --output-root output --item-range 01-24 --json
 ```
 
@@ -629,9 +629,9 @@ For timestamps inside one item, the frame-aligned manual calculation remains:
 import json, math, wave
 from pathlib import Path
 FPS, t = 15, 0.0
-entries = json.loads(Path("library/<Project>/01/narration.json").read_text("utf-8"))
+entries = json.loads(Path("data/library/<Project>/01/narration.json").read_text("utf-8"))
 for i, e in enumerate(entries):
-    with wave.open(f"audio/<Project>/01/{Path(e['image']).stem}.wav") as w:
+    with wave.open(f"data/audio/<Project>/01/{Path(e['image']).stem}.wav") as w:
         dur = w.getnframes() / w.getframerate()
     print(i, f"{int(t)//60}:{int(t)%60:02d}", e["image"])
     t += max(1, math.ceil(dur * FPS)) / FPS
@@ -656,7 +656,7 @@ separation, and enough negative space for the title:
 
 ```bash
 mediaconductor thumbnail-compose \
-    --base library/<P>/01/panels/<approved>.jpg --output thumb_base.png
+    --base data/library/<P>/01/panels/<approved>.jpg --output thumb_base.png
 ```
 
 Selection rules (non-negotiable — this is what keeps the channel monetizable,
@@ -762,7 +762,7 @@ mediaconductor youtube-profiles --json
 mediaconductor youtube-status --profile <profile> --verify --json
 
 mediaconductor youtube-upload --profile <profile> \
-  --video output/<Project>/<Project>_full_<timestamp>.mp4 \
+  --video data/output/<Project>/<Project>_full_<timestamp>.mp4 \
   --title "<title>" --description-file description.txt \
   --tags "tag1,tag2,..." --thumbnail thumbnail.png \
   --privacy public --json

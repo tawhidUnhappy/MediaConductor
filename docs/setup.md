@@ -64,10 +64,14 @@ uv run mediaconductor --version
 uv run mediaconductor where --json     # resolved data/tool paths for THIS install
 ```
 
-**Run every subsequent command from the repo root.** All data roots
-(`library/`, `audio/`, `output/`, `work/`, `.mangaeasy/`) resolve relative
-to the install; running from elsewhere is the classic "Failed to spawn:
-mediaconductor" / wrong-paths failure.
+**Run every subsequent command from the repo root.** Two roots are resolved
+per install: `data/` (everything downloaded or generated —
+`data/library/`, `data/audio/`, `data/audio_faded/`, `data/output/`,
+`data/review/`, `data/work/`) and `runtime/` (tool envs, caches, state,
+OAuth tokens). Running from elsewhere is the classic "Failed to spawn:
+mediaconductor" / wrong-paths failure. `setup` registers this workspace so a
+command started from the wrong directory still resolves back here, and
+`mediaconductor workspace-layout` shows exactly where each root landed.
 
 ### Step 2 — Provision binaries, tool envs and models
 
@@ -85,7 +89,7 @@ GPU-aware and profile-driven — what gets installed, in order:
    system-wide.
 2. **Hardware detection** — NVIDIA GPU check picks the profile.
 3. **AI tool environments** — each in its own isolated `uv` env under
-   `.mangaeasy/tools/`, models included:
+   `runtime/tools/`, models included:
 
    | Tool env | Installed when | Role | Download budget |
    |---|---|---|---|
@@ -196,16 +200,36 @@ produced for a real channel usually want:
 | GPU expected but `cuda: false` | check `nvidia-smi` works on the host; fix drivers, re-run `setup --cuda` |
 | no GPU at all | fine — CPU profile: TTS = Kokoro, encoding = libx264; `page-split` needs `setup --all` and is slow on CPU |
 | disk pressure | `--skip deepseek-ocr2` saves ~7 GB; `--skip-models` defers the rest |
-| corporate proxy blocks Hugging Face | set `HTTPS_PROXY` before `setup`; caches stay in-tree (`.mangaeasy/`) |
+| corporate proxy blocks Hugging Face | set `HTTPS_PROXY` before `setup`; caches stay in-tree (`runtime/`) |
 
 ### Where everything lands
 
-Self-contained by design: tool envs and model caches under `.mangaeasy/`
-(HF/torch/uv caches are force-pinned there — a global `HF_HOME` will NOT
-leak downloads elsewhere; set `MEDIACONDUCTOR_SHARE_CACHES=1` if you want shared
-caches; see [external-tools.md](external-tools.md)), projects under
-`library/`, generated output under `audio/`, `output/`, `work/`. Deleting
-the folder removes everything. `MEDIACONDUCTOR_ROOT` relocates the data root.
+Self-contained by design, in two folders:
+
+| Folder | Holds | Deleting it |
+|---|---|---|
+| `data/` | every downloaded chapter, panel, narration, WAV, render, review sheet and job log | **the supported fresh start** — costs re-work, nothing else |
+| `runtime/` | tool envs, HF/torch/uv caches, install state, YouTube tokens | costs an ~80 GB re-download; recover with `setup` |
+
+HF/torch/uv caches are force-pinned under `runtime/cache/` — a global
+`HF_HOME` will NOT leak downloads elsewhere; set
+`MEDIACONDUCTOR_SHARE_CACHES=1` if you want shared caches, see
+[external-tools.md](external-tools.md).
+
+Your `bgm/`, `vocal/` and config files sit beside both and are never written
+by MediaConductor, so a reset cannot take them with it.
+
+```bash
+mediaconductor workspace-layout         # where each root actually resolved
+mediaconductor workspace-reset          # dry run: what a fresh start would clear
+mediaconductor workspace-reset --confirm
+```
+
+`MEDIACONDUCTOR_DATA_ROOT` relocates `data/` (e.g. onto a larger drive) and
+`MEDIACONDUCTOR_HOME` relocates `runtime/` (e.g. to share one tool tree
+between checkouts). Point them at *different* trees — `workspace-layout`
+reports an overlap as an error, because a reset would otherwise delete the
+tool environments.
 
 ### After setup
 

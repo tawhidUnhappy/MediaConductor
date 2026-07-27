@@ -65,40 +65,27 @@ def app_root() -> Path:
 
 
 def data_home() -> Path:
-    """This install's own data dir: AI tool envs, app state, shared caches.
+    """This install's runtime dir: AI tool envs, caches, state, secrets.
 
-    Lives at ``<app_root>/.mediaconductor`` so deleting the install/repo
-    folder removes it too — nothing is written to the user's home directory.
-    Installs created before the rename keep their existing ``.mangaeasy``
-    dir (it holds multi-gigabyte tool envs and models; never force a
-    re-download). Override with MEDIACONDUCTOR_HOME (e.g. to share tool
-    installs across multiple dev checkouts).
+    ``<app_root>/runtime`` — see :mod:`mediaconductor.layout` for why it sits
+    beside ``data/`` rather than inside it (a fresh start must not cost an
+    80 GB re-download). Deleting the install folder still removes it, so
+    nothing is written to the user's home directory. Override with
+    MEDIACONDUCTOR_HOME to share one tool tree across checkouts.
     """
-    configured = os.environ.get("MEDIACONDUCTOR_HOME")
-    if configured:
-        return Path(configured).expanduser().resolve()
-    root = app_root()
-    home = root / ".mediaconductor"
-    legacy = root / ".mangaeasy"
-    if not home.exists() and legacy.exists():
-        return legacy.resolve()
-    return home.resolve()
+    from mediaconductor.layout import runtime_root
 
-
-# Compatibility alias for pre-rename imports.
-mangaeasy_home = data_home
+    return runtime_root()
 
 
 def tools_home() -> Path:
     """Managed dir where `mediaconductor install-tool` puts external tool envs.
 
-    Default `<data_home>/tools` — self-contained, deleted along
-    with the install/repo folder. Override with MEDIACONDUCTOR_TOOLS_DIR.
+    Default `<runtime>/tools`. Override with MEDIACONDUCTOR_TOOLS_DIR.
     """
-    configured = os.environ.get("MEDIACONDUCTOR_TOOLS_DIR")
-    if configured:
-        return Path(configured).expanduser().resolve()
-    return data_home() / "tools"
+    from mediaconductor.layout import tools_root
+
+    return tools_root()
 
 
 def candidate_roots() -> list[Path]:
@@ -161,9 +148,9 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     """Env for subprocesses that run inside an isolated tool venv.
 
     Every cache an external tool (or `uv` itself) might write is pinned under
-    this install's own `.mangaeasy/` dir, so the "everything MediaConductor writes
-    lives in one folder" promise holds and deleting the install folder leaves
-    nothing behind. These are **force-set** (they override an inherited
+    this install's own `runtime/cache/` dir, so the "everything MediaConductor
+    writes lives in one folder" promise holds and deleting the install folder
+    leaves nothing behind. These are **force-set** (they override an inherited
     ``HF_HOME`` / ``UV_CACHE_DIR`` / ... from the ambient environment): a
     global cache var the user exported for *other* tools would otherwise
     silently scatter multi-GB model downloads outside the install folder.
@@ -181,24 +168,26 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     venv instead of the tool's, which then can't find what it just
     "successfully" installed.
     """
+    from mediaconductor.layout import cache_dir
+
     env = dict(base or os.environ)
     env.pop("VIRTUAL_ENV", None)
     env.pop("PYTHONHOME", None)
-    hf_cache = data_home() / "hf_cache"
-    # Force these under .mangaeasy so an inherited global HF_HOME/UV_CACHE_DIR
+    hf_cache = cache_dir("hf")
+    # Force these under runtime/cache so an inherited global HF_HOME/UV_CACHE_DIR
     # can't leak downloads out of the install folder (opt out with
     # MEDIACONDUCTOR_SHARE_CACHES=1, which reverts them to setdefault semantics).
     set_cache = env.setdefault if _share_caches() else env.__setitem__
     set_cache("HF_HOME", str(hf_cache))
     set_cache("HF_HUB_CACHE", str(hf_cache / "hub"))
     set_cache("TRANSFORMERS_CACHE", str(hf_cache / "hub"))
-    set_cache("TORCH_HOME", str(data_home() / "torch_cache"))
-    set_cache("UV_CACHE_DIR", str(data_home() / "uv_cache"))
-    set_cache("UV_PYTHON_INSTALL_DIR", str(data_home() / "uv_python"))
-    set_cache("XDG_CACHE_HOME", str(data_home() / "xdg_cache"))
-    set_cache("TRITON_CACHE_DIR", str(data_home() / "triton_cache"))
-    set_cache("TORCHINDUCTOR_CACHE_DIR", str(data_home() / "torchinductor_cache"))
-    set_cache("TORCH_EXTENSIONS_DIR", str(data_home() / "torch_extensions"))
+    set_cache("TORCH_HOME", str(cache_dir("torch")))
+    set_cache("UV_CACHE_DIR", str(cache_dir("uv")))
+    set_cache("UV_PYTHON_INSTALL_DIR", str(cache_dir("uv_python")))
+    set_cache("XDG_CACHE_HOME", str(cache_dir("xdg")))
+    set_cache("TRITON_CACHE_DIR", str(cache_dir("triton")))
+    set_cache("TORCHINDUCTOR_CACHE_DIR", str(cache_dir("torchinductor")))
+    set_cache("TORCH_EXTENSIONS_DIR", str(cache_dir("torch_extensions")))
     env.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
     env.setdefault("HF_XET_HIGH_PERFORMANCE", "1")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -282,6 +271,7 @@ def where_main() -> int:
     import json
 
     from mediaconductor import __version__
+    from mediaconductor.layout import data_root
     from mediaconductor.tools.vendored import vendored_bin_dirs
 
     parser = argparse.ArgumentParser(description="Show this install's resolved paths.")
@@ -301,15 +291,17 @@ def where_main() -> int:
         # If this is not where you expect media to land, cd into the real
         # workspace, set MEDIACONDUCTOR_PROJECT_ROOT, or re-run `setup` there.
         "workspace_root": str(PROJECT_ROOT),
-        "data_home": str(data_home()),
-        # Legacy spelling kept so pre-rename scripts reading `where --json`
-        # keep resolving the same location.
-        "mangaeasy_home": str(data_home()),
+        # The one deletable folder: every downloaded and generated file.
+        "data_root": str(data_root()),
+        # Tool envs, model caches, state and secrets — kept out of data/ so a
+        # fresh start doesn't re-download tens of gigabytes.
+        "runtime_home": str(data_home()),
         "tools_home": str(tools_home()),
         "vendored_bin_dirs": [str(d) for d in vendored_bin_dirs()],
         "env_overrides": {
             name: os.environ.get(name)
-            for name in ("MEDIACONDUCTOR_ROOT", "MEDIACONDUCTOR_HOME", "MEDIACONDUCTOR_TOOLS_DIR")
+            for name in ("MEDIACONDUCTOR_ROOT", "MEDIACONDUCTOR_HOME",
+                         "MEDIACONDUCTOR_TOOLS_DIR", "MEDIACONDUCTOR_DATA_ROOT")
         },
     }
     if args.as_json:

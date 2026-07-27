@@ -66,10 +66,13 @@ def test_panel_prefix_rejects_unknown_format_fields_and_traversal(value: str) ->
 
 
 def test_configured_media_subdirectories_cannot_escape_roots(tmp_path: Path, monkeypatch) -> None:
+    import mediaconductor.layout as layout
     import mediaconductor.paths as configured_paths
     from mediaconductor.library_scan import library_dir
 
-    monkeypatch.setattr(configured_paths, "_path_cfg", lambda: {"library_subdir": "../escape"})
+    # The library root is resolved by layout.py now; a configured subdir that
+    # walks out of data/ must still be refused, not silently followed.
+    monkeypatch.setattr(layout, "_paths_config", lambda: {"library_subdir": "../escape"})
     with pytest.raises(UnsafePathComponentError):
         configured_paths.library_dir()
 

@@ -9,6 +9,7 @@ quietly landing outside the workspace.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -314,27 +315,70 @@ def test_workspace_layout_reports_every_persistent_root(monkeypatch, tmp_path):
     report = workspace.layout_report()
     names = {entry["name"] for entry in report["roots"]}
     assert {
-        "workspace_root", "items_root", "audio_root", "output_root", "work_dir",
-        "jobs_dir", "data_home", "tools_home", "cache_home", "state_home",
-        "secrets_home",
+        "workspace_root", "data_root", "items_root", "audio_root", "faded_audio_root",
+        "output_root", "review_root", "work_dir", "jobs_dir", "runtime_home",
+        "tools_home", "cache_home", "state_home", "secrets_home",
     } <= names
     for entry in report["roots"]:
         assert entry["path"]
 
 
-def test_a_root_escaping_the_workspace_is_reported(monkeypatch, tmp_path):
+def test_every_production_root_lands_inside_the_deletable_data_folder(monkeypatch, tmp_path):
+    """The whole promise: deleting data/ is a complete fresh start.
+
+    If any root that holds downloaded or generated files resolves outside
+    data/, that promise silently becomes false — the case this asserts
+    against, on the real resolution path rather than a stubbed one.
+    """
+    import mediaconductor.workspace as workspace
+
+    report = workspace.layout_report()
+    data_root = Path(report["data_root"])
+    production = ("items_root", "audio_root", "faded_audio_root", "output_root",
+                  "review_root", "work_dir", "jobs_dir")
+    for entry in report["roots"]:
+        if entry["name"] in production:
+            path = Path(entry["path"])
+            assert path == data_root or path.is_relative_to(data_root), \
+                f"{entry['name']} -> {path} is outside {data_root}"
+    # ...and the machinery must NOT be in there, or a reset costs a re-download.
+    runtime = Path(report["runtime_home"])
+    assert not (runtime == data_root or runtime.is_relative_to(data_root))
+
+
+def test_a_root_escaping_its_tree_is_reported(monkeypatch, tmp_path):
     """A stray env var used to scatter gigabytes with no symptom for weeks."""
     import mediaconductor.workspace as workspace
 
     workspace_root = tmp_path / "workspace"
+    data_root = workspace_root / "data"
     outside = tmp_path / "elsewhere"          # a sibling, genuinely outside
     monkeypatch.setattr(workspace, "resolved_roots", lambda: {
         "workspace_root": workspace_root,
+        "data_root": data_root,
+        "runtime_home": workspace_root / "runtime",
         "audio_root": outside,
-        "items_root": workspace_root / "library",
+        "items_root": data_root / "library",
     })
     report = workspace.layout_report()
     assert not report["ok"]
     assert report["escaped_roots"] == ["audio_root"]
     problems = workspace.workspace_problems()
-    assert any("outside the workspace" in problem for problem in problems)
+    assert any(str(data_root) in problem for problem in problems)
+
+
+def test_data_and_runtime_overlap_is_reported(monkeypatch, tmp_path):
+    """runtime/ inside data/ would make workspace-reset delete the tool envs."""
+    import mediaconductor.workspace as workspace
+
+    workspace_root = tmp_path / "workspace"
+    data_root = workspace_root / "data"
+    monkeypatch.setattr(workspace, "resolved_roots", lambda: {
+        "workspace_root": workspace_root,
+        "data_root": data_root,
+        "runtime_home": data_root / "runtime",
+    })
+    report = workspace.layout_report()
+    assert report["data_runtime_overlap"] is True
+    assert not report["ok"]
+    assert any("overlap" in problem for problem in workspace.workspace_problems())

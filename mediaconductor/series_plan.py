@@ -8,7 +8,7 @@ then 13–24, and so on (12 per video by default). Two commands own that state:
   (panels, narration), and cross-references ``publish.json`` to mark batches
   already uploaded. Machine-readable with ``--json``.
 - ``mediaconductor series-mark-published`` records a batch into
-  ``library/<project>/publish.json`` after a successful ``youtube-upload``
+  ``data/library/<project>/publish.json`` after a successful ``youtube-upload``
   (video id, title, timestamp). Re-recording the same item set replaces the
   old record instead of duplicating it.
 
@@ -116,7 +116,7 @@ def plan_main() -> int:
                     "and name the next batch to produce.",
     )
     parser.add_argument("--project-root", type=Path, required=True,
-                        help="Project folder (library/<name>).")
+                        help="Project folder (data/library/<name>).")
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument("--json", action="store_true", help="Emit one JSON object on stdout.")
     args = parser.parse_args()
@@ -161,11 +161,11 @@ def mark_main() -> int:
 
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} series-mark-published",
-        description="Record an uploaded batch in library/<project>/publish.json "
+        description="Record an uploaded batch in data/library/<project>/publish.json "
                     "so series-plan advances to the next window.",
     )
     parser.add_argument("--project-root", type=Path, required=True,
-                        help="Project folder (library/<name>).")
+                        help="Project folder (data/library/<name>).")
     parser.add_argument("--items", nargs="+", required=True,
                         help="The batch's items, e.g. 01-12 or 01 02 ... 12.")
     parser.add_argument("--video-id", required=True, help="YouTube video id from youtube-upload.")

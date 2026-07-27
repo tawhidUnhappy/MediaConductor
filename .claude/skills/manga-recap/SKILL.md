@@ -21,7 +21,7 @@ command prints one JSON object; generation commands end with a
 error, and 3 = artifacts generated but mandatory manual review remains
 (`review_required`, not approval); nothing ever prompts for input.
 
-**Hard safety rules** — never delete/rename anything inside `library/`
+**Hard safety rules** — never delete/rename anything inside `data/library/`
 source items; edit narration via `narration-edit`, not by hand; clear
 generated output only with `video-clean-*` (everything else auto-archives to
 `old/run_NNNN/`). `--gpu-workers` is clamped to 4 in code — don't fight it.
@@ -44,7 +44,7 @@ the log. Only foreground the quick `--json`/validation commands.
 ```bash
 mediaconductor where --json      # install paths + version
 mediaconductor doctor --json     # ffmpeg/GPU/tool readiness
-mediaconductor work-status --project-root library/<Project> --json   # resuming? exact per-item stage
+mediaconductor work-status --project-root data/library/<Project> --json   # resuming? exact per-item stage
 ```
 
 Resuming a project — including picking it back up on a **different LLM**
@@ -59,7 +59,7 @@ machine fix-until-clean gate — loop `work-qa → apply the listed fix → work
 until exit 0, then separately clear every reported manual visual review.
 `work-artifacts` lists what already exists for reuse before you regenerate
 anything. All of it is plain files under
-`library/<Project>/.workboard/`, not chat state, so any agent on any model
+`data/library/<Project>/.workboard/`, not chat state, so any agent on any model
 reads the exact same picture. Set `MEDIACONDUCTOR_AGENT` (e.g. `claude-fable`,
 `gpt-5.6`) so claims/notes/todos show which model did what.
 
@@ -68,8 +68,8 @@ Fresh clone/machine? Follow the agent runbook in `docs/setup.md`:
 `--skip <tool>`; re-run to resume) → verify `doctor --json` → `mediaconductor
 smoke-test` (renders and checks a tiny real video; `SMOKE TEST PASS` = the
 machine can produce videos). Working dir for a production run should be the
-install root — projects live in `library/`, generated output in `audio/`,
-`output/`, `work/`.
+install root — projects live in `data/library/`, generated output in `data/audio/`,
+`data/output/`, `data/work/`.
 
 ## 1. Download the series (user gives a MangaDex URL)
 
@@ -81,14 +81,14 @@ Polite by design (rate spacing, backoff, jitter) — never parallelize
 downloads or shrink its delays. `--name <Project>` overrides the derived
 folder name; `--from/--to` bound the range. Re-running resumes; complete
 chapters are skipped. The result line gives the project path
-(`library/<Project>/`), and `manga.json` records the source.
+(`data/library/<Project>/`), and `manga.json` records the source.
 
 ## 2. Plan the batch
 
 Videos ship 12 chapters at a time (01–12, then 13–24, …):
 
 ```bash
-mediaconductor series-plan --project-root library/<Project> --json
+mediaconductor series-plan --project-root data/library/<Project> --json
 ```
 
 Work on `next_batch` only. If it's partial, the series may have ended
@@ -97,7 +97,7 @@ Work on `next_batch` only. If it's partial, the series may have ended
 ## 3. Decide the crop tool, then crop and VERIFY
 
 ```bash
-mediaconductor style-detect --project-root library/<Project> --json
+mediaconductor style-detect --project-root data/library/<Project> --json
 ```
 
 Open 2–3 of the returned `sample_images` and confirm the verdict yourself:
@@ -110,7 +110,7 @@ and override with `--reading-direction rtl|ltr` if the source metadata is
 wrong. Then crop the batch, e.g.:
 
 ```bash
-mediaconductor webtoon-split --project-root library/<Project> --item-range 01-12
+mediaconductor webtoon-split --project-root data/library/<Project> --item-range 01-12
 ```
 
 **The crop double-verify loop** (details: `docs/operate/crop-verify-narrate.md`):
@@ -122,7 +122,7 @@ For webtoons, then run the full-resolution pass — judging crops on downscaled
 sheets alone has shipped sliced bubbles before:
 
 ```bash
-mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-12
+mediaconductor webtoon-cutcheck --project-root data/library/<Project> --item-range 01-12
 ```
 
 Read EVERY sheet and original crop; FIX any cut through a figure/speech bubble
@@ -131,14 +131,14 @@ and any bubble/SFX-fragment short panel by adding the fix with
 the manifest):
 
 ```bash
-mediaconductor webtoon-override --file work/overrides.json \
-    --project-root library/<Project> --item 07 --merge-at-cut 23140
+mediaconductor webtoon-override --file data/work/overrides.json \
+    --project-root data/library/<Project> --item 07 --merge-at-cut 23140
 # fuse sheet panels #4..#5:            --item 12 --merge-panels 4,5
 # reposition a bad cut:                --merge-at-cut 42186 --split-at 42394
 ```
 
 ACCEPT background/effect-art cuts, bordered thin scenery, scanlator
-banners. Re-run the split with `--overrides work/overrides.json`, then
+banners. Re-run the split with `--overrides data/work/overrides.json`, then
 re-run cutcheck to confirm. Do not proceed to narration with unresolved
 suspects.
 
@@ -150,7 +150,7 @@ Inspect that page and crop yourself and record the exact manual accept with
 `work-note --topic crop-review`; never infer the exception from MAGI output.
 
 **Re-cropping after narration exists?** Never re-narrate: `mediaconductor
-panels-remap --project-root library/<Project> --item-range 01-12` (dry run,
+panels-remap --project-root data/library/<Project> --item-range 01-12` (dry run,
 then `--apply`) carries narration texts and WAVs to the new numbering, then
 review its `shift`/`merge` list with `narration-review-sheets
 --only-images ...` and rebuild with `mediaconductor video --overwrite-video`.
@@ -165,7 +165,7 @@ reading for small/dense text or doubtful names, run panel-transcript first
 column on the review sheets:
 
 ```bash
-mediaconductor panel-transcript --project-root library/<Project> --item-range 01-12
+mediaconductor panel-transcript --project-root data/library/<Project> --item-range 01-12
 ```
 
 Skipping it skips nothing else — every gate below works with or without
@@ -174,7 +174,7 @@ interrupted run: finish it or delete it). DeepSeek output is a proposal, not
 ground truth: panel pixels, bubble tails, and established reading sequence win
 every disagreement. If you cannot see the images, stop and hand off to a
 vision-capable agent or human; never narrate from OCR alone. Write
-`library/<Project>/<item>/narration.json`
+`data/library/<Project>/<item>/narration.json`
 (`[{"image": "<panel file>", "narration": "..."}]`) from the **panel image**
 (+ transcript when present) — style rules in
 `mediaconductor/assets/prompts/narration.md`. Optional `intro.json` (same shape)
@@ -221,7 +221,7 @@ Grounding rules (each traces to real viewer complaints about a shipped recap):
 Verify in two passes:
 
 1. **Structural** — `mediaconductor narration-check --project-root
-   library/<Project> --item-range 01-12 --json` must pass (`ok:true`): no
+   data/library/<Project> --item-range 01-12 --json` must pass (`ok:true`): no
    dangling images, no empty text, no intro/narration overlap. Panels with no
    narration entry are reported as **warnings**, not failures — deliberately
    skipping credits/title banners, scanlator pages, SFX-only frames, and
@@ -229,12 +229,12 @@ Verify in two passes:
    from narrated panels). Confirm the uncovered list is exactly those skips,
    not a story beat you forgot.
 2. **Semantic** — `mediaconductor narration-review-sheets --project-root
-   library/<Project> --item-range 01-12`, then read EVERY sheet and open every
+   data/library/<Project> --item-range 01-12`, then read EVERY sheet and open every
    corresponding original crop at readable/full resolution. Check the
    grounding rules above against panel pixels and bubble tails. The OCR column
    is labeled unverified and may be wrong.
    Fix each bad line with one command (stale WAV pruned automatically):
-   `mediaconductor narration-edit --project-root library/<Project> --item 01
+   `mediaconductor narration-edit --project-root data/library/<Project> --item 01
    --set <image> "<new line>" --prune-audio`. Use `--delete <image>`,
    `--list`, `--intro`, or `--set-json '[...]'` for bulk edits — no
    hand-editing of narration.json needed.
@@ -242,9 +242,8 @@ Verify in two passes:
 ## 5. Audio → render → join → music
 
 ```bash
-mediaconductor video --project-root library/<Project> --audio-root audio \
-    --output-root output --item-range 01-12 --tts auto \
-    --build-long-video --normalize-audio \
+mediaconductor video --project-root data/library/<Project> --item-range 01-12 \
+    --tts auto --build-long-video --normalize-audio \
     --background-music "<music file>"
 ```
 
@@ -264,7 +263,7 @@ still reads continuously; bridge the gap in the narration of the following
 chapter's first line. (Don't reach for it to paper over a *failed render* —
 re-render that chapter instead.)
 After the run:
-`mediaconductor video-validate --project-root library/<Project> ... --json` —
+`mediaconductor video-validate --project-root data/library/<Project> ... --json` —
 `warnings` (unnarrated panels, orphan audio) are informational; anything in
 `errors` blocks upload.
 That structural result is not publication approval. Before any upload, validate
@@ -306,7 +305,7 @@ series/genre terms.
 
 ```bash
 mediaconductor youtube-upload --profile <profile> \
-    --video output/<Project>/<Project>_full.mp4 \
+    --video data/output/<Project>/<Project>_full.mp4 \
     --title "..." --description "..." --tags "manga,recap,..." \
     --thumbnail final_thumb.png --privacy public --json
 ```
@@ -329,7 +328,7 @@ when the channel's API project supports it, and verify the JSON result says the
 privacy you asked for. Then record the batch so the plan advances:
 
 ```bash
-mediaconductor series-mark-published --project-root library/<Project> \
+mediaconductor series-mark-published --project-root data/library/<Project> \
     --items 01-12 --video-id <id from upload> --title "..."
 ```
 

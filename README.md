@@ -93,12 +93,12 @@ There is no confirmation flag anywhere in the CLI or the MCP schema. An
 approval is a record bound to SHA-256 snapshots of exactly what was approved:
 
 ```bash
-mediaconductor manga-review crop        --project-root library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review narration   --project-root library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review final-video --project-root library/<P> --items 01 \
-    --video output/<P>/<P>_full.mp4 --reviewer NAME \
+mediaconductor manga-review crop        --project-root data/library/<P> --items 01 --reviewer NAME
+mediaconductor manga-review narration   --project-root data/library/<P> --items 01 --reviewer NAME
+mediaconductor manga-review final-video --project-root data/library/<P> --items 01 \
+    --video data/output/<P>/<P>_full.mp4 --reviewer NAME \
     --rights-confirmed --voice-consent-confirmed --source-permission-confirmed
-mediaconductor manga-review check       --project-root library/<P> --items 01
+mediaconductor manga-review check       --project-root data/library/<P> --items 01
 ```
 
 Re-cropping a panel, rewriting a line, or re-encoding the MP4 invalidates the
@@ -192,27 +192,46 @@ isolated tools and model snapshots survive container replacement.
 
 ## Self-contained workspace
 
-Everything persistent lives below one workspace, so a production can be moved,
-backed up, or deleted as a unit:
+Everything MediaConductor downloads or generates goes in **one folder**,
+`data/`. Delete that folder and the install is factory-fresh — nothing else
+needs cleaning up, and nothing you own goes with it:
 
 ```text
 <workspace>/
-  library/                 source chapters and cropped panels
-  audio/                   raw TTS takes + provenance sidecars
-  audio_faded/             render-safe narration derivatives
-  output/                  final and per-item videos + quality/ reports
-  review/                  review evidence and reports
-  work/                    jobs, sheets, manifests, render scratch
-  bgm/  vocal/             user-owned licensed music and narrator references
-  .mediaconductor/
-    tools/                 isolated AI environments
-    cache/                 HF, Torch, uv, and model caches
-    state/                 workspace/runtime metadata
-    youtube/               gitignored OAuth tokens
+  data/                    ← everything produced. Delete it to start fresh.
+    README.md              what each folder holds, in plain English
+    library/<project>/     downloaded chapters, cropped panels, narration, rights
+    audio/<project>/       raw TTS takes + provenance sidecars
+    audio_faded/<project>/ render-safe narration derivatives
+    output/<project>/      per-item videos, <project>_full.mp4, quality/ reports
+    review/                review sheets and evidence
+    work/                  jobs, manifests, render scratch — safe to delete any time
+  runtime/                 ← kept out of data/ so a fresh start stays cheap
+    tools/                 isolated AI environments (tens of GB)
+    cache/                 HF, Torch, uv, Triton, Inductor caches
+    state/                 which workspace this install points at
+    secrets/youtube/       gitignored OAuth tokens
+  bgm/  vocal/             your licensed music and narrator references
+  config.json  config.system.json
 ```
 
-`mediaconductor workspace-layout --json` reports every resolved root and
-whether it stays inside the workspace; `doctor` warns when one escapes.
+`bgm/`, `vocal/`, your config, the installed AI tools and your YouTube login
+all live outside `data/` on purpose: starting over should cost you a
+re-render, not your music library, an 80 GB re-download, or another OAuth
+round-trip.
+
+Start fresh without opening a file manager:
+
+```bash
+mediaconductor workspace-reset                 # dry run: what would go, and how big
+mediaconductor workspace-reset --confirm       # do it
+mediaconductor workspace-reset --keep-library --confirm   # keep the downloads, clear the rest
+```
+
+It refuses to run while a background job is still writing, and prints exactly
+what it removed. `mediaconductor workspace-layout --json` reports every
+resolved root and whether it landed in the right tree; `doctor` warns when one
+escapes.
 
 ## Isolated external tools
 
@@ -244,10 +263,10 @@ mediaconductor doctor --mode manga-video --json
 ```
 
 All HF, Torch, uv Python, Triton, TorchInductor, NLTK, and extension caches are
-redirected below the application data directory. Set `MEDIACONDUCTOR_SHARE_CACHES=1`
-only when deliberately opting into global caches. Existing `MEDIACONDUCTOR_*`
-environment names and `.mangaeasy` data directories remain stable in 2.x so
-multi-gigabyte installs are never silently moved.
+redirected below `runtime/cache/`, so a model is downloaded once per install
+and never scattered into a global cache. Set `MEDIACONDUCTOR_SHARE_CACHES=1`
+only when deliberately opting into global caches, and `MEDIACONDUCTOR_HOME` to
+point several checkouts at one shared `runtime/` tree.
 
 ## Safety and publishing
 
@@ -262,7 +281,7 @@ multi-gigabyte installs are never silently moved.
   delete-old.
 - `publish.json` prevents accidental repeat uploads.
 - Destructive cleanup requires an allowed generated root and exact
-  directory-name confirmation, and never touches `library/`.
+  directory-name confirmation, and never touches `data/library/`.
 - MCP path arguments and typed background jobs are confined to the server's
   repeatable `--allow-root` workspace boundary.
 - Project item and claim identifiers reject path traversal.

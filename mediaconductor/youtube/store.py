@@ -1,7 +1,9 @@
 """Credential storage for one or more YouTube account profiles.
 
-Everything lives in this install's own data folder
-(``<data root>/.mangaeasy/youtube/``), never the system keyring:
+Everything lives in this install's own runtime folder
+(``<install>/runtime/secrets/youtube/``), never the system keyring. It sits
+in ``runtime/`` rather than ``data/`` so clearing productions — or deleting
+``data/`` outright to start fresh — does not silently sign you out:
 
 * ``client_secret.json`` is the user's Google OAuth Desktop-app client.
 * ``token.json`` is the granted access/refresh token.
@@ -25,8 +27,6 @@ import re
 import stat
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-
-from mediaconductor.tools.external import data_home
 
 # Full video management (youtube.force-ssl): upload, edit metadata, and delete
 # the channel's videos. Tokens granted before this scope was added can be
@@ -65,8 +65,14 @@ def _confined_child(parent: Path, name: str, label: str) -> Path:
 
 
 def youtube_dir() -> Path:
-    home = data_home()
-    return _confined_child(home, "youtube", "YouTube credential store")
+    """``runtime/secrets/youtube`` — outside data/, so a fresh start keeps
+    you signed in. Deleting ``runtime/`` is what revokes this install's
+    stored tokens."""
+    from mediaconductor.layout import secrets_root
+
+    secrets = secrets_root()
+    secrets.mkdir(parents=True, exist_ok=True)
+    return _confined_child(secrets, "youtube", "YouTube credential store")
 
 
 def validate_profile(profile: str | None = None) -> str:

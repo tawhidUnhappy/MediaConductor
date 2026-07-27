@@ -151,7 +151,7 @@ Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 
 **Safety rules an agent must follow:**
 
-- Never create/delete/rename files inside `library/` items except
+- Never create/delete/rename files inside `data/library/` items except
   `narration.json`/`intro.json` content edits the user asked for (prefer
   `narration-edit` over hand-editing). The project-level `manga.json` and
   `publish.json` are machine-managed — read them freely, don't hand-edit them.
@@ -311,9 +311,15 @@ Set once for readability (absolute paths recommended):
 
 ```bash
 ROOT=/abs/path/to/workspace          # any folder the user chose
-PROJ=$ROOT/library/myproject         # items live here: $PROJ/01, $PROJ/02, ...
-AUDIO=$ROOT/audio  OUT=$ROOT/output  WORK=$ROOT/work
+DATA=$ROOT/data                      # everything produced lives here
+PROJ=$DATA/library/myproject         # items live here: $PROJ/01, $PROJ/02, ...
+AUDIO=$DATA/audio  OUT=$DATA/output  WORK=$DATA/work
 ```
+
+These are the defaults, so the `--audio-root` / `--output-root` / `--work-dir`
+flags below are only needed when you want something *other* than the standard
+layout. `mediaconductor where --json` prints the resolved `data_root` for the
+install you are talking to.
 
 ### MangaDex URL → published recap series (the full loop)
 
@@ -449,14 +455,14 @@ Agent rules for uploads:
   `MEDIACONDUCTOR_PROGRESS <bytes>/<total>` lines.
 - `youtube-logout --profile <profile>` disconnects only that profile; never
   read or print the token files under
-  `<data>/.mangaeasy/youtube/`.
+  `<install>/runtime/youtube/`.
 
 ## 9. Environment variables
 
 | Variable | Meaning |
 |---|---|
 | `MEDIACONDUCTOR_ROOT` | Override the data root (app root) — where models, tools, and projects live. Set it to run against a specific install's data. |
-| `MEDIACONDUCTOR_HOME` | Override just the `.mangaeasy` data dir (default `<root>/.mangaeasy`). |
+| `MEDIACONDUCTOR_HOME` | Override just the `runtime` data dir (default `<root>/runtime`). |
 | `MEDIACONDUCTOR_TOOLS_DIR` | Override where AI tool envs live. |
 | `MEDIACONDUCTOR_ITEMS_ROOT`, `MEDIACONDUCTOR_AUDIO_ROOT`, `MEDIACONDUCTOR_OUTPUT_ROOT`, `MEDIACONDUCTOR_WORK_DIR` | Defaults for the corresponding `--*-root` flags (bare legacy names `PROJECT_ROOT`/`AUDIO_ROOT`/`OUTPUT_ROOT`/`WORK_DIR` still honoured). Agents should pass explicit flags instead. |
 | `MEDIACONDUCTOR_JOBS_DIR` | Where `job-start` keeps job state/logs (default `<work>/jobs`). |
@@ -465,12 +471,12 @@ Agent rules for uploads:
 | `MEDIACONDUCTOR_SHARE_CACHES` | `1` to let external-tool subprocesses inherit an ambient `HF_HOME`/`UV_CACHE_DIR`/… instead of the isolated ones (a shared cross-project cache). Off by default — see below. |
 
 HF/torch/uv caches for external-tool subprocesses are **force-pinned** under
-the data folder (`<data>/.mangaeasy/{hf_cache,torch_cache,uv_cache}`), so a
+the data folder (`<install>/runtime/{hf_cache,torch_cache,uv_cache}`), so a
 global `HF_HOME`/`UV_CACHE_DIR` you exported for other tools can't scatter
 multi-GB model downloads outside the install folder — deleting the folder
 really does leave nothing behind. Set `MEDIACONDUCTOR_SHARE_CACHES=1` to opt into
 a shared ambient cache instead (models already downloaded there are then
-reused rather than re-fetched under `.mangaeasy`).
+reused rather than re-fetched under `runtime`).
 
 ## 10. MCP server
 

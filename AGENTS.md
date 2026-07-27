@@ -27,9 +27,9 @@ anywhere in the CLI or the MCP schema. Approvals are bound to the exact bytes
 they cover and can be recorded by a human or an LLM agent:
 
 ```bash
-mediaconductor manga-review crop      --project-root library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review narration --project-root library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review check     --project-root library/<P> --items 01
+mediaconductor manga-review crop      --project-root data/library/<P> --items 01 --reviewer NAME
+mediaconductor manga-review narration --project-root data/library/<P> --items 01 --reviewer NAME
+mediaconductor manga-review check     --project-root data/library/<P> --items 01
 ```
 
 Re-cropping a panel or rewriting a line invalidates the approval automatically,

@@ -6,7 +6,7 @@
    own tools dir (``bootstrap-tools``).
 2. Hardware detection — NVIDIA GPU present or not.
 3. AI tool environments — each into its isolated uv env under
-   ``.mangaeasy/tools/`` with model weights, GPU-aware by default:
+   ``runtime/tools/`` with model weights, GPU-aware by default:
 
    - always: ``kokoro-82m`` (CPU TTS — the universal fallback engine)
    - with an NVIDIA GPU: also ``index-tts``, ``magi-v3``, and
@@ -19,8 +19,9 @@ the core binaries, ``--skip <tool>`` drops individual tools. Re-running is
 safe and idempotent: existing tools are updated / partially-downloaded models
 resume (``install_tool`` already behaves that way).
 
-Everything lands inside this install's data folder — nothing is scattered on
-the host (see ``tool_env()`` cache pinning in tools/external.py).
+Everything lands inside this install's own two folders — ``runtime/`` for tool
+envs and caches, ``data/`` for anything a production writes — and nothing is
+scattered on the host (see ``tool_env()`` cache pinning in tools/external.py).
 """
 
 from __future__ import annotations
@@ -130,7 +131,7 @@ def main() -> int:
             return 1
 
     # 3. Register the workspace so later commands run from any cwd still
-    #    resolve library/audio/output here instead of the caller's directory.
+    #    resolve data/ here instead of the caller's directory.
     from pathlib import Path
 
     from mediaconductor.config import PROJECT_ROOT, register_workspace
@@ -141,9 +142,17 @@ def main() -> int:
             print(f"\nWorkspace registered: {workspace_candidate.resolve()} ({marker})")
             break
 
-    # 4. Readiness report.
+    # 4. Create the data/ tree with its README, so the folder explains itself
+    #    before anything has been produced — the point at which someone is
+    #    most likely to go looking for "where will my videos end up".
+    from mediaconductor.layout import ensure_data_root
+
+    data_root = ensure_data_root()
+
+    # 5. Readiness report.
     report = doctor()
     print("\n=== Setup summary ===")
+    print(f"  Data dir  : {data_root}   (delete this to start fresh)")
     print(f"  Tools dir : {report['tools_home']}")
     print(f"  GPU       : {report['gpu_backend']}")
     for name in tools:
@@ -163,6 +172,7 @@ def main() -> int:
         tools=statuses,
         failures=failures,
         tools_home=report["tools_home"],
+        data_root=str(data_root),
     )
     return 1 if failures else 0
 

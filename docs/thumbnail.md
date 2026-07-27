@@ -8,8 +8,8 @@ viewer who clicks.
 
 ```bash
 mediaconductor thumbnail-compose \
-  --base library/<P>/01/panels/01_014_02.jpg \
-  --output output/<P>/thumb.png \
+  --base data/library/<P>/01/panels/01_014_02.jpg \
+  --output data/output/<P>/thumb.png \
   --text "HE WAS THE WEAKEST" --text "UNTIL THE GATE OPENED"
 ```
 

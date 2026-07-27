@@ -184,9 +184,9 @@ and `webtoon-cutcheck`. The default is `download`.
    recorded before running. Keep licensed music below
    narration and re-render after any changed panel, narration, or audio input.
 
-   Production defaults to separate `audio_faded/<project>/...` derivatives:
+   Production defaults to separate `data/audio_faded/<project>/...` derivatives:
    every panel WAV gets a symmetric 8 ms fade-in and fade-out while the raw TTS
-   under `audio/` remains untouched. Use `audio_source: raw` only for an
+   under `data/audio/` remains untouched. Use `audio_source: raw` only for an
    intentional diagnostic comparison. With BGM, the order is join → mix music
    → one final two-pass whole-mix normalize to −14 LUFS / −1.5 dBTP. Any music
    change invalidates final normalization.

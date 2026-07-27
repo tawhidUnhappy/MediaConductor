@@ -1,7 +1,7 @@
 # mangaeasy/tools — external AI tool environments + vendored binaries
 
 Heavy AI models (panel detection, TTS, and OCR) each run in their
-**own isolated `uv` environment** under `<data>/.mangaeasy/tools/<tool>/`, so
+**own isolated `uv` environment** under `<install>/runtime/tools/<tool>/`, so
 their CUDA/Torch/Transformers versions can't conflict with the main package or
 each other. This package installs them, resolves them, and builds the
 subprocess environment they run in.
@@ -29,7 +29,7 @@ imports) live in [`../assets/tools/`](../assets/tools/): `detect_magi.py`,
 ## Gotchas
 
 - **`tool_env()` force-pins** `HF_HOME`/`HF_HUB_CACHE`/`TRANSFORMERS_CACHE`/
-  `TORCH_HOME`/`UV_CACHE_DIR` under `<data>/.mangaeasy/` (an *override*, not
+  `TORCH_HOME`/`UV_CACHE_DIR` under `<install>/runtime/` (an *override*, not
   `setdefault`) so a machine-global `HF_HOME` can't scatter multi-GB downloads
   outside the install. `MANGAEASY_SHARE_CACHES=1` opts back into a shared cache.
   Don't turn these back into `setdefault` without that opt-out.

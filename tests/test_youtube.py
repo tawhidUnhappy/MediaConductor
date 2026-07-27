@@ -215,13 +215,13 @@ def test_mcp_status_args():
 def test_named_profile_paths_are_isolated_and_default_is_legacy_compatible(tmp_path, monkeypatch):
     monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
 
-    assert store.profile_dir() == tmp_path / "youtube"
-    assert store.token_path() == tmp_path / "youtube" / "token.json"
-    assert store.client_secret_path() == tmp_path / "youtube" / "client_secret.json"
-    assert store.channel_cache_path() == tmp_path / "youtube" / "channel.json"
+    assert store.profile_dir() == tmp_path / "secrets" / "youtube"
+    assert store.token_path() == tmp_path / "secrets" / "youtube" / "token.json"
+    assert store.client_secret_path() == tmp_path / "secrets" / "youtube" / "client_secret.json"
+    assert store.channel_cache_path() == tmp_path / "secrets" / "youtube" / "channel.json"
 
-    manga = tmp_path / "youtube" / "profiles" / "manga"
-    song = tmp_path / "youtube" / "profiles" / "song"
+    manga = tmp_path / "secrets" / "youtube" / "profiles" / "manga"
+    song = tmp_path / "secrets" / "youtube" / "profiles" / "song"
     assert store.token_path("manga") == manga / "token.json"
     assert store.client_secret_path("manga") == manga / "client_secret.json"
     assert store.channel_cache_path("manga") == manga / "channel.json"
@@ -265,7 +265,7 @@ def test_cli_rejects_profile_traversal_before_file_access(tmp_path):
 
 def test_named_profile_directory_rejects_symlink_alias(tmp_path, monkeypatch):
     monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path))
-    profiles = tmp_path / "youtube" / "profiles"
+    profiles = tmp_path / "secrets" / "youtube" / "profiles"
     real = profiles / "real"
     real.mkdir(parents=True)
     alias = profiles / "alias"
@@ -284,7 +284,7 @@ def test_youtube_store_root_rejects_symlink_or_reparse_escape(tmp_path, monkeypa
     outside = tmp_path / "outside"
     home.mkdir()
     outside.mkdir()
-    root = home / "youtube"
+    root = home / "secrets" / "youtube"
     try:
         root.symlink_to(outside, target_is_directory=True)
     except OSError:
@@ -299,7 +299,7 @@ def test_youtube_store_root_rejects_symlink_or_reparse_escape(tmp_path, monkeypa
 
 def test_named_profiles_root_rejects_symlink_or_reparse_escape(tmp_path, monkeypatch):
     home = tmp_path / "home"
-    root = home / "youtube"
+    root = home / "secrets" / "youtube"
     outside = tmp_path / "outside"
     root.mkdir(parents=True)
     outside.mkdir()

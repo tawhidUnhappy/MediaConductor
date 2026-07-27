@@ -39,9 +39,19 @@ Record cast, speaker, crop, and handoff decisions with `work-note` so another
 agent can resume without guessing. Before building, inspect every crop and
 narration review sheet and rerun the corresponding checks after each fix.
 
-Always run `mediaconductor where --json` first and confirm `workspace_root` is
-the workspace you intend to fill: `library/`, `audio/`, `output/`, and `work/`
-are created under it.
+Always run `mediaconductor where --json` first and confirm `workspace_root` and
+`data_root` are the workspace you intend to fill. Everything you download or
+generate lands under `data_root` — `data/library/`, `data/audio/`,
+`data/audio_faded/`, `data/output/`, `data/review/`, `data/work/` — and
+nothing production-related is written anywhere else. `runtime_home` holds the
+tool environments, caches and OAuth tokens; it is deliberately outside
+`data/`, so clearing productions never costs a multi-gigabyte re-download.
+
+`mediaconductor workspace-layout --json` proves it: every persistent root with
+the tree it must stay inside. A production root outside `data/` is a defect,
+not a preference. To hand a user a clean slate, use `mediaconductor
+workspace-reset` (dry run by default, `--confirm` to delete, `--keep-library`
+to keep the downloaded chapters) rather than deleting paths yourself.
 
 ## MCP contract
 
@@ -73,12 +83,12 @@ argument. Approvals are bound to the exact bytes they cover and are verified
 independently by the commands that need them:
 
 ```bash
-mediaconductor manga-review crop      --project-root library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review narration --project-root library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review final-video --project-root library/<P> --items 01 \
-    --video output/<P>/<P>_full.mp4 --reviewer NAME \
+mediaconductor manga-review crop      --project-root data/library/<P> --items 01 --reviewer NAME
+mediaconductor manga-review narration --project-root data/library/<P> --items 01 --reviewer NAME
+mediaconductor manga-review final-video --project-root data/library/<P> --items 01 \
+    --video data/output/<P>/<P>_full.mp4 --reviewer NAME \
     --rights-confirmed --voice-consent-confirmed --source-permission-confirmed
-mediaconductor manga-review check     --project-root library/<P> --items 01
+mediaconductor manga-review check     --project-root data/library/<P> --items 01
 ```
 
 Re-cropping a panel, rewriting a line, or re-rendering the MP4 invalidates the

@@ -14,13 +14,28 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.mark.parametrize(
     "relative_path",
     [
-        "projects/story-demo/images/scene-001.png",
-        "projects/story-demo/render/final-story.mp4",
-        "projects/song-demo/audio/generated-song.wav",
-        "projects/song-demo/stems/vocals.flac",
+        # Everything downloaded or generated (mediaconductor/layout.py).
+        "data/library/Recap/01/panels/01_001_01.png",
+        "data/audio/Recap/01/01_001_01.wav",
+        "data/audio_faded/Recap/01/01_001_01.wav",
+        "data/output/Recap/Recap_full.mp4",
+        "data/review/Recap/crop-01.png",
+        "data/work/jobs/abc123.log",
+        # The install's machinery: tool envs, caches, state, OAuth tokens.
+        "runtime/tools/index-tts/.venv/pyvenv.cfg",
+        "runtime/cache/hf/hub/models--IndexTeam--IndexTTS-2/blob",
+        "runtime/secrets/youtube/token.json",
+        # User-owned media that must never be committed either.
+        "bgm/track.wav",
+        "vocal/narrator.wav",
     ],
 )
-def test_generated_projects_are_git_ignored(relative_path: str):
+def test_generated_and_user_media_are_git_ignored(relative_path: str):
+    """A production must be impossible to commit by accident.
+
+    Both trees matter: `data/` is gigabytes of downloaded third-party art,
+    and `runtime/secrets/` holds OAuth tokens.
+    """
     result = subprocess.run(
         ["git", "check-ignore", "--no-index", "--quiet", relative_path],
         cwd=ROOT,
@@ -29,9 +44,9 @@ def test_generated_projects_are_git_ignored(relative_path: str):
     assert result.returncode == 0, f"expected Git to ignore {relative_path}"
 
 
-def test_generated_projects_are_excluded_from_docker_context():
-    docker_rules = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
-    assert "/projects/" in docker_rules
+def test_generated_trees_are_excluded_from_docker_context():
+    docker_rules = set((ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines())
+    assert {"/data/", "/runtime/"} <= docker_rules
 
 
 def test_build_products_are_excluded_from_docker_context():

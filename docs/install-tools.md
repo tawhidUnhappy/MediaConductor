@@ -11,7 +11,7 @@ mediaconductor install-tool deepseek-ocr2 # DeepSeek-OCR 2 panel/document OCR
 mediaconductor doctor                     # check what's installed
 ```
 
-All tools go into the managed folder `<install folder>/.mangaeasy/tools` (override with
+All tools go into the managed folder `<install folder>/runtime/tools` (override with
 `MEDIACONDUCTOR_TOOLS_DIR`), so a globally-installed `mediaconductor` finds them from
 any working directory. Re-running an install resumes interrupted downloads.
 Installer-managed snapshots remain on their immutable manifest revisions.
@@ -101,7 +101,7 @@ target, and downloads `deepseek-ai/DeepSeek-OCR-2` revision
 
 ```bash
 mediaconductor install-tool deepseek-ocr2
-mediaconductor deepseek-ocr2 --project-root content --item-range 01-24
+mediaconductor deepseek-ocr2 --project-root data/library/<project> --item-range 01-24
 ```
 
 The run command scans `narration.json` and `narration_*.json` files, resolves
@@ -140,7 +140,7 @@ GPU, or when IndexTTS isn't set up), `mediaconductor video-audio`.
 `install-tool` is a convenience, not a requirement. Any folder that contains a
 `.venv` (or is a uv project) with the right name works:
 
-- managed: `<install folder>/.mangaeasy/tools/<name>`
+- managed: `<install folder>/runtime/tools/<name>`
 - explicit: `ACESTEP_ROOT`, `DEMUCS_ROOT`, `WHISPERX_ROOT`, `KOKORO_ROOT`,
   `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `DEEPSEEK_OCR2_ROOT`,
   `Z_IMAGE_TURBO_ROOT`

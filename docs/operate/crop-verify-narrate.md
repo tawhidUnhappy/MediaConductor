@@ -13,7 +13,7 @@ audio, video, thumbnail, and upload.
 > not optional — it is the point of this doc. MAGI detections and DeepSeek OCR
 > are proposals to inspect, never approvals or ground truth.
 
-Prerequisites: a project laid out as `library/<Project>/<item>/download/`
+Prerequisites: a project laid out as `data/library/<Project>/<item>/download/`
 (raw pages), one `item` per chapter (`01`, `02`, …). See
 [the data layout](../../CLAUDE.md) ("Data layout") for the full folder contract.
 Orient first with `mediaconductor where --json` and `mediaconductor doctor --json`.
@@ -30,7 +30,7 @@ Orient first with `mediaconductor where --json` and `mediaconductor doctor --jso
 Let the machine measure first:
 
 ```bash
-mediaconductor style-detect --project-root library/<Project> --json
+mediaconductor style-detect --project-root data/library/<Project> --json
 ```
 
 It reports a per-item and overall verdict (`webtoon` / `paged` / `uncertain`)
@@ -44,7 +44,7 @@ than wide → webtoon. Roughly page-shaped images with panel grids → paged.
 ## Step 1A — Crop a **webtoon** (`webtoon-split`)
 
 ```bash
-mediaconductor webtoon-split --project-root library/<Project> --item-range 01-19
+mediaconductor webtoon-split --project-root data/library/<Project> --item-range 01-19
 ```
 
 Per item it stitches `download/` into one tall strip, splits at gutters, then
@@ -53,7 +53,7 @@ is re-cut at the quietest row, so one missed gutter doesn't make a 10 000-px
 panel) and **gap rescue** (dropped gutter-colored gaps that still contain
 content — e.g. "ONE HOUR LATER…" captions — are attached to the next panel).
 
-- Crops land in `library/<Project>/<item>/panels/ch<item>_###.jpg` (an existing
+- Crops land in `data/library/<Project>/<item>/panels/ch<item>_###.jpg` (an existing
   `panels/` is archived to `<item>/old/run_NNNN/` first — never destroyed).
 - Verify images land in `work/webtoon_verify/<Project>/`:
   - `NN_sheet_K.png` — numbered contact sheet; suspects get a red `!!`.
@@ -78,18 +78,18 @@ indices by hand (doing that by eye shipped one-off merges twice):
 ```bash
 # undo the bad auto-split cut at stitched y=31099 (from a cutcheck label):
 mediaconductor webtoon-override --file work/overrides.json \
-    --project-root library/<Project> --item 01 --merge-at-cut 31099
+    --project-root data/library/<Project> --item 01 --merge-at-cut 31099
 
 # fuse the panels labeled #29 and #30 on the current sheets:
 mediaconductor webtoon-override --file work/overrides.json \
-    --project-root library/<Project> --item 01 --merge-panels 29,30
+    --project-root data/library/<Project> --item 01 --merge-panels 29,30
 
 # reposition a bad cut: merge across it, then force the right y:
 mediaconductor webtoon-override --file work/overrides.json \
-    --project-root library/<Project> --item 02 \
+    --project-root data/library/<Project> --item 02 \
     --merge-at-cut 42186 --split-at 42394
 
-mediaconductor webtoon-split --project-root library/<Project> --items 01 02 \
+mediaconductor webtoon-split --project-root data/library/<Project> --items 01 02 \
     --overrides work/overrides.json
 ```
 
@@ -113,7 +113,7 @@ Implementation: [mediaconductor/panels/webtoon.py](../../mediaconductor/panels/w
 
 ```bash
 mediaconductor install-tool magi-v3   # one-time; downloads the model on first run
-mediaconductor page-split --project-root library/<Project> --item-range 01-12 \
+mediaconductor page-split --project-root data/library/<Project> --item-range 01-12 \
     --reading-direction rtl            # rtl = Japanese; ltr = Chinese/Korean
 ```
 
@@ -122,7 +122,7 @@ Per item it runs MAGI v3 **once** over every page in `download/`
 time — not per page), sorts each page's boxes into manga reading order, and
 crops them.
 
-- Crops land in `library/<Project>/<item>/panels/<item>_<page>_<panel>.jpg`
+- Crops land in `data/library/<Project>/<item>/panels/<item>_<page>_<panel>.jpg`
   (e.g. `01_004_02.jpg`; page/panel are 1-based positions). Existing `panels/`
   is archived first, same as the webtoon path.
 - Verify images land in `work/page_verify/<Project>/<item>/`:
@@ -169,7 +169,7 @@ crops on downscaled contact sheets shipped a video with half panels, fused
 panels and sliced speech bubbles that all had to be redone:
 
 ```bash
-mediaconductor webtoon-cutcheck --project-root library/<Project> --item-range 01-07
+mediaconductor webtoon-cutcheck --project-root data/library/<Project> --item-range 01-07
 ```
 
 It renders a source-resolution window (±650 px of context) around **every
@@ -225,8 +225,8 @@ Re-running a splitter renumbers every panel, orphaning `narration.json` and
 the per-panel WAVs. Never re-narrate to fix that:
 
 ```bash
-mediaconductor panels-remap --project-root library/<Project> --item-range 01-07   # dry run
-mediaconductor panels-remap --project-root library/<Project> --item-range 01-07 --apply
+mediaconductor panels-remap --project-root data/library/<Project> --item-range 01-07   # dry run
+mediaconductor panels-remap --project-root data/library/<Project> --item-range 01-07 --apply
 ```
 
 It locates each archived old panel's span in the stitched strip, maps old →
@@ -260,7 +260,7 @@ beats; you can't hook a viewer on a story you skimmed. While reading, note:
 
 ```bash
 mediaconductor install-tool deepseek-ocr2   # one-time
-mediaconductor panel-transcript --project-root library/<Project> --item-range 01-07
+mediaconductor panel-transcript --project-root data/library/<Project> --item-range 01-07
 ```
 
 This OCRs every panel into `<item>/transcript.json`, which the review sheets
@@ -329,7 +329,7 @@ feedback):
 
 Rules that hold across the pipeline:
 
-- **`narration.json` lives at `library/<Project>/<item>/narration.json`.** The
+- **`narration.json` lives at `data/library/<Project>/<item>/narration.json`.** The
   *only* reader is `video_pipeline/item_assets.load_narration()` — it also
   prepends `intro.json` if present (the cold-open mechanism). Never re-parse
   the file yourself.
@@ -354,7 +354,7 @@ Feed it plus the panel images to an LLM, or write by hand.
 Validate before spending GPU time:
 
 ```bash
-mediaconductor video-check --project-root library/<Project> --items 01 --json
+mediaconductor video-check --project-root data/library/<Project> --items 01 --json
 ```
 
 When you deliberately narrate a subset, `video-check` returns `"ok": false`
@@ -369,7 +369,7 @@ text" warnings** (those become corrupt near-empty WAVs).
 are right. That pass is:
 
 ```bash
-mediaconductor narration-review-sheets --project-root library/<Project> --item-range 01-07
+mediaconductor narration-review-sheets --project-root data/library/<Project> --item-range 01-07
 ```
 
 Each sheet pairs a panel preview with the narration line that will be spoken
@@ -382,7 +382,7 @@ speech. Fix each bad line with one command — no JSON editing, and the stale WA
 is pruned so the next audio run regenerates it:
 
 ```bash
-mediaconductor narration-edit --project-root library/<Project> --item 01 \
+mediaconductor narration-edit --project-root data/library/<Project> --item 01 \
     --set ch01_005.jpg "Something ancient stirs inside the light." \
     --prune-audio
 ```

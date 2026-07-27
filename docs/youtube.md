@@ -53,7 +53,7 @@ First ask MediaConductor for the exact platform-specific location:
 ```bash
 mediaconductor youtube-profiles --json
 # Read shared_client_file, for example:
-# D:\MediaConductor\.mangaeasy\youtube\client_secret.json
+# D:\MediaConductor\runtime\youtube\client_secret.json
 ```
 
 Create the parent `youtube` directory if needed, then copy/move the downloaded
@@ -99,7 +99,7 @@ value directly with `--profile`.
 The original single-account files remain the `default` profile:
 
 ```text
-<application-data>/.mangaeasy/youtube/
+<application-data>/runtime/secrets/youtube/
   client_secret.json
   token.json
   channel.json
@@ -108,7 +108,7 @@ The original single-account files remain the `default` profile:
 Named profiles are isolated:
 
 ```text
-<application-data>/.mangaeasy/youtube/profiles/
+<application-data>/runtime/secrets/youtube/profiles/
   manga/{token.json,channel.json}
   song/{token.json,channel.json}
   manga-alt/{token.json,channel.json}

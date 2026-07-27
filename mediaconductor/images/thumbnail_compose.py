@@ -1,7 +1,8 @@
 """mediaconductor.images.thumbnail_compose — add text furniture to a thumbnail base.
 
-``mediaconductor thumbnail-compose`` turns a generated key-art image (usually the
-best ``mediaconductor zimage`` variant) into a finished YouTube thumbnail:
+``mediaconductor thumbnail-compose`` turns a base image — an approved source
+panel listed in the project's ``rights.json`` under ``thumbnail_sources``,
+never generated key art — into a finished YouTube thumbnail:
 1280×720 canvas (cover-scaled, center-cropped), 1–3 short text blocks in a
 bold impact-style font with the channel's proven treatment (black stroke
 ≈ 12 % of the font size, #FFE600/white fills), an optional arrow, and a thin
@@ -168,7 +169,8 @@ def main() -> int:
                     "blocks + optional arrow + white inset border (1280x720).",
     )
     parser.add_argument("--base", type=Path, required=True,
-                        help="Base image (e.g. the best zimage variant).")
+                        help="Base image: an approved source panel (see rights.json "
+                             "thumbnail_sources).")
     parser.add_argument("--output", type=Path, required=True, help="Output PNG/JPG path.")
     parser.add_argument("--text", action="append", default=[], metavar="WORDS",
                         help="Quick mode: one text block (repeatable, stacked top-left, "

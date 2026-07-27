@@ -4,7 +4,7 @@
 ``narration.json`` (or ``intro.json`` with ``--intro``) so an agent fixes a
 line with one command instead of hand-editing JSON:
 
-    mediaconductor narration-edit --project-root library/<P> --item 01 \
+    mediaconductor narration-edit --project-root data/library/<P> --item 01 \
         --set ch01_005.jpg "Something ancient stirs inside the light." \
         --delete ch01_010.jpg --prune-audio
 

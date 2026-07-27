@@ -1,7 +1,7 @@
 # mangaeasy/download — acquire source chapters
 
 The **acquire** stage: fetch raw manga pages from a source into
-`library/<Project>/<item>/download/`, and record where they came from.
+`data/library/<Project>/<item>/download/`, and record where they came from.
 
 ## Files
 
@@ -11,7 +11,7 @@ The **acquire** stage: fetch raw manga pages from a source into
   config.json (project name derived from the fetched title; override with
   `--name`); already-complete chapters are fast-skipped so `--all` re-runs
   resume without extra API calls. Writes pages to the item's `download/`
-  folder and **maintains `library/<Project>/manga.json`** — the per-project
+  folder and **maintains `data/library/<Project>/manga.json`** — the per-project
   source record (source site, canonical MangaDex title URL, the original
   pasted URL, fetched title, and a per-chapter map of
   `chapter_id`/`language`/`pages`/`downloaded_at`).

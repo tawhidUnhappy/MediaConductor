@@ -2,28 +2,42 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
 
+from mediaconductor.layout import (
+    audio_root,
+    library_root,
+    output_root,
+    review_root,
+    work_root,
+)
 from mediaconductor.path_safety import validate_portable_segment
 from mediaconductor.utils import LazyArchiveRunDir, archive_into_run
 
 
-def _env_path(namespaced: str, legacy: str, default: str) -> Path:
-    """Flag-default roots: MEDIACONDUCTOR_* wins, bare legacy name still honoured.
+def _env_path(namespaced: str, default: Callable[[], Path]) -> Path:
+    """Flag-default root: MEDIACONDUCTOR_* wins, else the workspace layout.
 
-    The unprefixed names (AUDIO_ROOT, WORK_DIR, ...) are generic enough to
-    collide with unrelated software in a user's shell; new setups should use
-    the MEDIACONDUCTOR_-prefixed forms. Agents should pass explicit --*-root flags
-    and rely on neither.
+    The bare, unprefixed spellings (``AUDIO_ROOT``, ``WORK_DIR``, ...) used to
+    be honoured too. They are gone: those names are generic enough to already
+    exist in an unrelated shell, and a single inherited ``WORK_DIR`` silently
+    relocated production state out of the workspace — exactly what the one
+    ``data/`` folder exists to prevent. Agents should pass explicit
+    ``--*-root`` flags and rely on neither.
     """
-    value = os.environ.get(namespaced) or os.environ.get(legacy)
-    return Path(value) if value else Path(default)
+    value = os.environ.get(namespaced)
+    return Path(value) if value else default()
 
 
-DEFAULT_PROJECT_ROOT = _env_path("MEDIACONDUCTOR_ITEMS_ROOT", "PROJECT_ROOT", "content")
-DEFAULT_AUDIO_ROOT = _env_path("MEDIACONDUCTOR_AUDIO_ROOT", "AUDIO_ROOT", "audio")
-DEFAULT_OUTPUT_ROOT = _env_path("MEDIACONDUCTOR_OUTPUT_ROOT", "OUTPUT_ROOT", "output")
-DEFAULT_WORK_DIR = _env_path("MEDIACONDUCTOR_WORK_DIR", "WORK_DIR", "work")
+# Resolved once at import, against the workspace — never the cwd. Relative
+# defaults ("audio", "work") meant the same command produced files in a
+# different place depending on which directory an agent happened to start in.
+DEFAULT_PROJECT_ROOT = _env_path("MEDIACONDUCTOR_ITEMS_ROOT", library_root)
+DEFAULT_AUDIO_ROOT = _env_path("MEDIACONDUCTOR_AUDIO_ROOT", audio_root)
+DEFAULT_OUTPUT_ROOT = _env_path("MEDIACONDUCTOR_OUTPUT_ROOT", output_root)
+DEFAULT_WORK_DIR = _env_path("MEDIACONDUCTOR_WORK_DIR", work_root)
+DEFAULT_REVIEW_ROOT = _env_path("MEDIACONDUCTOR_REVIEW_ROOT", review_root)
 DEFAULT_KOKORO_ROOT = Path(os.environ.get("KOKORO_ROOT", "kokoro-82m"))
 
 # The one home for media-extension sets — modules used to keep drifting

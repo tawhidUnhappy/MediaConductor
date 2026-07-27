@@ -48,7 +48,7 @@ _ITEMS = {
 }
 _PROJECT_ROOT = {
     "type": "string",
-    "description": "Absolute path to the folder containing the item folders (usually library/<project>).",
+    "description": "Absolute path to the folder containing the item folders (usually data/library/<project>).",
 }
 # MCP tool name -> (cli command, description, {property: schema}, [required], {property: flag spec})
 TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
@@ -116,7 +116,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "source art, then re-split any fixes.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
-         "work_dir": {**_STR, "description": "Work dir for verify sheets (default: work)."},
+         "work_dir": {**_STR, "description": "Work dir for verify sheets (default: data/work)."},
          "overrides": {**_STR, "description": "JSON file with per-item split_at/merge fixes."},
          "force_style": {**_BOOL, "description": "Bypass the webtoon-vs-paged pre-flight guard "
                                                  "(only for deliberate mixed-format items)."}},
@@ -137,7 +137,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "background/effect art, banners, bordered thin panels) before narrating.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
-         "work_dir": {**_STR, "description": "Work dir holding webtoon_verify manifests (default: work)."}},
+         "work_dir": {**_STR, "description": "Work dir holding webtoon_verify manifests (default: data/work)."}},
         ["project_root"],
         {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
          "source_subdir": ("--source-subdir", "value"),
@@ -173,7 +173,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Review every shift/merge panel with narration-review-sheets afterwards.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
-         "audio_root": {**_STR, "description": "Audio root (default: audio)."},
+         "audio_root": {**_STR, "description": "Audio root (default: data/audio)."},
          "old_run": {**_STR, "description": "Archive run (e.g. run_0002) the narration was written against."},
          "apply": {**_BOOL, "description": "Write narration.json + audio (default: dry-run report)."}},
         ["project_root"],
@@ -191,7 +191,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "full resolution, including full/tall boxes and reading-order numbers, before narration.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
-         "work_dir": {**_STR, "description": "Work dir for verify sheets (default: work)."},
+         "work_dir": {**_STR, "description": "Work dir for verify sheets (default: data/work)."},
          "overrides": {**_STR, "description": "JSON file with per-page box fixes."},
          "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]},
          "force_style": {**_BOOL, "description": "Bypass the webtoon-vs-paged pre-flight guard "
@@ -255,7 +255,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "sequence are authoritative. Verify one current beat, speaker attribution, factual "
         "grounding, natural causal prose, and spoken flow.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
-         "work_dir": {**_STR, "description": "Scratch root (default: work)."},
+         "work_dir": {**_STR, "description": "Scratch root (default: data/work)."},
          "output_root": {**_STR, "description": "Review-sheet output root."},
          "per_sheet": {**_INT, "description": "Entries per review sheet (default: 4)."},
          "only_images": {"type": "array", "items": {"type": "string"},
@@ -758,9 +758,12 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "workspace_layout": (
         "workspace-layout",
-        "Report every resolved persistent root (items, audio, output, work, jobs, tool envs, "
-        "caches, state, OAuth tokens) and whether each stays inside the workspace. Read-only.",
-        {"strict": {**_BOOL, "description": "Exit non-zero when a root escapes the workspace."}},
+        "Report every resolved persistent root and whether it landed in the right tree: "
+        "everything downloaded or generated (items, audio, output, review, work, jobs) belongs "
+        "under data/, and the re-downloadable machinery (tool envs, caches, state, OAuth "
+        "tokens) under runtime/. Deleting data/ is the supported fresh start, so a production "
+        "root outside it is a real defect. Read-only.",
+        {"strict": {**_BOOL, "description": "Exit non-zero when a root lands outside its tree."}},
         [],
         {"strict": ("--strict", "flag")},
     ),

@@ -36,10 +36,11 @@ from mediaconductor.audio.provenance import (
     stale_reason,
     write_provenance,
 )
-from mediaconductor.config import HF_CACHE_DIR
+from mediaconductor.config import hf_cache_dir
 from mediaconductor.utils import LazyArchiveRunDir
 from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
 from mediaconductor.video_pipeline.common import (
+    DEFAULT_AUDIO_ROOT,
     item_dirs,
     merge_item_selection,
     project_name,
@@ -47,11 +48,13 @@ from mediaconductor.video_pipeline.common import (
 )
 
 # setdefault, NOT assignment: when this runs inside the index-tts tool env
-# the parent already force-pinned HF_HOME under <data>/.mangaeasy/ via
+# the parent already force-pinned HF_HOME under <install>/runtime/cache/ via
 # tool_env() — overriding it here scattered model downloads into a second
-# cache at <cwd>/.hf_cache. The fallback only matters for bare standalone runs.
-os.environ.setdefault("HF_HOME", str(HF_CACHE_DIR))
-os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(HF_CACHE_DIR))
+# cache at <cwd>/.hf_cache. The fallback only matters for bare standalone runs,
+# and now resolves to that same pinned cache.
+_HF_CACHE = str(hf_cache_dir())
+os.environ.setdefault("HF_HOME", _HF_CACHE)
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", _HF_CACHE)
 os.environ.setdefault("HF_HUB_OFFLINE", "0")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "0")
 
@@ -127,7 +130,7 @@ except Exception as exc:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Batch IndexTTS2 audio generation.")
     parser.add_argument("--project-root", type=Path, required=True)
-    parser.add_argument("--audio-root", type=Path, default=Path("audio"))
+    parser.add_argument("--audio-root", type=Path, default=DEFAULT_AUDIO_ROOT)
     parser.add_argument("--project-name", default=None)
     parser.add_argument("--items", nargs="*")
     parser.add_argument("--item-range")

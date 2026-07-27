@@ -22,10 +22,10 @@ class ModeSpec:
 
 
 COMMON_COMMANDS = frozenset({
-    "commands", "modes", "where", "workspace-layout", "doctor", "setup",
-    "smoke-test", "install-tool", "bootstrap-tools", "tools", "mcp",
-    "job-start", "job-status", "jobs", "youtube-profiles", "youtube-auth",
-    "youtube-status", "youtube-logout",
+    "commands", "modes", "where", "workspace-layout", "workspace-reset",
+    "doctor", "setup", "smoke-test", "install-tool", "bootstrap-tools",
+    "tools", "mcp", "job-start", "job-status", "jobs", "youtube-profiles",
+    "youtube-auth", "youtube-status", "youtube-logout",
 })
 
 COMMON_TOOLS = frozenset({

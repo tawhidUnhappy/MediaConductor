@@ -1,7 +1,7 @@
 # mangaeasy/panels — cropping raw pages into panels
 
 The **crop** stage of the pipeline. Turns raw source images
-(`library/<Project>/<item>/download/`) into ordered panel crops
+(`data/library/<Project>/<item>/download/`) into ordered panel crops
 (`.../panels/`) plus verification evidence. A vision-capable reviewer opens
 every source page/strip overlay and every actual crop at readable/full
 resolution before narration; contact sheets alone never clear the gate.
@@ -21,7 +21,7 @@ Start with the operator doc: [docs/operate/crop-verify-narrate.md](../../docs/op
 ## Public entry points
 
 - `webtoon.main()` / `page.main()` — the two `*-split` commands. Both take
-  `--project-root library/<name> --items 01 02` (or `--item-range`), write
+  `--project-root data/library/<name> --items 01 02` (or `--item-range`), write
   crops to `<item>/panels/`, archive any existing `panels/` to
   `<item>/old/run_NNNN/` first, and emit `MANGAEASY_PROGRESS` + `MANGAEASY_RESULT`.
 - `ai.detect_panels_ai(image_path)` — MAGI boxes for one image, reading-order

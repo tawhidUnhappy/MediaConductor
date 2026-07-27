@@ -5,8 +5,8 @@ this project root, and how far along is each chapter/item". Read-only — never
 writes.
 
 Handles both on-disk layouts:
-- item pipeline:  library/<project>/<NN>/{panels/, narration.json[, intro.json]}
-- older chapter:  library/<name>/<NN>/{panels/, narration_<NN>.json, audio/, *.mp4}
+- item pipeline:  data/library/<project>/<NN>/{panels/, narration.json[, intro.json]}
+- older chapter:  data/library/<name>/<NN>/{panels/, narration_<NN>.json, audio/, *.mp4}
 """
 
 from __future__ import annotations

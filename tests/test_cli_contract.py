@@ -60,8 +60,8 @@ def test_full_catalog_describes_typed_job_wrapper_and_source_layout(capsys):
 def test_where_json_keys(capsys):
     assert main(["where", "--json"]) == 0
     data = json.loads(capsys.readouterr().out)
-    for key in ("version", "platform", "frozen", "app_root", "mangaeasy_home",
-                "tools_home", "vendored_bin_dirs", "env_overrides"):
+    for key in ("version", "platform", "frozen", "app_root", "data_root",
+                "runtime_home", "tools_home", "vendored_bin_dirs", "env_overrides"):
         assert key in data
     assert data["version"] == __version__
 

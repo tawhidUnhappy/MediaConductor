@@ -5,7 +5,7 @@ are deliberately kept in their own isolated ``uv`` environments instead of
 being dependencies of mediaconductor, so their conflicting torch/transformers stacks
 never clash with the core install. This module clones / sets them up into the
 managed tools dir
-(``<app_root>/.mangaeasy/tools`` by default — self-contained, removed along
+(``<app_root>/runtime/tools`` by default — self-contained, removed along
 with the install/repo folder).
 
 Used by the ``mediaconductor install-tool`` and ``mediaconductor doctor``
@@ -304,7 +304,7 @@ def _pty_opt_in() -> bool:
 def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
     # Every install-tool subprocess (git clone, uv sync, hf download, …) runs
     # under tool_env() by default so its caches (UV_CACHE_DIR, HF_HOME, …)
-    # always land under this install's own .mangaeasy/ dir, never the
+    # always land under this install's own runtime/cache/ dir, never the
     # system-wide default — explicit `env=` callers (e.g. one-off env tweaks
     # that already merged tool_env() themselves) are left untouched.
     if env is None:

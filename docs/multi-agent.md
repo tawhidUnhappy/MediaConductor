@@ -6,7 +6,7 @@ sessions" case explicitly includes **switching which LLM is driving** —
 Claude runs out of budget mid-batch, and GPT (or any other model) picks the
 exact same project back up. Nothing in the workboard is Claude-specific or
 tied to one chat session: it's plain JSON/JSONL under
-`library/<Project>/.workboard/`, so it travels with the project, works over a
+`data/library/<Project>/.workboard/`, so it travels with the project, works over a
 network share, and item scanning ignores it. The filesystem stays the single
 source of truth for *work done*; the workboard coordinates *work in
 progress* and *working memory* — the facts and plans that would otherwise
@@ -20,8 +20,8 @@ Every session — first or fiftieth, alone or with other agents (or other
 models) running — starts the same way:
 
 ```bash
-mediaconductor work-status --project-root library/<Project> --json   # where is everything?
-mediaconductor work-status --project-root library/<Project> --next   # what should I grab?
+mediaconductor work-status --project-root data/library/<Project> --json   # where is everything?
+mediaconductor work-status --project-root data/library/<Project> --next   # what should I grab?
 ```
 
 `work-status` derives each item's stage (`download → crop → narrate →
@@ -36,7 +36,7 @@ only the unclaimed, actionable tasks.
 Then loop:
 
 1. **Claim** the task before touching it:
-   `mediaconductor work-claim --project-root library/<P> --item 07 --stage narrate --agent me`
+   `mediaconductor work-claim --project-root data/library/<P> --item 07 --stage narrate --agent me`
    Exit 0 = yours (lease default 60 min); exit 1 = someone live holds it —
    pick another task. Long job still running? `--renew`. Done? `--release`.
    Expired leases are taken over automatically, so a crashed (or simply
@@ -44,14 +44,14 @@ Then loop:
 2. **Hold the GPU mutex around GPU model work.** `page-split`,
    `panel-transcript`, and TTS (`video` / `video-audio-indextts`) each load
    a multi-GB model — two at once on a consumer card is an OOM:
-   `mediaconductor work-claim --project-root library/<P> --resource gpu --agent me`
+   `mediaconductor work-claim --project-root data/library/<P> --resource gpu --agent me`
    (release it the moment the GPU step exits; NVENC rendering does not need
    it). Give it a `--ttl-minutes` that covers the whole job.
 3. **Write down what the next agent needs.** Character names, speaker
    conventions, tone decisions, warnings — the facts that otherwise die with
    your context window:
-   `mediaconductor work-note --project-root library/<P> --add "Labyris = red-haired knight, tsundere, calls Chrome 'onii-chan'" --topic characters`
-   Read the notebook before narrating anything: `mediaconductor work-note --project-root library/<P> --list`.
+   `mediaconductor work-note --project-root data/library/<P> --add "Labyris = red-haired knight, tsundere, calls Chrome 'onii-chan'" --topic characters`
+   Read the notebook before narrating anything: `mediaconductor work-note --project-root data/library/<P> --list`.
    Narration written by different agents must agree on names and voice — the
    notebook is how.
 4. **Track plan-level next steps on the shared todo list** — see
@@ -72,12 +72,12 @@ project instead of state inside one process, so it outlives any single
 context window or model:
 
 ```bash
-mediaconductor work-todo --project-root library/<P> --add "Redo ch10 thumbnail text" --topic publishing
-mediaconductor work-todo --project-root library/<P> --list
-mediaconductor work-todo --project-root library/<P> --start 3   # mark in_progress
-mediaconductor work-todo --project-root library/<P> --done 3    # mark done
-mediaconductor work-todo --project-root library/<P> --reopen 3  # undo a premature "done"
-mediaconductor work-todo --project-root library/<P> --remove 3  # no longer relevant — delete it
+mediaconductor work-todo --project-root data/library/<P> --add "Redo ch10 thumbnail text" --topic publishing
+mediaconductor work-todo --project-root data/library/<P> --list
+mediaconductor work-todo --project-root data/library/<P> --start 3   # mark in_progress
+mediaconductor work-todo --project-root data/library/<P> --done 3    # mark done
+mediaconductor work-todo --project-root data/library/<P> --reopen 3  # undo a premature "done"
+mediaconductor work-todo --project-root data/library/<P> --remove 3  # no longer relevant — delete it
 ```
 
 Open (non-done) todos also appear directly in `work-status`'s report (capped
@@ -104,7 +104,7 @@ instead of across two processes:
    call (e.g. a narration tone choice) without re-deriving it.
 2. **Before a session ends — planned or forced —** leave a `handoff`-topic
    note describing exactly what was in flight, not just what stage you were
-   on: `mediaconductor work-note --project-root library/<P> --topic handoff
+   on: `mediaconductor work-note --project-root data/library/<P> --topic handoff
    --add "item 14 video-render was running in the background when I was cut
    off; check job-status before re-launching, don't assume it crashed."`
    Filesystem state plus a claim lease already recover *what stage* an item
@@ -133,7 +133,7 @@ if another live agent's claim covers any selected item at that stage.
 
 Project-level stages (`join`, `thumbnail`, `upload`) are single-agent by
 nature — claim them without `--item`:
-`mediaconductor work-claim --project-root library/<P> --stage join --agent me`.
+`mediaconductor work-claim --project-root data/library/<P> --stage join --agent me`.
 
 ## The fix-until-clean QA loop (built for small models)
 
@@ -145,7 +145,7 @@ one ordered problem list. **Every problem carries the exact fix command.** A
 small model needs no global judgment; the whole correction workflow is:
 
 ```bash
-until mediaconductor work-qa --project-root library/<P> --items 07 --errors-only --json; do
+until mediaconductor work-qa --project-root data/library/<P> --items 07 --errors-only --json; do
     # read problems[0].fix, run/apply it, repeat
 done
 ```
@@ -172,7 +172,7 @@ timestamped long videos, hash-cached music beds). Before regenerating
 anything, check the inventory:
 
 ```bash
-mediaconductor work-artifacts --project-root library/<P> --json
+mediaconductor work-artifacts --project-root data/library/<P> --json
 ```
 
 Each category comes with its reuse hint — the important ones:

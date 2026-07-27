@@ -19,9 +19,9 @@ build by shelling out to the narrower commands, in this order:
    clone). `resolve_tts_engine()` picks IndexTTS only on a capable GPU machine.
 2. **Fade derivatives** —
    [`preprocess_audio_fades.py`](preprocess_audio_fades.py) writes a separate
-   `audio_faded/<project>/...` tree with a symmetric 8 ms fade at both edges
+   `data/audio_faded/<project>/...` tree with a symmetric 8 ms fade at both edges
    of every panel WAV. Production renders use these derivatives by default;
-   raw TTS under `audio/` is never changed. `--audio-source raw` is an
+   raw TTS under `data/audio/` is never changed. `--audio-source raw` is an
    explicit diagnostic override.
 3. **Render** — [`make_videos.py`](make_videos.py) /
    [`item_video_builder.py`](item_video_builder.py): one video per item,
@@ -73,7 +73,7 @@ before audio: coverage, dangling images, empty text), `video-validate`
 ([validate_generation.py](validate_generation.py); structural coverage,
 streams, and duration only), `video-audio-audit`
 ([audio_audit.py](audio_audit.py)), and the `video-clean-*` family (never touch
-`library/` sources; generated output is archived, not deleted).
+`data/library/` sources; generated output is archived, not deleted).
 
 `video-chapters` ([chapter_timestamps.py](chapter_timestamps.py)) mirrors the
 joiner's item selection, probes video-stream durations, and prints cumulative

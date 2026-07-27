@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
                          help="The manga's library folder, used only as a safety check against --dir.")
     parser.add_argument("--dir", type=Path, required=True,
                          help="The manga-specific output directory to delete wholesale "
-                              "(e.g. library/<manga>/output).")
+                              "(e.g. data/library/<manga>/output).")
     parser.add_argument("--allowed-root", type=Path,
                         help="Required with --yes: target must be a strict descendant of this generated-data root.")
     parser.add_argument("--confirm-name",

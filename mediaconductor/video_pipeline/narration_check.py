@@ -110,7 +110,7 @@ def main() -> int:
                     "(accuracy, speaker attribution) remains an agent's reading job.",
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT,
-                        help="Project folder containing item subfolders (library/<name>).")
+                        help="Project folder containing item subfolders (data/library/<name>).")
     parser.add_argument("--items", nargs="*", help="Item folders, e.g. 01 02 05-08 (default: all).")
     parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-19.")
     parser.add_argument("--json", action="store_true", help="Emit one JSON object on stdout.")

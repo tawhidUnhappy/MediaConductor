@@ -165,7 +165,7 @@ def _save_cache(ch_dir: Path, data: dict) -> None:
     )
 
 
-# ── Manga metadata (library/<name>/manga.json) ───────────────────────────────
+# ── Manga metadata (data/library/<name>/manga.json) ───────────────────────────────
 # One file per manga answering "where did this come from?": source site,
 # title URL, MangaDex UUID, canonical title, and which chapters were
 # downloaded when. Written/merged on every download; surfaced by
@@ -256,7 +256,7 @@ def merge_manga_record(
 
 
 def update_manga_json(manga_root: Path, **kwargs) -> Path:
-    """Read-merge-write library/<name>/manga.json; returns the file path."""
+    """Read-merge-write data/library/<name>/manga.json; returns the file path."""
     record = merge_manga_record(load_manga_json(manga_root), **kwargs)
     manga_root.mkdir(parents=True, exist_ok=True)
     path = manga_root / _MANGA_JSON
@@ -583,7 +583,7 @@ def _download_one_chapter(
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     })
 
-    # ── Record the manga's source link (library/<name>/manga.json) ────────
+    # ── Record the manga's source link (data/library/<name>/manga.json) ────────
     existing = load_manga_json(manga_root)
     title = existing.get("title")
     original_language = existing.get("original_language")
@@ -688,7 +688,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--name", metavar="PROJECT", type=portable_segment_arg,
-        help="Library folder name (library/<PROJECT>/). With --url and no "
+        help="Library folder name (data/library/<PROJECT>/). With --url and no "
              "--name, a safe name is derived from the manga's title.",
     )
     parser.add_argument(
@@ -733,8 +733,12 @@ def main() -> None:
     # library/ tree it never intended; make the resolved root impossible
     # to miss (and cheap to correct) before any network work starts.
     from mediaconductor.config import PROJECT_ROOT
+    from mediaconductor.layout import ensure_data_root
     from mediaconductor.paths import library_dir
 
+    # First command that writes anything: lay out data/ properly (and drop its
+    # README) rather than letting mkdir(parents=True) create a lone library/.
+    ensure_data_root()
     print(f"[download] workspace: {PROJECT_ROOT}", flush=True)
     print(f"[download] library:   {library_dir()}", flush=True)
     if not (PROJECT_ROOT / "config.json").is_file():

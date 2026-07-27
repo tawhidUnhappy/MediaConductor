@@ -1,18 +1,25 @@
 """Report — and check — every persistent path this install resolves.
 
-The workspace is meant to be self-contained: source chapters, audio, renders,
-review evidence, job state, tool environments, model caches and OAuth tokens
-all live below one directory, so the whole production can be moved, backed up,
-or deleted as a unit. Nothing enforced that. A stray ``MEDIACONDUCTOR_AUDIO_ROOT``,
-a shared ``MEDIACONDUCTOR_HOME``, or simply running from the wrong cwd could scatter
-gigabytes across the machine, and the first symptom was usually a second
-``library/`` tree discovered weeks later.
+The install keeps exactly two persistent trees (see
+:mod:`mediaconductor.layout`): ``data/`` for everything downloaded or
+generated, ``runtime/`` for tool envs, caches, state and secrets. The
+promise that buys is concrete: **delete ``data/`` and the install is
+factory-fresh**, with no second copy of a production hiding elsewhere.
 
-``mediaconductor workspace-layout`` resolves every persistent root and reports
-where it actually lands, which is also what ``doctor`` consumes to warn when a
-root escapes the workspace. Roots are *reported*, never silently rewritten:
-a deliberate override (a models cache on a second drive) is legitimate, and
+Nothing enforced that before. A stray ``MEDIACONDUCTOR_AUDIO_ROOT``, a
+shared ``MEDIACONDUCTOR_HOME``, or simply running from the wrong cwd could
+scatter gigabytes across the machine, and the first symptom was usually a
+second ``library/`` tree discovered weeks later.
+
+``mediaconductor workspace-layout`` resolves every persistent root and
+reports where it actually lands, which is also what ``doctor`` consumes to
+warn when a root escapes. Roots are *reported*, never silently rewritten: a
+deliberate override (a models cache on a second drive) is legitimate, and
 the check exists to make it visible rather than to forbid it.
+
+``mediaconductor workspace-reset`` is the supported way to take the fresh
+start without opening a file manager — same outcome as deleting ``data/``,
+but it refuses to run while a job is writing and it says what it removed.
 """
 
 from __future__ import annotations
@@ -20,28 +27,24 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
 from mediaconductor.brand import CLI_NAME
+from mediaconductor.layout import DATA_SUBDIRS, RUNTIME_SUBDIRS
 
-# The recommended layout, documented in docs/manga-quality-design.md.
-WORKSPACE_SUBDIRS: tuple[tuple[str, str], ...] = (
-    ("library", "source chapters and cropped panels"),
-    ("audio", "raw TTS takes and provenance sidecars"),
-    ("audio_faded", "render-safe narration derivatives"),
-    ("output", "final and per-item videos"),
-    ("review", "review evidence and reports"),
-    ("work", "jobs, sheets, manifests, render scratch"),
-    ("bgm", "user-owned licensed background music"),
-    ("vocal", "user-owned narrator references"),
-)
+# Kept as module attributes for callers that only want the workspace half.
+WORKSPACE_SUBDIRS: tuple[tuple[str, str], ...] = DATA_SUBDIRS
+DATA_HOME_SUBDIRS: tuple[tuple[str, str], ...] = RUNTIME_SUBDIRS
 
-DATA_HOME_SUBDIRS: tuple[tuple[str, str], ...] = (
-    ("tools", "isolated AI tool environments"),
-    ("cache", "Hugging Face, Torch, and uv model caches"),
-    ("state", "workspace and runtime metadata"),
-    ("secrets", "gitignored OAuth tokens"),
+# User-owned folders that live beside data/ and must survive a reset: the
+# user's licensed music and their narrator reference takes. MediaConductor
+# reads them and never writes them, which is exactly why they are not in
+# data/ — a fresh start must not cost someone their audio library.
+USER_ASSET_DIRS: tuple[tuple[str, str], ...] = (
+    ("bgm", "licensed background music"),
+    ("vocal", "narrator reference takes"),
 )
 
 
@@ -53,46 +56,62 @@ def resolved_roots() -> dict[str, Path]:
     """Every persistent root this process would write to, already resolved."""
     from mediaconductor.config import PROJECT_ROOT
     from mediaconductor.jobs import jobs_dir
-    from mediaconductor.tools.external import app_root, data_home, tools_home
+    from mediaconductor.layout import (
+        cache_root,
+        data_root,
+        runtime_root,
+        secrets_root,
+        state_root,
+    )
+    from mediaconductor.tools.external import app_root, tools_home
     from mediaconductor.video_pipeline.common import (
         DEFAULT_AUDIO_ROOT,
         DEFAULT_OUTPUT_ROOT,
         DEFAULT_PROJECT_ROOT,
+        DEFAULT_REVIEW_ROOT,
         DEFAULT_WORK_DIR,
     )
-    from mediaconductor.youtube.store import youtube_dir
 
-    roots: dict[str, Path] = {
+    return {
         "app_root": _resolve(app_root()),
         "workspace_root": _resolve(PROJECT_ROOT),
-        "data_home": _resolve(data_home()),
-        "tools_home": _resolve(tools_home()),
+        "data_root": _resolve(data_root()),
         "items_root": _resolve(DEFAULT_PROJECT_ROOT),
         "audio_root": _resolve(DEFAULT_AUDIO_ROOT),
+        "faded_audio_root": _resolve(Path(f"{DEFAULT_AUDIO_ROOT}_faded")),
         "output_root": _resolve(DEFAULT_OUTPUT_ROOT),
+        "review_root": _resolve(DEFAULT_REVIEW_ROOT),
         "work_dir": _resolve(DEFAULT_WORK_DIR),
         "jobs_dir": _resolve(jobs_dir()),
-        "cache_home": _resolve(data_home() / "cache"),
-        "state_home": _resolve(data_home() / "state"),
-        "secrets_home": _resolve(youtube_dir()),
+        "runtime_home": _resolve(runtime_root()),
+        "tools_home": _resolve(tools_home()),
+        "cache_home": _resolve(cache_root()),
+        "state_home": _resolve(state_root()),
+        "secrets_home": _resolve(secrets_root()),
     }
-    return roots
 
 
-# Roots that genuinely belong to the workspace. ``app_root`` is the install
-# itself and is allowed to sit elsewhere (a frozen build, a shared checkout).
-_CONFINED_ROOTS = (
-    "items_root", "audio_root", "output_root", "work_dir", "jobs_dir",
-    "data_home", "tools_home", "cache_home", "state_home", "secrets_home",
+# Roots holding downloaded/generated production state. Every one must sit
+# inside data/, or "delete data/ to start fresh" is a lie.
+_DATA_CONFINED_ROOTS = (
+    "items_root", "audio_root", "faded_audio_root", "output_root",
+    "review_root", "work_dir", "jobs_dir",
 )
 
+# Roots holding re-downloadable machinery and install state. These must sit
+# inside runtime/ — and deliberately NOT inside data/, so a fresh start
+# doesn't force an 80 GB re-download or a re-authorization.
+_RUNTIME_CONFINED_ROOTS = ("tools_home", "cache_home", "state_home", "secrets_home")
+
 _ROOT_ENV_OVERRIDES = {
-    "items_root": ("MEDIACONDUCTOR_ITEMS_ROOT", "PROJECT_ROOT"),
-    "audio_root": ("MEDIACONDUCTOR_AUDIO_ROOT", "AUDIO_ROOT"),
-    "output_root": ("MEDIACONDUCTOR_OUTPUT_ROOT", "OUTPUT_ROOT"),
-    "work_dir": ("MEDIACONDUCTOR_WORK_DIR", "WORK_DIR"),
+    "items_root": ("MEDIACONDUCTOR_ITEMS_ROOT",),
+    "audio_root": ("MEDIACONDUCTOR_AUDIO_ROOT",),
+    "output_root": ("MEDIACONDUCTOR_OUTPUT_ROOT",),
+    "review_root": ("MEDIACONDUCTOR_REVIEW_ROOT",),
+    "work_dir": ("MEDIACONDUCTOR_WORK_DIR",),
     "jobs_dir": ("MEDIACONDUCTOR_JOBS_DIR",),
-    "data_home": ("MEDIACONDUCTOR_HOME",),
+    "data_root": ("MEDIACONDUCTOR_DATA_ROOT",),
+    "runtime_home": ("MEDIACONDUCTOR_HOME",),
     "tools_home": ("MEDIACONDUCTOR_TOOLS_DIR",),
     "workspace_root": ("MEDIACONDUCTOR_PROJECT_ROOT",),
     "app_root": ("MEDIACONDUCTOR_ROOT",),
@@ -104,14 +123,23 @@ def _is_inside(path: Path, root: Path) -> bool:
 
 
 def layout_report() -> dict:
-    """Resolved roots plus whether each stays inside the workspace."""
+    """Resolved roots plus whether each one landed where it belongs."""
     roots = resolved_roots()
     workspace = roots["workspace_root"]
+    data = roots["data_root"]
+    runtime = roots["runtime_home"]
+
     entries: list[dict] = []
     escaped: list[str] = []
     for name, path in roots.items():
-        confined = name in _CONFINED_ROOTS
-        inside = _is_inside(path, workspace)
+        if name in _DATA_CONFINED_ROOTS:
+            container, inside = "data_root", _is_inside(path, data)
+        elif name in _RUNTIME_CONFINED_ROOTS:
+            container, inside = "runtime_home", _is_inside(path, runtime)
+        elif name == "data_root":
+            container, inside = "workspace_root", _is_inside(path, workspace)
+        else:
+            container, inside = None, True
         overrides = {
             variable: os.environ.get(variable)
             for variable in _ROOT_ENV_OVERRIDES.get(name, ())
@@ -121,38 +149,61 @@ def layout_report() -> dict:
             "name": name,
             "path": str(path),
             "exists": path.exists(),
-            "inside_workspace": inside,
-            "must_be_inside_workspace": confined,
+            "must_be_inside": container,
+            "contained": inside,
             "env_overrides": overrides,
         })
-        if confined and not inside:
+        if container is not None and not inside:
             escaped.append(name)
+
+    # data/ inside runtime/ (or the reverse) would make a reset delete the
+    # tool envs, or make deleting data/ miss half the production.
+    overlapping = _is_inside(data, runtime) or _is_inside(runtime, data)
     return {
-        "ok": not escaped,
+        "ok": not escaped and not overlapping,
         "workspace_root": str(workspace),
+        "data_root": str(data),
+        "runtime_home": str(runtime),
         "roots": entries,
         "escaped_roots": escaped,
+        "data_runtime_overlap": overlapping,
+        "fresh_start": {
+            "delete": str(data),
+            "command": f"{CLI_NAME} workspace-reset",
+            "survives": [str(runtime), *(
+                str(workspace / name) for name, _ in USER_ASSET_DIRS
+            )],
+        },
         "recommended_layout": {
-            "workspace": {name: description for name, description in WORKSPACE_SUBDIRS},
-            "data_home": {name: description for name, description in DATA_HOME_SUBDIRS},
+            "data": {name: description for name, description in DATA_SUBDIRS},
+            "runtime": {name: description for name, description in RUNTIME_SUBDIRS},
+            "user_assets": {name: description for name, description in USER_ASSET_DIRS},
         },
     }
 
 
 def workspace_problems() -> list[str]:
-    """Persistent roots resolving outside the workspace, as doctor messages."""
+    """Persistent roots resolving outside their tree, as doctor messages."""
     report = layout_report()
-    workspace = report["workspace_root"]
     problems: list[str] = []
     for entry in report["roots"]:
         if entry["name"] not in report["escaped_roots"]:
             continue
         override = ", ".join(f"{k}={v}" for k, v in entry["env_overrides"].items())
         hint = f" (set by {override})" if override else ""
+        container = report[entry["must_be_inside"]]
         problems.append(
-            f"{entry['name']} resolves to {entry['path']}, outside the workspace {workspace}"
-            f"{hint}. Persistent production state should stay below the workspace so it can "
-            "be moved, backed up, or deleted as one unit."
+            f"{entry['name']} resolves to {entry['path']}, outside {container}{hint}. "
+            f"Production state must stay under data/ so deleting that one folder "
+            f"really is a fresh start; machinery must stay under runtime/ so a fresh "
+            f"start doesn't re-download it."
+        )
+    if report["data_runtime_overlap"]:
+        problems.append(
+            f"data_root ({report['data_root']}) and runtime_home "
+            f"({report['runtime_home']}) overlap: a workspace reset would delete the "
+            f"installed AI tool environments, and deleting data/ would not be a clean "
+            f"fresh start. Point MEDIACONDUCTOR_HOME or MEDIACONDUCTOR_DATA_ROOT apart."
         )
     return problems
 
@@ -160,13 +211,13 @@ def workspace_problems() -> list[str]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} workspace-layout",
-        description="Report every resolved persistent root and whether it stays inside "
-                    "the workspace.",
+        description="Report every resolved persistent root and whether it stays in "
+                    "the tree it belongs to (data/ for production, runtime/ for tools).",
     )
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="Emit one JSON object on stdout.")
     parser.add_argument("--strict", action="store_true",
-                        help="Exit 1 when any persistent root escapes the workspace.")
+                        help="Exit 1 when any persistent root lands outside its tree.")
     args = parser.parse_args(argv)
 
     report = layout_report()
@@ -177,13 +228,131 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"workspace: {report['workspace_root']}\n")
     width = max(len(entry["name"]) for entry in report["roots"]) + 2
     for entry in report["roots"]:
-        marker = " " if entry["inside_workspace"] or not entry["must_be_inside_workspace"] else "!"
+        marker = " " if entry["contained"] else "!"
         print(f" {marker} {entry['name']:<{width}}{entry['path']}")
-    if report["escaped_roots"]:
+    print(f"\n  fresh start: delete {report['data_root']}  (or run "
+          f"{CLI_NAME} workspace-reset)")
+    print(f"  survives:    {report['runtime_home']}, "
+          + ", ".join(name for name, _ in USER_ASSET_DIRS))
+    if not report["ok"]:
         print()
         for problem in workspace_problems():
             print(f"  [warn] {problem}")
     return 0 if report["ok"] or not args.strict else 1
+
+
+# ── workspace-reset ───────────────────────────────────────────────────────────
+
+def _dir_size(path: Path) -> int:
+    total = 0
+    for entry in path.rglob("*"):
+        try:
+            if entry.is_file():
+                total += entry.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def _human(size: int) -> str:
+    value = float(size)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if value < 1024 or unit == "TB":
+            return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} B"
+        value /= 1024
+    return f"{value:.1f} TB"
+
+
+def reset_main(argv: Sequence[str] | None = None) -> int:
+    """Clear generated/downloaded state — the scriptable 'delete data/'."""
+    from mediaconductor.jobs import live_jobs
+    from mediaconductor.layout import data_root, ensure_data_root
+    from mediaconductor.utils import emit_result
+
+    parser = argparse.ArgumentParser(
+        prog=f"{CLI_NAME} workspace-reset",
+        description="Delete everything MediaConductor downloaded or generated "
+                    "(the data/ folder) and recreate it empty. Installed AI tools, "
+                    "caches, YouTube tokens, bgm/ and vocal/ are untouched.",
+    )
+    parser.add_argument("--confirm", action="store_true",
+                        help="Actually delete. Without it this is a dry run.")
+    parser.add_argument("--keep-library", action="store_true",
+                        help="Keep data/library/ (downloaded chapters and panels) and "
+                             "clear only what can be regenerated from it.")
+    parser.add_argument("--only", nargs="*", metavar="SUBDIR",
+                        help="Clear only these data/ subfolders "
+                             f"({', '.join(name for name, _ in DATA_SUBDIRS)}).")
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="Emit one JSON object on stdout.")
+    args = parser.parse_args(argv)
+
+    known = [name for name, _ in DATA_SUBDIRS]
+    if args.only:
+        unknown = sorted(set(args.only) - set(known))
+        if unknown:
+            parser.error(f"unknown data subfolder(s): {', '.join(unknown)}; "
+                         f"known: {', '.join(known)}")
+        targets = [name for name in known if name in set(args.only)]
+    elif args.keep_library:
+        targets = [name for name in known if name != "library"]
+    else:
+        targets = known
+
+    # A render writing into a tree being deleted produces a half-erased
+    # production and a confusing traceback instead of a clean refusal.
+    running = live_jobs()
+    if running and args.confirm:
+        detail = ", ".join(f"{job['id']} ({job['command']})" for job in running)
+        message = (f"refusing to reset while {len(running)} job(s) are running: {detail}. "
+                   f"Wait for them, or stop them, then retry.")
+        if args.as_json:
+            print(json.dumps({"ok": False, "error": message}, ensure_ascii=False))
+        else:
+            print(f"[error] {message}")
+        return 1
+
+    root = data_root()
+    removed: list[dict] = []
+    for name in targets:
+        path = root / name
+        if not path.exists():
+            continue
+        size = _dir_size(path)
+        entry = {"path": str(path), "bytes": size, "human": _human(size)}
+        if args.confirm:
+            shutil.rmtree(path, ignore_errors=False)
+        removed.append(entry)
+
+    if args.confirm:
+        ensure_data_root()
+
+    total = sum(entry["bytes"] for entry in removed)
+    payload = {
+        "ok": True,
+        "dry_run": not args.confirm,
+        "data_root": str(root),
+        "cleared": removed,
+        "kept": sorted(set(known) - set(targets)),
+        "freed_bytes": total,
+        "freed": _human(total),
+    }
+    if args.as_json:
+        print(json.dumps(payload, ensure_ascii=False))
+    else:
+        if not removed:
+            print(f"[reset] nothing to clear under {root}")
+        for entry in removed:
+            verb = "removed" if args.confirm else "would remove"
+            print(f"  {verb} {entry['path']}  ({entry['human']})")
+        if payload["kept"]:
+            print(f"  kept: {', '.join(payload['kept'])}")
+        print(f"\n{'Freed' if args.confirm else 'Would free'} {payload['freed']}. "
+              f"Installed tools, caches, YouTube tokens, bgm/ and vocal/ are untouched.")
+        if not args.confirm:
+            print(f"Re-run with --confirm to delete: {CLI_NAME} workspace-reset --confirm")
+    emit_result(**payload)
+    return 0
 
 
 if __name__ == "__main__":

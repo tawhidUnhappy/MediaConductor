@@ -164,6 +164,31 @@ To allow MediaConductor to access multiple folders, repeat the `--allow-root` fl
 
 ---
 
+## 📁 Where the server writes
+
+Everything the server downloads or generates goes under one folder in the
+workspace — `<workspace>/data/`:
+
+```text
+data/library/<Project>/   downloaded chapters, panels, narration, rights, reviews
+data/audio/  data/audio_faded/   TTS takes and render-safe derivatives
+data/output/<Project>/    item videos, <Project>_full.mp4, quality reports
+data/review/  data/work/  review sheets; scratch and job logs
+```
+
+Deleting `data/` returns the workspace to a clean slate. The AI tool
+environments, model caches and YouTube tokens live in `<install>/runtime/`
+instead, so a fresh start never triggers a multi-gigabyte re-download, and
+`bgm/` + `vocal/` stay outside too. Call the `where` tool for the resolved
+`data_root` of the install you are connected to, and `workspace_layout` to
+confirm nothing escaped.
+
+`workspace-reset` is deliberately **not** an MCP tool — an irreversible
+"delete every production" is not something a client should be able to trigger
+by name. Run it from the CLI when you mean it.
+
+---
+
 ## 🤖 LLM Self-Review & Agent Automation
 
 The MediaConductor MCP server supports **complete autonomous LLM operation**:
@@ -175,7 +200,7 @@ The MediaConductor MCP server supports **complete autonomous LLM operation**:
   "tool": "manga_review",
   "arguments": {
     "action": "crop",
-    "project_root": "D:/MediaProjects/library/Recap",
+    "project_root": "D:/MediaProjects/data/library/Recap",
     "items": ["01"],
     "reviewer": "antigravity-agent"
   }
@@ -221,8 +246,8 @@ The catalog exposes **49 tools** from `mediaconductor/command_spec.py`. Every to
 | `modes` | — | Show the manga-video catalog, dependencies, and MCP restart command. |
 | `setup` | — | One-command provisioning: core binaries, AI tool envs, model downloads. Long-running. |
 | `doctor` | — | Check ffmpeg/uv/git, GPU backend, installed AI tools. |
-| `where` | — | Resolved paths (data root, tools home) and version. |
-| `workspace_layout` | — | Every resolved persistent root and workspace confinement state. |
+| `where` | — | Resolved paths (`data_root` — the one deletable folder — plus `runtime_home` and `tools_home`) and version. |
+| `workspace_layout` | — | Every resolved persistent root, and whether it stayed in `data/` (production) or `runtime/` (tool envs and caches). |
 | `install_tool` | `name` | Install external AI env: `kokoro-82m`, `index-tts`, `magi-v3`, `deepseek-ocr2`. |
 
 ### Acquire & Crop (7)

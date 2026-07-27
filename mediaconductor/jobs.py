@@ -204,6 +204,34 @@ def _effective_status(state: dict) -> str:
     return status
 
 
+def live_jobs(base: Path | None = None) -> list[dict]:
+    """Jobs whose supervisor is still alive, as {id, command, status}.
+
+    Used by destructive commands (``workspace-reset``) to refuse to delete
+    a tree that a running render is still writing into. Orphaned jobs — the
+    'running' record of a supervisor that died — deliberately do not count:
+    nothing is writing, and treating them as live would make a reset
+    impossible after a crash, which is exactly when it is wanted.
+    """
+    root = base or jobs_dir()
+    if not root.is_dir():
+        return []
+    live: list[dict] = []
+    for state_file in sorted(root.glob("*.json")):
+        try:
+            state = _load_state(state_file)
+        except (OSError, ValueError):
+            continue
+        status = _effective_status(state)
+        if status in ("starting", "running"):
+            live.append({
+                "id": state.get("id", state_file.stem),
+                "command": state.get("command"),
+                "status": status,
+            })
+    return live
+
+
 def _status_for_exit_code(exit_code: int) -> str:
     """Map the stable CLI contract onto a background-job state."""
     if exit_code == 0:

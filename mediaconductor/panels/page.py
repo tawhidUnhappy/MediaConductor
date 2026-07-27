@@ -370,7 +370,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                     "verification sheets (item-pipeline layout)."
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT,
-                        help="Project folder containing item subfolders (library/<name>).")
+                        help="Project folder containing item subfolders (data/library/<name>).")
     parser.add_argument("--items", nargs="*", help="Item folders, e.g. 01 02 05-08.")
     parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-19.")
     parser.add_argument("--source-subdir", type=relative_subpath_arg, default="download",
