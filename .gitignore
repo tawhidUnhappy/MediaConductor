@@ -42,7 +42,6 @@ config.system.json
 /index-tts/
 /magi-v3/
 /deepseek-ocr2/
-/z-image-turbo/
 
 # Isolated dev tooling (e.g. portable Node.js) — not vendored, not global
 /.tools/

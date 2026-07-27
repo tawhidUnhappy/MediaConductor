@@ -266,25 +266,79 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "per_sheet": ("--per-sheet", "value"),
          "only_images": ("--only-images", "list")},
     ),
+    "thumbnail_candidates": (
+        "thumbnail-candidates",
+        "Shortlist the cropped panels worth using as a thumbnail base, and render numbered "
+        "contact sheets of them. Scores each panel on detail, ink coverage, shape against "
+        "16:9, and resolution. THE SCORE DOES NOT PICK THE THUMBNAIL: no pixel statistic "
+        "knows which panel shows the reversal the title promises, or whether a composition "
+        "reads as a sexualized minor. Open the shortlisted candidates at full resolution and "
+        "choose by looking at them, exactly as with MAGI's panel proposals.",
+        {"project_root": _PROJECT_ROOT,
+         "items": _ITEMS,
+         "item_range": {**_STR, "description": "Convenience range, e.g. 01-12."},
+         "top": {**_INT, "description": "How many candidates to shortlist (default 20)."},
+         "no_sheets": {**_BOOL, "description": "Score only; skip contact-sheet rendering."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "item_range": ("--item-range", "value"), "top": ("--top", "value"),
+         "no_sheets": ("--no-sheets", "flag")},
+    ),
     "thumbnail_compose": (
         "thumbnail-compose",
-        "Compose a YouTube thumbnail from an APPROVED SOURCE PANEL + bold stroked text "
-        "blocks (rotate/shadow supported) + fat outlined block-arrows + white inset border at "
-        "1280x720. Generated key art is not used: it promises art the video does not contain. "
-        "The base panel must be listed in rights.json under thumbnail_sources. Prefer "
-        "spec_json (inline, no file). Tilt the big hook block a few degrees and keep arrows "
-        "chunky so the markup reads hand-placed. Inspect the output at mobile size before "
-        "uploading.",
-        {"base": {**_STR, "description": "Absolute path to an approved source panel."},
+        "Compose a 1280x720 YouTube thumbnail from APPROVED SOURCE PANELS. There is no image "
+        "generation in this path: the base pixels are always manga panels the crop review "
+        "approved and rights.json lists under thumbnail_sources, because art the video does "
+        "not contain is both a thumbnail-policy problem and a disappointment for whoever "
+        "clicked. Four elements: 'blocks' (short ALL-CAPS hook words, yellow #FFE600, thick "
+        "black stroke, -2..-5 degree rotate reads hand-placed), 'arrows' (fat block arrows "
+        "pointing from a label to the character it names -- the most effective element in the "
+        "reference set), 'bubbles' (a real line of dialogue in a dark bubble with white brush "
+        "text, or a light bubble with black text), and 'badge' (the chapter range in a "
+        "corner). Start from preset='label-arrow'|'bubble'|'split' and adjust. Pass check=true "
+        "to get mechanical faults (off-canvas text, sub-44px text, collisions with each other "
+        "or with YouTube's duration overlay) and exit 3. THEN OPEN THE IMAGE AND LOOK AT IT: "
+        "the check knows nothing about whether the crop cuts a face, matches the title, or "
+        "reads as explicit or minor-coded.",
+        {"base": {"type": "array", "items": {"type": "string"},
+                  "description": "Approved source panel path(s). Two or more = split layout."},
          "output": {**_STR, "description": "Absolute output PNG path."},
          "text": {"type": "array", "items": {"type": "string"},
-                  "description": "Quick mode: 1-3 short text blocks (3-5 punchy words each)."},
-         "spec_json": {**_STR, "description": "Full mode inline: JSON spec (blocks/arrows/border)."},
-         "spec": {**_STR, "description": "Full mode: path to a JSON spec file."}},
+                  "description": "Hook words (3-5 each). With preset, they fill its slots."},
+         "preset": {**_STR, "enum": ["label-arrow", "bubble", "split"],
+                    "description": "Worked starting layout to adjust."},
+         "badge": {**_STR, "description": "Chapter-range stamp, e.g. '1-12'."},
+         "badge_corner": {**_STR,
+                          "enum": ["top-left", "top-right", "bottom-left", "top-center"],
+                          "description": "Badge position (default top-left)."},
+         "spec_json": {**_STR,
+                       "description": "Inline JSON: layout/blocks/arrows/bubbles/badge/border."},
+         "spec": {**_STR, "description": "Path to a JSON spec file."},
+         "check": {**_BOOL, "description": "Report mechanical faults and exit 3 if any."}},
         ["base", "output"],
-        {"base": ("--base", "value"), "output": ("--output", "value"),
-         "text": ("--text", "repeat"), "spec_json": ("--spec-json", "value"),
-         "spec": ("--spec", "value")},
+        {"base": ("--base", "repeat"), "output": ("--output", "value"),
+         "text": ("--text", "repeat"), "preset": ("--preset", "value"),
+         "badge": ("--badge", "value"), "badge_corner": ("--badge-corner", "value"),
+         "spec_json": ("--spec-json", "value"), "spec": ("--spec", "value"),
+         "check": ("--check", "flag")},
+    ),
+    "title_check": (
+        "title-check",
+        "Check recap title candidates against the house pattern: <STATUS or PREMISE> + "
+        "<REVERSAL> [+ CONSEQUENCE] [(chapter range)] - <Manga|Manhwa> Recap. Reports length "
+        "against YouTube's 100-character limit, the recap suffix a returning viewer scans "
+        "for, all-caps shouting, emoji, punctuation spam, and a malformed chapter range. "
+        "SHAPE ONLY -- a title that passes can still be a lie. Whether the reversal is the "
+        "real turn of the story, and whether every claim is supported by a beat that appears "
+        "in the video, is your judgement. Pass pattern=true for the formula and worked "
+        "examples.",
+        {"titles": {"type": "array", "items": {"type": "string"},
+                    "description": "One or more candidate titles."},
+         "pattern": {**_BOOL, "description": "Print the house pattern and examples instead."},
+         "strict": {**_BOOL, "description": "Exit 1 on warnings as well as errors."}},
+        [],
+        {"titles": ("", "positional-list"), "pattern": ("--pattern", "flag"),
+         "strict": ("--strict", "flag")},
     ),
     "series_plan": (
         "series-plan",

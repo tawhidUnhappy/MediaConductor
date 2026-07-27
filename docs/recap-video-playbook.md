@@ -13,7 +13,7 @@ All commands run from the install root (`uv run mediaconductor ...` in a dev
 checkout).
 
 **Working style — go idle between long steps.** Downloading, cropping, OCR,
-audio/render, image generation, and upload each take minutes to tens of
+audio/render and upload each take minutes to tens of
 minutes. Launch each as a background job and then **stop and wait for the
 completion notification** instead of polling or sleeping in a loop — it is the
 biggest compute saver on a full run. GPU tools block-buffer stdout (their logs
@@ -651,13 +651,20 @@ problem and a straightforward disappointment for whoever clicks. The panel you
 use must be listed in `rights.json` under `thumbnail_sources`, or
 `manga-rights check` fails closed.
 
-Pick a panel with a strong focal character, readable emotion, clear silhouette
-separation, and enough negative space for the title:
+Shortlist candidates first, then choose by opening them:
 
 ```bash
-mediaconductor thumbnail-compose \
-    --base data/library/<P>/01/panels/<approved>.jpg --output thumb_base.png
+mediaconductor thumbnail-candidates --project-root data/library/<P> \
+    --item-range 01-12 --json
 ```
+
+It scores every cropped panel on detail, ink coverage, shape against 16:9 and
+resolution, and writes numbered contact sheets under
+`data/review/<P>/thumbnail-candidates/`. **The ranking is a proposal, not a
+choice** — the same rule as MAGI's panel boxes. No statistic knows which panel
+carries the reversal the title promises. Open the shortlist at full
+resolution and pick a panel with a strong focal character, readable emotion,
+clear silhouette separation, and enough negative space for the markup.
 
 Selection rules (non-negotiable — this is what keeps the channel monetizable,
 not optional flavor):
@@ -674,10 +681,25 @@ not optional flavor):
 - Foreground face ≈ 30% of frame height; keep the payload out of the
   bottom-right corner, where the duration badge sits.
 
-Then add the signature text/furniture with `mediaconductor thumbnail-compose`
-(quick mode: repeated `--text` flags; full placement control via `--spec`
-JSON — blocks/arrows/border; a custom PIL script is only needed for effects
-beyond it, e.g. speech-tails and radial glows):
+Then add the signature markup with `mediaconductor thumbnail-compose`. Start
+from a preset that matches one of the three reference layouts and adjust it:
+
+| Preset | What it draws | Use when |
+|---|---|---|
+| `label-arrow` | ALL-CAPS yellow label + fat block arrow at a character | the hook is a description the narrator applies (`VILLAIN`, `YANDERE`) |
+| `bubble` | one line of dialogue in a dark or light speech bubble | the hook is something a character *said* (`YOU'RE MINE`) |
+| `split` | two panels side by side, a label under each | a power reversal legible as two states at a glance (`WEAK` \| `STRONG`) |
+
+```bash
+mediaconductor thumbnail-compose --base <approved-panel>.jpg \
+    --output data/output/<P>/thumb.png \
+    --preset label-arrow --text "VILLAIN" --badge "1-12" --check
+```
+
+`--badge` stamps the chapter range in a corner so a returning viewer sees
+which part this is. Full placement control via `--spec-json`
+(`layout` / `blocks` / `arrows` / `bubbles` / `badge` / `border`); a custom
+PIL script is now only needed for effects beyond those, e.g. radial glows.
 1–3 blocks of 1–4 words each — ALL-CAPS role labels + lowercase dialogue
 quips — **yellow #FFE600 or white fills, black stroke ≈ 12% of font size**.
 **Make the markup read hand-placed, not programmatic** (viewer feedback on a
@@ -694,26 +716,33 @@ felt unnatural next to the reference channels):
 
 Example spec:
 
+Example spec — two labelled characters, the variant that performs best:
+
 ```json
 {"blocks": [
-   {"text": "HE ATE\nHER SON?!", "x": 24, "y": 500, "size": 84, "rotate": -4},
-   {"text": "TIGER MOM", "x": 556, "y": 22, "size": 62},
-   {"text": "CH 1-7", "x": 28, "y": 22, "size": 44, "fill": "#FFFFFF"}],
- "arrows": [{"from": [742, 108], "to": [818, 178], "width": 26}],
+   {"text": "VILLAIN", "x": 40, "y": 34, "size": 100, "rotate": -3, "fill": "#FFE600"},
+   {"text": "HEROINE", "x": 900, "y": 60, "size": 100, "rotate": -2, "fill": "#FFE600"}],
+ "arrows": [{"from": [170, 150], "to": [300, 250], "width": 30},
+            {"from": [1010, 175], "to": [930, 265], "width": 30}],
+ "badge": {"text": "1-12", "corner": "top-left"},
  "border": true}
 ```
+
+…or a spoken hook in a bubble:
+
+```json
+{"bubbles": [{"text": "YOU'RE MINE", "center": [270, 260], "rx": 168, "ry": 196,
+              "style": "dark", "tail": [410, 450], "size": 56}]}
+```
+
+`--check` exits 3 on mechanical faults — text off-canvas, type under 44 px,
+elements overlapping each other, anything colliding with YouTube's duration
+badge. It knows nothing about whether the art is *right*; that is the
+render-and-look step below.
 
 A live video's thumbnail can be replaced without re-uploading:
 `mediaconductor youtube-thumbnail --profile <profile> --video-id <id>
 --image <png>`.
-
-**B. Panel collage (works with no image model).** Dramatic panel as
-background, scaled to width, blurred (GaussianBlur ~2.5), darkened
-(brightness ~0.42), warm/red tint blended through an elliptical mask;
-subject panel cropped tight and pasted right at ~700 px tall with a 6 px
-white sticker border; 3–5 words of text on the left in Impact, 90–120 pt,
-white/yellow/red fills, black stroke (`stroke_width ≈ size//9`) plus a
-small drop shadow.
 
 Mandatory checks, all from real failures:
 

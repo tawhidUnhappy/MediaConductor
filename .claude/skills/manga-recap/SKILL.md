@@ -272,24 +272,58 @@ readability, speaker/name pronunciation, pacing, transition, and audio boundary.
 Record the final video review via `manga-review final-video`.
 Full recipe + troubleshooting: `docs/recap-video-playbook.md`.
 
-## 6. Thumbnail (1280×720)
+## 6. Thumbnail (1280×720) and title
 
-1. Pick base art from the **approved source panels** (selection rules in
-   `docs/thumbnail.md`). Generated key art is not used: it promises art the
-   video does not contain. The panel must be listed in `rights.json` under
-   `thumbnail_sources`.
-2. Compose 2-3 candidates, open each at mobile size, pick the best (faces and
-   speech bubbles intact, nothing clipped by the frame edge).
-3. Add text furniture — 1–3 blocks, 3–5 punchy words each, highlighting one
-   shocking fact from the batch:
-   `mediaconductor thumbnail-compose --base <approved-panel>.jpg --output final_thumb.png
-   --text "HE ATE A GOD?!" --text "CH 1-12"`
-   (full control via `--spec` JSON: blocks/arrows/border). Make the markup
-   read hand-placed: tilt the big hook block (`"rotate": -3…-5`), use the
-   default fat outlined block-arrows (width ≈ 22–30) instead of thin lines,
-   keep the drop shadow on.
-4. **Open the final image at full size** and check text overlap, edges, and
-   anything that could read as explicit — fix and re-compose if needed.
+Both are built from the manga itself. **There is no image generation** — the
+base pixels are always approved panels, because generated key art promises
+art the video does not contain. Full recipe: `docs/thumbnail.md`.
+
+1. **Find the panel.** Shortlist and render contact sheets:
+   `mediaconductor thumbnail-candidates --project-root data/library/<Project>
+   --item-range 01-12 --json`. Then **open the shortlisted candidates at full
+   resolution and choose by looking** — the score ranks detail/shape/ink, it
+   has no idea which panel shows the reversal your title promises. Want: 1–3
+   focal characters, one clear conflict, a readable face with a strong
+   expression, and room in a top corner for the label. The chosen panel must
+   be listed in `rights.json` under `thumbnail_sources`.
+2. **Compose from a preset**, then adjust:
+   - `--preset label-arrow` — ALL-CAPS yellow label + fat block arrow pointing
+     at the character it names. The workhorse; two labels with two arrows
+     (`VILLAIN` / `HEROINE`) is a proven variant.
+   - `--preset bubble` — one real line of dialogue in a speech bubble
+     (`dark` = black bubble + white brush text; `light` = white + black). Use
+     it when the hook is something a character *said*.
+   - `--preset split` — two panels side by side, a label under each
+     (`WEAK` | `STRONG`), badge top-center. Only for a legible power reversal.
+
+   ```bash
+   mediaconductor thumbnail-compose --base data/library/<Project>/03/panels/03_014_02.jpg \
+       --output data/output/<Project>/thumb.png \
+       --preset label-arrow --text "VILLAIN" --badge "1-12" --check
+   ```
+
+   Add `--badge "1-12"` so returning viewers see which part this is. Keep the
+   markup hand-placed: the presets already tilt the hook block −3° and use fat
+   outlined block-arrows; keep the drop shadow on. Full control via
+   `--spec-json` (`layout` / `blocks` / `arrows` / `bubbles` / `badge`).
+3. `--check` exits 3 on mechanical faults (off-canvas text, sub-44px type,
+   elements overlapping, collisions with YouTube's duration badge). Fix and
+   re-render until it is clean.
+4. **Then open the PNG at full size and look at it.** A clean `--check` is not
+   a review: it cannot see a face cut in half, a thumbnail that contradicts
+   the title, or a composition that reads as explicit or minor-coded — and
+   these leads are usually teenagers, so that is a live constraint. Compose
+   2–3 candidates and pick deliberately.
+5. **Write the title** to the house pattern
+   (`mediaconductor title-check --pattern` prints it in full):
+   `<STATUS or PREMISE> + <REVERSAL> [+ CONSEQUENCE] [(1-12)] - Manga Recap`.
+   The reversal *is* the title — what the premise led you to expect, and what
+   happened instead. Title Case, 65–97 chars, at most three ALL-CAPS emphasis
+   words (none is fine), one `!`/`?` at most, no emoji. Generate several and
+   check them together:
+   `mediaconductor title-check "candidate one" "candidate two" --json`.
+   It validates shape only — every claim must be supported by a beat that
+   actually appears in the video, and the title and thumbnail must agree.
 5. Iterating after upload? Reuse the exact verified account with
    `mediaconductor youtube-thumbnail --profile <profile> --video-id <id>
    --image final_thumb.png` so a multi-channel install cannot target the

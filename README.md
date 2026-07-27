@@ -76,6 +76,14 @@ MangaDex acquisition, webtoon or paged-manga crops, visual verification sheets,
 source-grounded narration with optional OCR cross-evidence, Kokoro/IndexTTS,
 item and long-video rendering, music mixing, thumbnails, QA, and YouTube.
 
+Thumbnails are composed from the manga itself — there is no image generation
+anywhere in the pipeline, because generated key art promises art the video does
+not contain. `thumbnail-candidates` shortlists the panels worth opening and
+renders contact sheets; `thumbnail-compose` draws the house markup over the one
+you chose (hook labels, block arrows, speech bubbles, chapter badge) with
+`--preset label-arrow|bubble|split`; `title-check` holds titles to the house
+pattern. See [docs/thumbnail.md](docs/thumbnail.md).
+
 The splitters refuse a confident wrong-format run (webtoon pages into the paged
 splitter and vice versa), but crop approval and narration remain visual tasks.
 Use verification sheets as indexes, then open every source page/strip overlay

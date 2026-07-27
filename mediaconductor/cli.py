@@ -140,7 +140,9 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "panel-transcript":     ("mediaconductor.ocr.panel_transcript",                 "main",        "Manga: acquire",   "Add optional SHA-bound, unverified OCR cross-evidence to <item>/transcript.json."),
 
     # ── Packaging for publication ─────────────────────────────────────────────
-    "thumbnail-compose":    ("mediaconductor.images.thumbnail_compose",             "main",        "Manga: publish",   "Compose a YouTube thumbnail: base art + stroked text blocks + border (1280x720)."),
+    "thumbnail-candidates": ("mediaconductor.images.thumbnail_candidates",          "main",        "Manga: publish",   "Shortlist cropped panels worth using as a thumbnail base, with contact sheets to open (--json)."),
+    "thumbnail-compose":    ("mediaconductor.images.thumbnail_compose",             "main",        "Manga: publish",   "Compose a thumbnail from approved panels: hook text + block arrows + speech bubbles + chapter badge (1280x720)."),
+    "title-check":          ("mediaconductor.images.title_check",                   "main",        "Manga: publish",   "Check recap title candidates against the house pattern (length, suffix, emphasis, punctuation)."),
     "panels-context-pack":  ("mediaconductor.images.ai_zip_cli",                    "main",        "Manga: publish",   "Pack a chapter's panels into a labelled ZIP so an LLM can read them as narration context."),
 }
 

@@ -18,8 +18,8 @@ network share) and the dot-prefix keeps it invisible to item scanning:
   gives a fresh agent everything it needs to pick up exactly where the last
   one (on any model) left off.
 - ``mediaconductor work-claim`` — atomic TTL-leased claims on an ``(item, stage)``
-  pair or a named ``--resource`` (e.g. ``gpu``: MAGI/DeepSeek/IndexTTS/
-  Z-Image cannot share a consumer card). Acquire is an O_CREAT|O_EXCL file
+  pair or a named ``--resource`` (e.g. ``gpu``: MAGI/DeepSeek/IndexTTS
+  cannot share a consumer card). Acquire is an O_CREAT|O_EXCL file
   create — safe across processes and network filesystems. Leases expire, so
   a crashed (or simply cut-off) agent never wedges the board; a live agent
   must ``--renew``.

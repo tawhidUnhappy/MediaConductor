@@ -302,8 +302,11 @@ crop → verify → narrate loop is documented in
 [operate/crop-verify-narrate.md](operate/crop-verify-narrate.md).
 
 **Image export & AI context** — `to-pdf`, `to-pdf-lossless`,
-`convert-images`, `watermark`, `thumbnail-compose` (text furniture onto a
-thumbnail base — see [thumbnail.md](thumbnail.md)), `ai-zip`.
+`thumbnail-candidates` (shortlist panels worth using as a base),
+`thumbnail-compose` (hook text, block arrows, speech bubbles and a chapter
+badge onto approved panel art — never generated art), and `title-check`
+(recap titles against the house pattern) — see [thumbnail.md](thumbnail.md).
+Also `panels-context-pack`.
 
 ## 7. Recipes
 

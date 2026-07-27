@@ -81,6 +81,41 @@ rather than an assertion.** Both changes are breaking.
 
 ### Changed
 
+- **Thumbnails are built from manga panels, end to end, and the image-generation
+  path is gone for good.** `thumbnail-candidates` scores every cropped panel in
+  a batch (detail, ink coverage, shape against 16:9, resolution) and renders
+  numbered contact sheets, so an agent opens twenty full-resolution candidates
+  instead of two thousand — and the ranking is explicitly a proposal, the same
+  standing as MAGI's panel boxes, because no pixel statistic knows which panel
+  carries the reversal the title promises. `thumbnail-compose` grew the three
+  layouts the reference thumbnails actually use: **speech bubbles** (dark bubble
+  with white brush lettering for a spoken hook, or light with black text),
+  a **chapter badge** pinned to a corner, and a **split** before/after canvas
+  from two panels — alongside the existing hook blocks and block arrows.
+  `--preset label-arrow|bubble|split` gives a worked starting spec, since
+  writing coordinates blind cost two or three render-and-look rounds before
+  anything was even roughly placed. `--check` reports the mechanical faults an
+  agent cannot see in a JSON spec (text off-canvas, type under 44 px, elements
+  stacked on each other, collisions with YouTube's duration overlay) and exits
+  3. It stays deliberately narrow: it cannot tell whether the crop cuts a face
+  in half or whether the composition reads as a sexualized minor, and a linter
+  that pretended to would be worse than none, because it would be trusted.
+- **`title-check`** — recap titles against the house pattern:
+  `<STATUS or PREMISE> + <REVERSAL> [+ CONSEQUENCE] [(range)] - <Manga|Manhwa>
+  Recap`. Checks length against YouTube's 100-character limit, the recap suffix,
+  all-caps shouting, emoji, punctuation spam, and chapter-range shape;
+  `--pattern` prints the formula and worked examples. Calibrated against the
+  titles this channel has actually published, and the test suite pins them:
+  every shipped title must pass with no warnings, because a check that nags
+  about known-good work teaches an agent to ignore its output. Shape only —
+  a title that passes can still be a lie, and truthfulness stays a reviewer
+  judgement.
+- Removed the last references to image generation: the orphaned
+  `z-image-turbo` tool env (35 GB) and its model cache, the `zimage` mentions in
+  `thumbnail-compose`'s own help and in the workboard GPU note, and the
+  `/z-image-turbo/` ignore rule. The base pixels of a thumbnail are always
+  approved panel art, because generated key art promises art the video does not
+  contain.
 - **One folder for everything produced, and deleting it is the fresh start.**
   Every downloaded or generated file now lives under `<workspace>/data/`
   (`library/`, `audio/`, `audio_faded/`, `output/`, `review/`, `work/`), and

@@ -100,6 +100,20 @@ is worse than one that reports and defers.
 - **Video**: frozen video ≥ 12 s, near-silence ≥ 3 s. Both are legitimate
   editorial choices and both are also exactly what a stalled render or a missing
   WAV looks like.
+- **Thumbnail candidates** (`images/thumbnail_candidates.py`): panels ranked by
+  detail, ink coverage, shape against 16:9, and resolution. The ranking shortens
+  a two-thousand-panel batch to twenty worth opening and nothing more — no pixel
+  statistic knows which panel carries the reversal the title promises, or whether
+  a composition reads as a sexualized minor. Same standing as MAGI's boxes.
+- **Thumbnail composition** (`thumbnail-compose --check`): text off-canvas, type
+  under 44 px, elements stacked on each other, collisions with YouTube's duration
+  overlay. Deliberately mechanical — it cannot see a face cut in half or a
+  thumbnail that contradicts its title, and a linter that pretended to would be
+  worse than none because it would be trusted.
+- **Titles** (`title-check`): length against YouTube's 100-character limit, the
+  recap suffix, all-caps shouting, emoji, punctuation spam, chapter-range shape.
+  A title that passes can still be a lie; whether every claim is supported by a
+  beat in the video is a reviewer judgement.
 
 Unsafe narration is the exception: phonetic screams and laughs, copied stammers,
 repeated punctuation, shout-caps, and empty/punctuation-only lines **block** TTS

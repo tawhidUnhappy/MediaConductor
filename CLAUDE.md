@@ -43,10 +43,10 @@ Each package has its own README.md with entry points and gotchas.
 | acquire | `panels/` | crop: `webtoon-split`, `page-split` (MAGI), cutcheck, overrides, remap |
 | read | `ocr/` | DeepSeek-OCR 2 panel transcripts |
 | produce | `video_pipeline/` | narration contract, editorial timeline, audio → faded derivatives → render → join → BGM → final normalize → encoded-output quality gate |
-| produce | `data/audio/` | IndexTTS pipeline, narration safety/quality lints, TTS provenance |
+| produce | `audio/` | IndexTTS pipeline, narration safety/quality lints, TTS provenance |
 | publish | `youtube/` | OAuth, resumable upload, list/delete/thumbnail |
 | tools | `tools/` | isolated external AI tool envs + vendored ffmpeg/uv/git-lfs |
-| shared | `images/`, `utils/` | thumbnail compose, panel context packs, archive/result helpers |
+| shared | `images/`, `utils/` | thumbnail candidate ranking + composition (panels only, no image generation), recap title checks, panel context packs, archive/result helpers |
 
 ## Architecture (what calls what)
 

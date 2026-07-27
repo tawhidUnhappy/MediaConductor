@@ -310,7 +310,9 @@ The catalog exposes **49 tools** from `mediaconductor/command_spec.py`. Every to
 ### Thumbnail & Publishing (7)
 | Tool | Required | Purpose |
 | --- | --- | --- |
-| `thumbnail_compose` | `base`, `output` | Compose 1280×720 thumbnail from approved source panel. |
+| `thumbnail_candidates` | `project_root` | Shortlist panels worth using as a thumbnail base + contact sheets. Ranking is a proposal — open and choose. |
+| `thumbnail_compose` | `base`, `output` | Compose a 1280×720 thumbnail from approved panels: hook text, block arrows, speech bubbles, chapter badge. No image generation. |
+| `title_check` | `titles` | Check recap titles against the house pattern (shape only — truthfulness is yours). |
 | `youtube_profiles` | — | List YouTube account profiles and channel state. |
 | `youtube_status` | — | Check profile status and refresh token. |
 | `youtube_upload` | `project_root`, `video`, `title` | Resumable upload through YouTube profile. Long-running. |

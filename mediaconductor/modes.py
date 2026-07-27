@@ -55,7 +55,8 @@ MANGA_COMMANDS = frozenset({
     "index-tts", "download", "style-detect",
     "gutter-split", "webtoon-split", "webtoon-cutcheck",
     "webtoon-override", "panels-remap", "page-split", "panel-transcript",
-    "thumbnail-compose", "panels-context-pack",
+    "thumbnail-candidates", "thumbnail-compose", "title-check",
+    "panels-context-pack",
 })
 
 MANGA_TOOLS = frozenset({
@@ -68,7 +69,7 @@ MANGA_TOOLS = frozenset({
     "run_full_pipeline", "manga_review", "panel_decisions", "manga_rights",
     "video_validate", "video_chapters", "video_quality",
     "work_status", "work_claim", "work_note", "work_todo", "work_qa",
-    "work_artifacts", "thumbnail_compose",
+    "work_artifacts", "thumbnail_candidates", "thumbnail_compose", "title_check",
 })
 
 
