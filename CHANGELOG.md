@@ -166,6 +166,35 @@ rather than an assertion.** Both changes are breaking.
 
 ### Fixed
 
+- **`setup` registered no workspace on a fresh clone, disabling the guard
+  against stray data trees.** `register_workspace()` accepted a directory only
+  if it contained `config.json` — but `config.json` is gitignored and
+  optional, so a just-cloned checkout has none. Registration silently did
+  nothing (no marker, no message), and every later command run from another
+  directory resolved its data root to *that* directory, which is precisely the
+  second-library-tree incident the registration mechanism exists to prevent,
+  reintroduced by the check meant to guard it. Found by cloning onto a wiped
+  disk and following `docs/setup.md` literally: after a clean `setup`,
+  `mediaconductor where` run from `C:\Users\me` reported
+  `data_root: C:\Users\me\data`. A workspace is now recognised by any of three
+  signals (`config.json`, an existing `data/`, or a MediaConductor source
+  checkout), `setup` creates `data/` before registering so the signal exists,
+  and a failure to register now prints a loud warning instead of passing
+  silently.
+- `config.system.example.json` advertised `video` (resolution, fps, encoder),
+  `audio`, `watermark`, and `process_panels` sections that **no code reads** —
+  copying the example and setting `video.fps` did nothing, silently. The last
+  two were leftovers from commands deleted in 3.0.0. The example now carries
+  only the six sections every `load_system_config()` call site actually
+  consumes, and says so.
+- `docs/setup.md` understated the install budget by more than half: the
+  per-tool table claimed ~18 GB total against a measured 30 GB of tool envs
+  plus ~17 GB of `uv` build cache. It now states real on-disk sizes and the
+  ~50 GB free-space requirement, and points at `uv cache prune` for reclaiming
+  the cache.
+- `docs/install.md` still described the pre-3.0 single-folder model and never
+  mentioned `data/` or `runtime/`; `run.sh` / `run.bat` still advertised the
+  "MCP router" removed in 3.0.0.
 - `video-quality` loudness measurement was silently discarded by ffmpeg's
   `-loglevel error`, which suppresses `loudnorm`'s JSON summary, and digital
   silence (`-inf`) would have serialized as invalid JSON.

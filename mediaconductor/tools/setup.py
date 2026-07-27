@@ -130,24 +130,38 @@ def main() -> int:
             print(f"\n[setup] interrupted — re-run `{CLI_NAME} setup` to resume.", file=sys.stderr)
             return 1
 
-    # 3. Register the workspace so later commands run from any cwd still
-    #    resolve data/ here instead of the caller's directory.
-    from pathlib import Path
-
-    from mediaconductor.config import PROJECT_ROOT, register_workspace
-
-    for workspace_candidate in (Path.cwd(), PROJECT_ROOT):
-        marker = register_workspace(workspace_candidate)
-        if marker is not None:
-            print(f"\nWorkspace registered: {workspace_candidate.resolve()} ({marker})")
-            break
-
-    # 4. Create the data/ tree with its README, so the folder explains itself
+    # 3. Create the data/ tree with its README, so the folder explains itself
     #    before anything has been produced — the point at which someone is
     #    most likely to go looking for "where will my videos end up".
+    #    This runs BEFORE registration on purpose: an existing data/ is one of
+    #    the signals that marks a directory as a workspace, and a frozen
+    #    install has no pyproject.toml to fall back on.
+    from pathlib import Path
+
     from mediaconductor.layout import ensure_data_root
 
     data_root = ensure_data_root()
+
+    # 4. Register the workspace so later commands run from any cwd still
+    #    resolve data/ here instead of the caller's directory. Registration
+    #    failing is not cosmetic — it is how a command run from the wrong
+    #    directory ends up creating a second library tree somewhere else — so
+    #    say so loudly rather than continuing in silence.
+    from mediaconductor.config import PROJECT_ROOT, register_workspace
+
+    registered = None
+    for workspace_candidate in (Path.cwd(), PROJECT_ROOT):
+        marker = register_workspace(workspace_candidate)
+        if marker is not None:
+            registered = workspace_candidate.resolve()
+            print(f"\nWorkspace registered: {registered} ({marker})")
+            break
+    if registered is None:
+        print(f"\n[WARN] could not register a workspace (tried {Path.cwd().resolve()} and "
+              f"{PROJECT_ROOT}). Commands run from another directory will resolve their "
+              f"data root to that directory instead of here. Set "
+              f"MEDIACONDUCTOR_PROJECT_ROOT, or re-run setup from the install root.",
+              file=sys.stderr)
 
     # 5. Readiness report.
     report = doctor()

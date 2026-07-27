@@ -1,70 +1,38 @@
 {
-  "_comment": "Copy to config.system.json and tune for your machine/project.",
+  "_comment": "Copy to config.system.json for machine-wide defaults. ONLY the keys below are read by the code — verified against every load_system_config() call site. Render settings (resolution, fps, encoder, background style, blur) are CLI flags on `mediaconductor video` / `video-render`, not config keys; setting them here would silently do nothing.",
+
   "download_defaults": {
     "translated_language": "en",
     "use_data_saver": false,
     "download_delay": 0.5
   },
+
   "bgm": {
+    "_comment": "volume_db is how far the bed sits BELOW the measured narration loudness. Keep new values within -20..-32; -30 is the shipped default.",
     "directory": "bgm",
     "file": null,
     "volume_db": -30
   },
+
+  "tts": {
+    "_comment": "engine: auto | indextts | kokoro. speaker_wav is the voice-clone reference IndexTTS needs; with none, `--tts auto` falls back to Kokoro.",
+    "engine": "auto",
+    "speaker_wav": null
+  },
+
   "manga_video": {
+    "_comment": "audio_source stays 'faded' in production: raw clip edges click. 'raw' is a diagnostic override.",
     "audio_source": "faded",
     "audio_fade_ms": 8.0
   },
-  "video": {
-    "width": 1920,
-    "height": 1080,
-    "fps": 24,
-    "background_style": "blur",
-    "blur_backend": "auto",
-    "blur_downscale": 4,
-    "blur_sigma": 28.0,
-    "background_brightness": -0.06,
-    "background_saturation": 1.08,
-    "background_image": "background_image/BACKGROUND.png",
-    "encoder": {
-      "nvenc_cq": 19,
-      "nvenc_preset": "p6",
-      "libx264_crf": 18,
-      "libx264_preset": "slow",
-      "aac_bitrate": "256k",
-      "bgm_bitrate": "192k"
-    }
-  },
-  "audio": {
-    "sample_rate": 48000,
-    "channels": 1,
-    "tail_silence_ms": 80
-  },
-  "paths": {
-    "library_subdir": "library",
-    "panels_subdir": "panels",
-    "audio_subdir": "audio",
-    "processed_subdir": "panels_processed"
-  },
-  "process_panels": {
-    "upscale": false,
-    "upscale_factor": 4,
-    "mirror": false,
-    "hide_bubbles": false,
-    "inpaint_radius": 5
-  },
-  "watermark": {
-    "enabled": false,
-    "text": "MyChannel",
-    "opacity": 0.55,
-    "font_size": 48,
-    "padding": 20
-  },
-  "tts": {
-    "engine": "auto",
-    "speaker_wav": null,
-    "use_raw_narration": true
-  },
+
   "cut_page": {
+    "_comment": "Fallback panel reading order when the source language is unknown. `download` normally records it in manga.json and page-split resolves it automatically.",
     "reading_direction": "rtl"
+  },
+
+  "paths": {
+    "_comment": "library_subdir renames data/library/. It is validated as a relative subpath, so it cannot escape data/.",
+    "library_subdir": "library"
   }
 }

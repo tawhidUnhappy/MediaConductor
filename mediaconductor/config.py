@@ -34,6 +34,33 @@ class ConfigError(RuntimeError):
     """
 
 
+def looks_like_workspace(root: Path) -> bool:
+    """Whether *root* is a directory this install may treat as its workspace.
+
+    ``config.json`` used to be the only accepted evidence, which quietly broke
+    the whole registration mechanism on a fresh clone: ``config.json`` is
+    gitignored and optional, so a just-cloned checkout has none, ``setup``
+    refused to register it, and a command run from any other directory then
+    resolved its data root to *that* directory — the second-library-tree
+    incident the registration exists to prevent, reintroduced by the check
+    meant to guard it.
+
+    Any one of three signals is enough, because each means "a human or
+    ``setup`` has committed to this directory":
+
+    * ``config.json`` — an explicitly configured workspace;
+    * ``data/`` — a workspace that has already produced something;
+    * a source checkout of MediaConductor itself (``pyproject.toml`` beside
+      the ``mediaconductor`` package), which is where a dev install lives.
+    """
+    root = Path(root)
+    if (root / "config.json").is_file():
+        return True
+    if (root / "data").is_dir():
+        return True
+    return (root / "pyproject.toml").is_file() and (root / "mediaconductor").is_dir()
+
+
 def _registered_workspace() -> Path | None:
     """The workspace `setup` registered for this install, if still valid.
 
@@ -53,14 +80,15 @@ def _registered_workspace() -> Path | None:
         root = Path(str(recorded["workspace_root"])).expanduser().resolve()
     except (OSError, ValueError, KeyError, TypeError):
         return None
-    return root if (root / "config.json").is_file() else None
+    return root if looks_like_workspace(root) else None
 
 
 def _project_root() -> Path:
     """Resolve the workspace root. Priority:
 
     1. ``MEDIACONDUCTOR_PROJECT_ROOT`` — explicit always wins.
-    2. The cwd, when it actually is a workspace (has ``config.json``).
+    2. The cwd, when it actually is a workspace (see
+       :func:`looks_like_workspace`).
     3. The workspace registered by ``mediaconductor setup`` (workspace.json).
     4. A source checkout's own root, when it is a workspace.
     5. The cwd (legacy behavior — lets ``download --name`` bootstrap anywhere).
@@ -84,7 +112,7 @@ def _project_root() -> Path:
         from mediaconductor.tools.external import app_root
 
         checkout = app_root()
-        if (checkout / "config.json").is_file():
+        if looks_like_workspace(checkout):
             return checkout
     return cwd
 
@@ -92,13 +120,13 @@ def _project_root() -> Path:
 def register_workspace(root: Path) -> Path | None:
     """Record *root* as this install's workspace (used by resolution step 3).
 
-    Only roots that look like a workspace (have ``config.json``) are recorded;
+    Only roots that :func:`looks_like_workspace` accepts are recorded;
     returns the marker path on success, None when skipped/unwritable.
     """
     from mediaconductor.layout import state_root
 
     root = root.expanduser().resolve()
-    if not (root / "config.json").is_file():
+    if not looks_like_workspace(root):
         return None
     marker = state_root() / "workspace.json"
     try:

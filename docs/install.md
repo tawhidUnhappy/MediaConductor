@@ -93,21 +93,40 @@ mediaconductor install-tool index-tts
 mediaconductor install-tool magi-v3
 ```
 
-Everything MediaConductor writes — installed AI tools, models, settings, logs, and
-(by default) your projects — lives under one data folder, so deleting it leaves
-no trace. GPU acceleration (NVIDIA CUDA / Apple Silicon) is detected
-automatically. Core video tools and selected models support CPU fallback;
-GPU-only or impractically slow tools are reported by `doctor` for the chosen
-mode. Override the data root with the `MEDIACONDUCTOR_ROOT` environment variable.
+Everything MediaConductor writes stays inside the install — nothing is
+scattered across the system. GPU acceleration (NVIDIA CUDA / Apple Silicon) is
+detected automatically. Core video tools and selected models support CPU
+fallback; GPU-only or impractically slow tools are reported by `doctor` for the
+chosen mode.
 
 ### Where your data lives
 
-| Platform | Data folder (when `MEDIACONDUCTOR_ROOT` is unset) |
+Two folders, and the split is deliberate:
+
+| Folder | Holds | Deleting it |
+|---|---|---|
+| `<install>/data/` | every downloaded chapter, panel, narration, WAV, render, review sheet and job log | **the supported fresh start** (`mediaconductor workspace-reset`) — costs re-work, nothing else |
+| `<install>/runtime/` | AI tool envs, HF/torch/uv caches, install state, YouTube tokens | costs a multi-gigabyte re-download; recover with `mediaconductor setup` |
+
+Your `bgm/`, `vocal/` and config files sit beside both and are never written
+by MediaConductor, so a reset cannot take them with it. Check where a given
+install actually resolved them with `mediaconductor where --json` /
+`mediaconductor workspace-layout`.
+
+`<install>` is the repo root in a source checkout. For a frozen build it is the
+folder holding the executable, unless that location is read-only:
+
+| Platform | `<install>` for a frozen build (when `MEDIACONDUCTOR_ROOT` is unset) |
 |---|---|
-| Windows (frozen) | next to the exe |
-| macOS | `~/Library/Application Support/mangaEasy` (legacy-compatible path) |
-| Linux | `~/.local/share/mangaEasy` (or `$XDG_DATA_HOME/mangaEasy`; legacy-compatible path) |
-| Dev checkout | the repo root |
+| Windows | next to the exe |
+| macOS | next to the exe, or `~/Library/Application Support/mangaEasy` inside a sealed `.app` |
+| Linux | next to the exe, or `~/.local/share/mangaEasy` when that is read-only (AppImage, `/opt`) |
+
+`MEDIACONDUCTOR_ROOT` moves the whole install root. To move just one tree,
+use `MEDIACONDUCTOR_DATA_ROOT` (productions — e.g. onto a larger drive) or
+`MEDIACONDUCTOR_HOME` (tool envs and caches — e.g. shared between checkouts);
+point those at *different* trees, since a reset of one must not delete the
+other.
 
 ---
 

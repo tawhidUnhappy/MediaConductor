@@ -89,17 +89,24 @@ GPU-aware and profile-driven — what gets installed, in order:
    system-wide.
 2. **Hardware detection** — NVIDIA GPU check picks the profile.
 3. **AI tool environments** — each in its own isolated `uv` env under
-   `runtime/tools/`, models included:
+   `runtime/tools/`, models included. Sizes below are **on-disk after
+   install**, measured on a real Windows/CUDA run — each env carries its own
+   torch build, which is why a "small" model still costs gigabytes:
 
-   | Tool env | Installed when | Role | Download budget |
+   | Tool env | Installed when | Role | On disk |
    |---|---|---|---|
-   | `kokoro-82m` | always | CPU TTS (universal fallback voice) | ~1 GB |
-   | `index-tts` | NVIDIA GPU | voice-cloning TTS (the recap voice) | ~6 GB |
-   | `magi-v3` | NVIDIA GPU | panel detection for paged manga | ~4 GB |
-   | `deepseek-ocr2` | NVIDIA GPU | panel OCR (`panel-transcript`) | ~7 GB |
+   | `kokoro-82m` | always | CPU TTS (universal fallback voice) | 4.5 GB |
+   | `index-tts` | NVIDIA GPU | voice-cloning TTS (the recap voice) | 10.6 GB |
+   | `magi-v3` | NVIDIA GPU | panel detection for paged manga | 4.3 GB |
+   | `deepseek-ocr2` | NVIDIA GPU | panel OCR (`panel-transcript`) | 10.6 GB |
 
 4. **Readiness report** — the same data as `mediaconductor doctor --json`, plus
    a `MEDIACONDUCTOR_RESULT` line with per-tool ok/failed status.
+
+**Free disk needed: ~50 GB** for the full GPU profile — 30 GB of tool envs
+plus ~17 GB of `uv` build cache under `runtime/cache/uv/`. The cache is pure
+scratch once the envs exist; `uv cache prune` reclaims most of it without
+touching an installed tool. The CPU profile (Kokoro only) needs ~10 GB.
 
 Useful variants:
 
@@ -160,7 +167,7 @@ use if `--skip-models` was used):
 uv run mediaconductor smoke-test --tts kokoro
 ```
 
-`--keep` leaves `work/smoke_test/` behind for inspection on failure.
+`--keep` leaves `data/work/smoke_test/` behind for inspection on failure.
 
 ### Step 5 — Optional per-channel assets (not in the repo)
 
@@ -195,11 +202,11 @@ produced for a real channel usually want:
 | `uv: command not found` | Step 0 install, then open a fresh shell |
 | `Failed to spawn: mediaconductor` | you left the repo root — `cd` back before `uv run` |
 | `doctor` shows a tool `installed: false` | `mediaconductor install-tool <name>` or re-run `setup` |
-| model download interrupted / partial | re-run `mediaconductor setup` (resumes) |
+| model download interrupted / partial | re-run `mediaconductor setup` (resumes). A Hugging Face `CAS Client Error` / `error decoding response body` mid-download is a transient transfer failure, not a broken install — `doctor` names the missing file and the re-run fetches just that |
 | `ffmpeg not found` in smoke-test | `mediaconductor bootstrap-tools`, re-check `doctor` |
 | GPU expected but `cuda: false` | check `nvidia-smi` works on the host; fix drivers, re-run `setup --cuda` |
 | no GPU at all | fine — CPU profile: TTS = Kokoro, encoding = libx264; `page-split` needs `setup --all` and is slow on CPU |
-| disk pressure | `--skip deepseek-ocr2` saves ~7 GB; `--skip-models` defers the rest |
+| disk pressure | `--skip deepseek-ocr2` saves ~10.6 GB, `--skip index-tts` ~10.6 GB; `--skip-models` defers model weights; `uv cache prune` reclaims most of `runtime/cache/uv/` afterwards |
 | corporate proxy blocks Hugging Face | set `HTTPS_PROXY` before `setup`; caches stay in-tree (`runtime/`) |
 
 ### Where everything lands

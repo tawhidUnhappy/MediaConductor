@@ -57,3 +57,57 @@ def test_stale_registration_is_ignored(tmp_path: Path, monkeypatch):
 def test_register_workspace_refuses_non_workspaces(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "data"))
     assert config.register_workspace(tmp_path / "no_config") is None
+
+
+# ── A fresh clone has no config.json ─────────────────────────────────────────
+# Found by cloning the repo onto a wiped disk and following docs/setup.md:
+# config.json is gitignored, so a just-cloned checkout has none, and requiring
+# it made `setup` register nothing at all. Every later command run from
+# another directory then resolved its data root to *that* directory — the
+# exact second-library-tree incident this whole mechanism exists to prevent.
+
+def _make_fresh_clone(path: Path) -> Path:
+    """A checkout as `git clone` leaves it: no config.json, no data/."""
+    (path / "mediaconductor").mkdir(parents=True, exist_ok=True)
+    (path / "pyproject.toml").write_text("[project]\nname='media-conductor'\n",
+                                         encoding="utf-8")
+    return path
+
+
+def test_a_fresh_clone_is_a_registerable_workspace(tmp_path: Path, monkeypatch):
+    clone = _make_fresh_clone(tmp_path / "clone")
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "home"))
+    assert config.looks_like_workspace(clone)
+    assert config.register_workspace(clone) is not None
+
+
+def test_a_workspace_that_only_has_data_still_counts(tmp_path: Path, monkeypatch):
+    """A frozen install has no pyproject.toml; its evidence is data/."""
+    produced = tmp_path / "produced"
+    (produced / "data").mkdir(parents=True)
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "home"))
+    assert config.looks_like_workspace(produced)
+    assert config.register_workspace(produced) is not None
+
+
+def test_a_fresh_clone_rescues_a_wrong_cwd(tmp_path: Path, monkeypatch):
+    """The end-to-end guarantee docs/setup.md promises, on a clone."""
+    clone = _make_fresh_clone(tmp_path / "clone")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.delenv("MEDIACONDUCTOR_PROJECT_ROOT", raising=False)
+    monkeypatch.setenv("MEDIACONDUCTOR_HOME", str(tmp_path / "home"))
+    assert config.register_workspace(clone) is not None
+    monkeypatch.chdir(elsewhere)
+    assert config._project_root() == clone.resolve()
+
+
+def test_an_arbitrary_directory_is_still_not_a_workspace(tmp_path: Path):
+    """The relaxation must not make every cwd look like a workspace."""
+    plain = tmp_path / "downloads"
+    plain.mkdir()
+    assert not config.looks_like_workspace(plain)
+    # A pyproject alone is some other project, not a MediaConductor checkout.
+    (plain / "pyproject.toml").write_text("[project]\nname='something-else'\n",
+                                          encoding="utf-8")
+    assert not config.looks_like_workspace(plain)
