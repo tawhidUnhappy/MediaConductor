@@ -151,4 +151,9 @@ def background_music_source() -> dict:
                 "problem": "not set — add bgm.file, or pass --background-music per run"}
     if not path.is_file():
         return {"source": str(path), "track": None, "problem": "file not found"}
+    from mediaconductor.audio.formats import describe_unsupported, is_supported_audio
+
+    if not is_supported_audio(path):
+        return {"source": str(path), "track": None,
+                "problem": describe_unsupported(path, label="music bed")}
     return {"source": str(path), "track": str(path), "problem": None}

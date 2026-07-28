@@ -202,7 +202,8 @@ The narrator voice-clone reference and the music bed are set once in
 ```
 
 `run_full_pipeline` uses them whenever `speaker_wav` / `background_music` are
-omitted, and `add_bgm` no longer requires `background_music` at all. Each value
+omitted, and `add_bgm` no longer requires `background_music` at all. Both take
+**any mainstream audio format** (wav, mp3, m4a, aac, flac, ogg, opus, wma, aiff, and anything else ffmpeg reads). Each value
 accepts a **Windows absolute path** (`D:/vocal/n.wav`, `D:\vocal\n.wav`, UNC
 shares), a **Linux absolute path** (`/home/me/vocal/n.wav`), or a path
 **relative to `config.system.json` itself** — never relative to the server's

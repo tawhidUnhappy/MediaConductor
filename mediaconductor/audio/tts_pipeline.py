@@ -36,6 +36,11 @@ from mediaconductor.audio.provenance import (
     stale_reason,
     write_provenance,
 )
+from mediaconductor.audio.formats import (
+    as_pcm_wav,
+    describe_unsupported,
+    is_supported_audio,
+)
 from mediaconductor.config import hf_cache_dir
 from mediaconductor.utils import LazyArchiveRunDir
 from mediaconductor.video_pipeline.item_assets import load_narration, validate_calm_narration
@@ -188,7 +193,10 @@ def main() -> int:
         print(f"[FATAL] Project root not found: {project_root}")
         return 1
     if not speaker_wav.is_file():
-        print(f"[FATAL] Speaker WAV not found: {speaker_wav}")
+        print(f"[FATAL] Speaker reference not found: {speaker_wav}")
+        return 1
+    if not is_supported_audio(speaker_wav):
+        print("[FATAL] " + describe_unsupported(speaker_wav, label="Speaker reference"))
         return 1
 
     selected = item_dirs(project_root, merge_item_selection(args.items, args.item_range))
@@ -256,6 +264,12 @@ def main() -> int:
         print("\n[INFO] All audio already generated.")
         return 0
 
+    # IndexTTS loads the prompt through librosa/torchaudio, whose codec
+    # support varies with how the wheels were built. Hand it PCM and the
+    # user's format stops mattering. The contract above still hashes the
+    # ORIGINAL file, so a conversion never invalidates existing takes.
+    prompt_audio = as_pcm_wav(speaker_wav, audio_root / ".voice_cache")
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     use_cuda = device == "cuda"
     print(f"\n[INFO] Loading IndexTTS2 (device: {device}, speaker: {speaker_wav.name})...", flush=True)
@@ -277,7 +291,7 @@ def main() -> int:
             print(f"  [{i}/{len(to_generate)}] {dst.parent.name}/{dst.name}", flush=True)
             try:
                 tts.infer(
-                    spk_audio_prompt=str(speaker_wav),
+                    spk_audio_prompt=str(prompt_audio),
                     text=text,
                     output_path=str(dst),
                     verbose=False,

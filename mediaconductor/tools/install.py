@@ -860,6 +860,18 @@ def doctor(*, check_updates: bool = False, mode: str | None = None) -> dict:
     }
 
 
+def _speaker_problem(speaker) -> str | None:
+    from mediaconductor.audio.formats import describe_unsupported, is_supported_audio
+
+    if speaker is None:
+        return "not set — add tts.speaker_wav, or pass --speaker-wav per run"
+    if not speaker.is_file():
+        return "file not found"
+    if not is_supported_audio(speaker):
+        return describe_unsupported(speaker, label="voice clone")
+    return None
+
+
 def _configured_media() -> dict:
     """Where the two user-configured media paths actually resolved.
 
@@ -883,12 +895,9 @@ def _configured_media() -> dict:
         "config_file_exists": SYSTEM_CONFIG_FILE.is_file(),
         "tts_engine": default_tts_engine(),
         "speaker_wav": str(speaker) if speaker else None,
-        "speaker_wav_exists": bool(speaker and speaker.is_file()),
-        "speaker_wav_problem": (
-            None if speaker and speaker.is_file()
-            else "not set — add tts.speaker_wav, or pass --speaker-wav per run"
-            if speaker is None else "file not found"
-        ),
+        "speaker_wav_exists": bool(
+            speaker and speaker.is_file() and _speaker_problem(speaker) is None),
+        "speaker_wav_problem": _speaker_problem(speaker),
         "background_music": music["track"],
         "background_music_source": music["source"],
         "background_music_exists": music["track"] is not None,

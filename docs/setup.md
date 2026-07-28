@@ -195,6 +195,11 @@ produced for a real channel usually want:
   itself** — never to the current directory, so one config works from any cwd
   and on either OS. `--speaker-wav` / `--background-music` override per run.
 
+  **Any mainstream audio format works** for both — wav, mp3, m4a, aac, flac, ogg, opus, wma, aiff, and anything
+  else ffmpeg reads. A non-WAV voice reference is transcoded to PCM once and
+  cached, because IndexTTS decodes the prompt through librosa/torchaudio and
+  their codec support varies by machine.
+
   Check what resolved before a long render depends on it:
 
   ```bash

@@ -166,6 +166,9 @@ rather than per run. Put them in `config.system.json` beside the workspace:
 - `bgm.file` — the exact music track, used whenever `--background-music` is
   omitted. Missing ⇒ the video renders with no bed.
 
+Both accept **any mainstream audio format** — wav, mp3, m4a, aac, flac, ogg, opus, wma, aiff, and anything else
+ffmpeg reads; a non-WAV voice reference is transcoded to PCM once and cached.
+
 Each value accepts a **Windows absolute path** (`D:/vocal/n.wav`,
 `D:\vocal\n.wav`, `\\nas\share\n.wav`), a **Linux absolute path**
 (`/home/me/vocal/n.wav`), or a path **relative to `config.system.json`

@@ -7,6 +7,7 @@ from mediaconductor import runtime
 from datetime import datetime
 from pathlib import Path
 
+from mediaconductor.audio.formats import describe_unsupported, is_supported_audio
 from mediaconductor.defaults import (
     configured_background_music,
     default_music_volume_db,
@@ -231,6 +232,8 @@ def main() -> int:
     music = requested_music
     if not requested_music.is_file():
         raise FileNotFoundError(f"Background music not found: {requested_music}")
+    if not is_supported_audio(requested_music):
+        raise ValueError(describe_unsupported(requested_music, label="Background music"))
     if not args.raw_music:
         from mediaconductor.video_pipeline.audio_audit import ffprobe_duration
         from mediaconductor.video_pipeline.music_bed import (
