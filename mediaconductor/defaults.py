@@ -134,3 +134,37 @@ def configured_background_music() -> Path:
 def default_background_music() -> Path | None:
     path = configured_background_music()
     return path if path.is_file() else None
+
+
+def background_music_source() -> dict:
+    """What the user configured, and what it resolved to — reported separately.
+
+    ``configured_background_music()`` falls through to the conventional
+    folders when the configured one yields nothing, which makes it a bad
+    thing to show a user: they set ``bgm.directory: "bgm"``, the folder is
+    empty, and the report names ``media/background-music.wav`` — a path they
+    never wrote, so the real problem (an empty folder) stays hidden.
+    """
+    cfg = _system_config().get("bgm", {})
+    explicit = cfg.get("file") or cfg.get("path")
+    directory = cfg.get("directory") or cfg.get("dir")
+
+    if explicit:
+        source, kind = project_path(explicit), "file"
+    elif directory:
+        source, kind = project_path(directory), "directory"
+    else:
+        source, kind = project_path(DEFAULT_BACKGROUND_MUSIC_DIR), "default directory"
+
+    track = _pick_music_file(source)
+    if track is None and (explicit or directory):
+        # Configured but unusable: say so about the configured path itself.
+        return {"kind": kind, "source": str(source), "track": None,
+                "problem": ("file not found" if kind == "file"
+                            else f"no audio file in {source.name}/"
+                                 if source.is_dir() else "folder not found")}
+    if track is None:
+        track = default_background_music()
+    return {"kind": kind, "source": str(source),
+            "track": str(track) if track else None,
+            "problem": None if track else "no music configured"}

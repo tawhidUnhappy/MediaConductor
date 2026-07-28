@@ -176,3 +176,51 @@ def test_a_missing_configured_track_reports_none_rather_than_a_wrong_file(
     _write_system_config(
         tmp_path, monkeypatch, '{"bgm": {"file": "/mnt/nas/does-not-exist.wav"}}')
     assert defaults.default_background_music() is None
+
+
+# ── Reporting what the user configured, not what we fell back to ─────────────
+
+def test_an_empty_music_folder_is_reported_as_an_empty_music_folder(
+    tmp_path, monkeypatch
+):
+    """Reporting the fallback path hides the real problem.
+
+    The user sets bgm.directory, the folder is empty, and naming
+    `media/background-music.wav` — a path they never wrote — sends them
+    looking in the wrong place.
+    """
+    import mediaconductor.defaults as defaults
+
+    workspace = _write_system_config(
+        tmp_path, monkeypatch, '{"bgm": {"directory": "bgm"}}')
+    (workspace / "bgm").mkdir()
+
+    source = defaults.background_music_source()
+    assert source["kind"] == "directory"
+    assert Path(source["source"]) == workspace / "bgm"
+    assert source["track"] is None
+    assert "no audio file" in source["problem"]
+
+
+def test_a_configured_track_is_reported_as_found(tmp_path, monkeypatch):
+    import mediaconductor.defaults as defaults
+
+    workspace = _write_system_config(
+        tmp_path, monkeypatch, '{"bgm": {"directory": "bgm"}}')
+    (workspace / "bgm").mkdir()
+    (workspace / "bgm" / "bed.wav").write_bytes(b"RIFF")
+
+    source = defaults.background_music_source()
+    assert source["problem"] is None
+    assert Path(source["track"]) == workspace / "bgm" / "bed.wav"
+
+
+def test_a_missing_configured_file_names_that_file(tmp_path, monkeypatch):
+    import mediaconductor.defaults as defaults
+
+    _write_system_config(
+        tmp_path, monkeypatch, '{"bgm": {"file": "D:/music/gone.wav"}}')
+    source = defaults.background_music_source()
+    assert source["kind"] == "file"
+    assert source["source"].replace("\\", "/").lower() == "d:/music/gone.wav"
+    assert source["problem"] == "file not found"

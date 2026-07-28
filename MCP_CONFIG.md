@@ -209,9 +209,10 @@ shares), a **Linux absolute path** (`/home/me/vocal/n.wav`), or a path
 working directory, so one config resolves identically from any launcher.
 
 Call the `doctor` tool and read its `media` block to confirm what resolved:
-`speaker_wav`, `background_music`, and an `_exists` flag for each. Both
-failures are silent otherwise — IndexTTS falls back to Kokoro without a
-reference, and a video renders fine with no bed.
+`speaker_wav`, `background_music` (the track actually found),
+`background_music_source` (what you configured), and an `_exists` flag for
+each. Both failures are silent otherwise — IndexTTS falls back to Kokoro
+without a reference, and a video renders fine with no bed.
 
 Configured defaults are still bound by `--allow-root`: a media file outside the
 allowed roots is refused before the CLI is invoked.

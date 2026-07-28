@@ -174,38 +174,34 @@ uv run mediaconductor smoke-test --tts kokoro
 Nothing below is required — the pipeline runs without them — but recaps
 produced for a real channel usually want:
 
-- **Voice-clone reference WAV** (IndexTTS): a clean ~10–30 s speech sample.
-  Point `config.system.json → tts.speaker_wav` at it, or pass `--speaker-wav`
-  per run. Without it, `--tts auto` falls back to Kokoro.
-- **Background music track**: point `config.system.json → bgm.file` at one
-  track, or `bgm.directory` at a folder (the first audio file wins), or pass
-  `--background-music <path>` per run. It is QC'd, conditioned,
-  loudness-aligned and ducked automatically (see
-  [recap-video-playbook.md](recap-video-playbook.md)).
+- **A narrator voice and a music bed.** Copy `config.system.example.json` to
+  `config.system.json` and fill in two paths:
 
   ```json
   {
     "tts": { "engine": "auto", "speaker_wav": "vocal/narrator.wav" },
-    "bgm": { "directory": "bgm", "file": null, "volume_db": -30 }
+    "bgm": { "file": null, "directory": "bgm", "volume_db": -30 }
   }
   ```
 
-  **Both accept three spellings, on either OS:** a Windows absolute path
-  (`D:/vocal/narrator.wav` or `D:\\vocal\\narrator.wav`, UNC shares included),
-  a Linux absolute path (`/home/me/vocal/narrator.wav`), or a path **relative
-  to `config.system.json` itself** — not to the current directory, so the same
-  config resolves identically no matter where a command is launched from. A
-  per-run `--speaker-wav` / `--background-music` always wins.
+  | Setting | What it is | If it's missing |
+  |---|---|---|
+  | `tts.speaker_wav` | a clean 10–30 s sample of the narrator, cloned by IndexTTS | `--tts auto` falls back to Kokoro |
+  | `bgm.file` *or* `bgm.directory` | one track, or a folder whose first track is used | the video renders with no bed |
 
-  Confirm both resolved the way you meant, before a long render depends on it:
+  Paths may be **absolute** (`D:/vocal/n.wav`, `/home/me/vocal/n.wav`, UNC
+  shares) or **relative to `config.system.json` itself** — never to the
+  current directory, so one config works from any cwd and on either OS.
+  `--speaker-wav` / `--background-music` override per run.
+
+  Check what resolved before a long render depends on it:
 
   ```bash
-  mediaconductor doctor          # "Configured media" — resolved path + found/not-found
+  mediaconductor doctor     # "Configured media" — the path, and whether it exists
   ```
 
-  This matters because both fail *silently*: IndexTTS quietly falls back to
-  Kokoro when the reference is missing, and a video renders perfectly well
-  with no music bed. Both look like success until you listen.
+  Both settings fail *silently* otherwise: IndexTTS drops to Kokoro and the
+  bed just goes missing, and both look like success until you listen.
 - **YouTube upload**: place one downloaded Desktop-app client JSON at the
   `shared_client_file` reported by `mediaconductor youtube-profiles --json`.
   Each named profile keeps its own token/channel; the first live status/upload
