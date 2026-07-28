@@ -8,16 +8,17 @@
   },
 
   "bgm": {
-    "_comment": "volume_db is how far the bed sits BELOW the measured narration loudness. Keep new values within -20..-32; -30 is the shipped default.",
+    "_comment": "Background music bed. `file` is one track and wins; `directory` picks the first audio file in a folder. Both accept a Windows absolute path (\"D:/bgm/tapion.wav\" or \"D:\\\\bgm\\\\tapion.wav\"), a Linux absolute path (\"/home/me/bgm/tapion.wav\"), or a path relative TO THIS FILE (\"bgm/tapion.wav\") — never relative to the current directory. Override per run with --background-music.",
     "directory": "bgm",
     "file": null,
+    "_volume_comment": "volume_db is how far the bed sits BELOW the measured narration loudness. Keep new values within -20..-32; -30 is the shipped default.",
     "volume_db": -30
   },
 
   "tts": {
-    "_comment": "engine: auto | indextts | kokoro. speaker_wav is the voice-clone reference IndexTTS needs; with none, `--tts auto` falls back to Kokoro.",
+    "_comment": "engine: auto | indextts | kokoro. speaker_wav is the IndexTTS voice-clone reference — a clean 10-30s sample of the narrator. With none, `--tts auto` falls back to Kokoro. Same path rules as bgm: Windows absolute, Linux absolute, or relative to THIS FILE. Override per run with --speaker-wav.",
     "engine": "auto",
-    "speaker_wav": null
+    "speaker_wav": "vocal/narrator.wav"
   },
 
   "manga_video": {

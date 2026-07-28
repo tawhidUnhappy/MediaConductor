@@ -1,11 +1,20 @@
-"""Default media paths used by the video and TTS workflows."""
+"""Default media paths used by the video and TTS workflows.
+
+The two the user actually sets are the IndexTTS voice-clone reference
+(``tts.speaker_wav``) and the background music (``bgm.file`` /
+``bgm.directory``) in ``config.system.json``. Both accept a Windows absolute
+path, a Linux absolute path, or a path relative to the config file — see
+:func:`mediaconductor.path_safety.resolve_portable_path` for why the host's
+own ``Path.is_absolute()`` is not good enough.
+"""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from mediaconductor.config import PROJECT_ROOT, SYSTEM_CONFIG_FILE
+from mediaconductor.config import SYSTEM_CONFIG_FILE
+from mediaconductor.path_safety import UnsafePathComponentError, resolve_portable_path
 
 DEFAULT_BACKGROUND_MUSIC = Path("media/background-music.wav")
 DEFAULT_BACKGROUND_MUSIC_DIR = Path("bgm")
@@ -31,9 +40,25 @@ def _system_config() -> dict:
         return {}
 
 
+def config_dir() -> Path:
+    """The directory configured relative paths resolve against.
+
+    The config file's own folder, deliberately — not the cwd. Agents run
+    commands from wherever they happen to be, and ``"vocal/narrator.wav"``
+    has to mean the same file every time.
+    """
+    return SYSTEM_CONFIG_FILE.parent
+
+
 def project_path(value: str | Path) -> Path:
-    path = Path(value)
-    return path if path.is_absolute() else PROJECT_ROOT / path
+    """Resolve a configured media path (Windows-absolute, POSIX-absolute, or
+    relative to the config file)."""
+    try:
+        return resolve_portable_path(str(value), config_dir())
+    except UnsafePathComponentError:
+        # A malformed value must not take the whole command down; the caller
+        # reports "configured file not found" against a path that cannot exist.
+        return config_dir() / "__invalid_configured_path__"
 
 
 def _pick_music_file(path: Path) -> Path | None:
@@ -96,13 +121,12 @@ def configured_background_music() -> Path:
         if chosen is not None:
             return chosen
 
-    chosen = _pick_music_file(DEFAULT_BACKGROUND_MUSIC)
-    if chosen is not None:
-        return chosen
-
-    chosen = _pick_music_file(DEFAULT_BACKGROUND_MUSIC_DIR)
-    if chosen is not None:
-        return chosen
+    # Fall back to the conventional folders — resolved against the config
+    # file too, so a command run from another directory finds the same bed.
+    for fallback in (DEFAULT_BACKGROUND_MUSIC, DEFAULT_BACKGROUND_MUSIC_DIR):
+        chosen = _pick_music_file(project_path(fallback))
+        if chosen is not None:
+            return chosen
 
     return project_path(cfg.get("file") or DEFAULT_BACKGROUND_MUSIC)
 

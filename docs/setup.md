@@ -175,12 +175,37 @@ Nothing below is required — the pipeline runs without them — but recaps
 produced for a real channel usually want:
 
 - **Voice-clone reference WAV** (IndexTTS): a clean ~10–30 s speech sample.
-  Point `config.system.json → tts.speaker_wav` at it, or pass
-  `--speaker-wav` to `mediaconductor video`. Without it, `--tts auto` falls back
-  to Kokoro.
-- **Background music track**: any music file; pass `--background-music
-  <path>`. It is QC'd, conditioned, loudness-aligned and ducked
-  automatically (see [recap-video-playbook.md](recap-video-playbook.md)).
+  Point `config.system.json → tts.speaker_wav` at it, or pass `--speaker-wav`
+  per run. Without it, `--tts auto` falls back to Kokoro.
+- **Background music track**: point `config.system.json → bgm.file` at one
+  track, or `bgm.directory` at a folder (the first audio file wins), or pass
+  `--background-music <path>` per run. It is QC'd, conditioned,
+  loudness-aligned and ducked automatically (see
+  [recap-video-playbook.md](recap-video-playbook.md)).
+
+  ```json
+  {
+    "tts": { "engine": "auto", "speaker_wav": "vocal/narrator.wav" },
+    "bgm": { "directory": "bgm", "file": null, "volume_db": -30 }
+  }
+  ```
+
+  **Both accept three spellings, on either OS:** a Windows absolute path
+  (`D:/vocal/narrator.wav` or `D:\\vocal\\narrator.wav`, UNC shares included),
+  a Linux absolute path (`/home/me/vocal/narrator.wav`), or a path **relative
+  to `config.system.json` itself** — not to the current directory, so the same
+  config resolves identically no matter where a command is launched from. A
+  per-run `--speaker-wav` / `--background-music` always wins.
+
+  Confirm both resolved the way you meant, before a long render depends on it:
+
+  ```bash
+  mediaconductor doctor          # "Configured media" — resolved path + found/not-found
+  ```
+
+  This matters because both fail *silently*: IndexTTS quietly falls back to
+  Kokoro when the reference is missing, and a video renders perfectly well
+  with no music bed. Both look like success until you listen.
 - **YouTube upload**: place one downloaded Desktop-app client JSON at the
   `shared_client_file` reported by `mediaconductor youtube-profiles --json`.
   Each named profile keeps its own token/channel; the first live status/upload

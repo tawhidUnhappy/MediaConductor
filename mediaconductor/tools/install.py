@@ -856,6 +856,36 @@ def doctor(*, check_updates: bool = False, mode: str | None = None) -> dict:
         "gpu_backend": gpu_info.backend,
         "executables": executables,
         "tools": tools,
+        "media": _configured_media(),
+    }
+
+
+def _configured_media() -> dict:
+    """Where the two user-configured media paths actually resolved.
+
+    A path typed into ``config.system.json`` is the one setting whose failure
+    mode is silent: IndexTTS quietly falls back to Kokoro when the voice-clone
+    reference is missing, and a video renders perfectly well with no music
+    bed. Both look like success. Reporting the resolved path *and* whether the
+    file exists turns "why is it not my narrator's voice" into one command.
+    """
+    from mediaconductor.config import SYSTEM_CONFIG_FILE
+    from mediaconductor.defaults import (
+        configured_background_music,
+        default_speaker_wav,
+        default_tts_engine,
+    )
+
+    speaker = default_speaker_wav()
+    music = configured_background_music()
+    return {
+        "config_file": str(SYSTEM_CONFIG_FILE),
+        "config_file_exists": SYSTEM_CONFIG_FILE.is_file(),
+        "tts_engine": default_tts_engine(),
+        "speaker_wav": str(speaker),
+        "speaker_wav_exists": speaker.is_file(),
+        "background_music": str(music),
+        "background_music_exists": music.is_file(),
     }
 
 
@@ -902,6 +932,25 @@ def doctor_main() -> int:
         else:
             status = f"not installed  ->  {CLI_NAME} install-tool {key}"
         print(f"  {key:12s} {status}")
+    print()
+
+    media = report["media"]
+    print("Configured media (config.system.json):")
+    if not media["config_file_exists"]:
+        print(f"  [-- ] no config.system.json at {media['config_file']}")
+        print("        Optional — copy config.system.example.json to set a voice-clone")
+        print("        reference and a music bed instead of passing them every run.")
+    for label, path_key, exists_key, hint in (
+        ("voice clone", "speaker_wav", "speaker_wav_exists",
+         "IndexTTS needs this; without it --tts auto falls back to Kokoro"),
+        ("music bed", "background_music", "background_music_exists",
+         "videos render silent-bed without it"),
+    ):
+        mark = "ok " if media[exists_key] else "-- "
+        print(f"  [{mark}] {label:11s} {media[path_key]}")
+        if not media[exists_key]:
+            print(f"        not found — {hint}")
+    print(f"        tts engine: {media['tts_engine']}")
     print()
     print(f"Install a tool with:  {CLI_NAME} install-tool <name>")
     return 0

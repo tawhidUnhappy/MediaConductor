@@ -154,6 +154,17 @@ dispatcher renders it; never `sys.exit` from library code). Note
 
 ## Invariants (each earned by a shipped failure — stories in [docs/history/incidents.md](docs/history/incidents.md))
 
+- **A path a human typed into a config file resolves through
+  `path_safety.resolve_portable_path()`**, never through bare
+  `Path.is_absolute()`. That method answers only for the host: on Windows it
+  calls `/home/me/v.wav` relative, on Linux it calls `D:\vocal\v.wav`
+  relative, and either wrong answer silently rebases a good path under the
+  workspace and then reports the wrong file missing. Relative values anchor to
+  the **config file's own directory** (`defaults.config_dir()`), not the cwd,
+  because agents launch commands from wherever they happen to be. Applies to
+  `tts.speaker_wav` and `bgm.file`/`bgm.directory`; `doctor`'s `media` block
+  reports what each one resolved to and whether it exists, because both fail
+  silently (IndexTTS drops to Kokoro, the bed just goes missing).
 - **New persistent paths resolve through `layout.py`, never by hand**: no
   module composes its own `PROJECT_ROOT / "something"`, and no argparse
   default is a bare relative `Path("work")`. Relative defaults resolved

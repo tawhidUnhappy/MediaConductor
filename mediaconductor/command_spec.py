@@ -503,10 +503,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Mix background music into the already-joined long video (cheap — no re-join). "
         "Writes a new timestamped file unless replace=true.",
         {"project_root": _PROJECT_ROOT, "output_root": _STR,
-         "background_music": {**_STR, "description": "Absolute path to the music file."},
+         "background_music": {**_STR, "description": "Path to the music file. Optional: defaults to config.system.json -> bgm.file, else the first track in bgm.directory. Accepts a Windows absolute path, a Linux absolute path, or a path relative to config.system.json."},
          "music_volume_db": {**_NUM, "description": "Music loudness in dB, negative = quieter (default -30)."},
          "project_name": _STR, "replace": _BOOL},
-        ["project_root", "output_root", "background_music"],
+        ["project_root", "output_root"],
         {"project_root": ("--project-root", "value"), "output_root": ("--output-root", "value"),
          "background_music": ("--background-music", "value"),
          "music_volume_db": ("--music-volume-db", "value"), "project_name": ("--project-name", "value"),
@@ -519,8 +519,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Prefer the single-step tools when iterating.",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR, "items": _ITEMS,
          "tts": {"type": "string", "enum": ["auto", "kokoro", "indextts"]},
-         "speaker_wav": {**_STR, "description": "IndexTTS speaker reference WAV (defaults to "
-                         "config.system.json -> tts.speaker_wav)."},
+         "speaker_wav": {**_STR, "description": "IndexTTS voice-clone reference WAV (a clean 10-30s narrator sample). Optional: defaults to config.system.json -> tts.speaker_wav. Accepts a Windows absolute path, a Linux absolute path, or a path relative to config.system.json. Without one, --tts auto falls back to Kokoro."},
          "skip_audio": {**_BOOL, "description": "Reuse existing narration WAVs instead of "
                         "running TTS; the selected audio_source is still prepared and rendered."},
          "audio_source": {"type": "string", "enum": ["raw", "faded"], "default": "faded",
@@ -540,8 +539,9 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "overwrite_audio": {**_BOOL, "description": "Regenerate narration WAVs that already exist."},
          "overwrite_video": {**_BOOL, "description": "Re-render item videos that already exist — "
                              "REQUIRED after any panel/narration/audio change."},
-         "no_background_music": _BOOL,
-         "background_music": _STR,
+         "no_background_music": {**_BOOL, "description":
+             "Render with no music bed, ignoring the configured default."},
+         "background_music": {**_STR, "description": "Path to the music file. Optional: defaults to config.system.json -> bgm.file, else the first track in bgm.directory. Accepts a Windows absolute path, a Linux absolute path, or a path relative to config.system.json."},
          "music_volume_db": _NUM},
         ["project_root", "audio_root", "output_root"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),

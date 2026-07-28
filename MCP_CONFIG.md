@@ -189,6 +189,35 @@ by name. Run it from the CLI when you mean it.
 
 ---
 
+## 🎙️ Configured voice and music
+
+The narrator voice-clone reference and the music bed are set once in
+`config.system.json`, so tool calls do not have to carry them:
+
+```json
+{
+  "tts": { "engine": "auto", "speaker_wav": "vocal/narrator.wav" },
+  "bgm": { "directory": "bgm", "file": null, "volume_db": -30 }
+}
+```
+
+`run_full_pipeline` uses them whenever `speaker_wav` / `background_music` are
+omitted, and `add_bgm` no longer requires `background_music` at all. Each value
+accepts a **Windows absolute path** (`D:/vocal/n.wav`, `D:\vocal\n.wav`, UNC
+shares), a **Linux absolute path** (`/home/me/vocal/n.wav`), or a path
+**relative to `config.system.json` itself** — never relative to the server's
+working directory, so one config resolves identically from any launcher.
+
+Call the `doctor` tool and read its `media` block to confirm what resolved:
+`speaker_wav`, `background_music`, and an `_exists` flag for each. Both
+failures are silent otherwise — IndexTTS falls back to Kokoro without a
+reference, and a video renders fine with no bed.
+
+Configured defaults are still bound by `--allow-root`: a media file outside the
+allowed roots is refused before the CLI is invoked.
+
+---
+
 ## 🤖 LLM Self-Review & Agent Automation
 
 The MediaConductor MCP server supports **complete autonomous LLM operation**:
@@ -245,7 +274,7 @@ The catalog exposes **49 tools** from `mediaconductor/command_spec.py`. Every to
 | --- | --- | --- |
 | `modes` | — | Show the manga-video catalog, dependencies, and MCP restart command. |
 | `setup` | — | One-command provisioning: core binaries, AI tool envs, model downloads. Long-running. |
-| `doctor` | — | Check ffmpeg/uv/git, GPU backend, installed AI tools. |
+| `doctor` | — | Check ffmpeg/uv/git, GPU backend, installed AI tools, and the resolved `media` block (configured voice-clone WAV + music bed, each with an exists flag). |
 | `where` | — | Resolved paths (`data_root` — the one deletable folder — plus `runtime_home` and `tools_home`) and version. |
 | `workspace_layout` | — | Every resolved persistent root, and whether it stayed in `data/` (production) or `runtime/` (tool envs and caches). |
 | `install_tool` | `name` | Install external AI env: `kokoro-82m`, `index-tts`, `magi-v3`, `deepseek-ocr2`. |
@@ -284,8 +313,8 @@ The catalog exposes **49 tools** from `mediaconductor/command_spec.py`. Every to
 | `generate_audio` | `project_root`, `audio_root` | Kokoro TTS per panel. Long-running. |
 | `render_videos` | `project_root`, `audio_root`, `output_root` | Render item videos from panels + audio. Long-running. |
 | `build_long_video` | `project_root`, `output_root` | Join item videos into one long video. Long-running. |
-| `add_bgm` | `project_root`, `output_root`, `background_music` | Mix background music into joined video. |
-| `run_full_pipeline` | `project_root`, `audio_root`, `output_root` | Complete pipeline: audio → fade → render → join/BGM/normalize → validate. Long-running. |
+| `add_bgm` | `project_root`, `output_root` | Mix background music into joined video. `background_music` is optional — defaults to `config.system.json` → `bgm.file` / `bgm.directory`. |
+| `run_full_pipeline` | `project_root`, `audio_root`, `output_root` | Complete pipeline: audio → fade → render → join/BGM/normalize → validate. `speaker_wav` and `background_music` default to `config.system.json` (`tts.speaker_wav`, `bgm.*`). Long-running. |
 
 ### Validation & QA (4)
 | Tool | Required | Purpose |

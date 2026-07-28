@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 import re
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 
 
 class UnsafePathComponentError(ValueError):
@@ -84,6 +84,56 @@ def portable_segment_arg(value: str) -> str:
         return validate_portable_segment(value)
     except UnsafePathComponentError as exc:
         raise argparse.ArgumentTypeError(str(exc)) from None
+
+
+_DRIVE_PREFIX_RE = re.compile(r"^[A-Za-z]:/")
+
+
+def is_portable_absolute(value: str) -> bool:
+    """Whether *value* is an absolute path **on either Windows or POSIX**.
+
+    ``Path.is_absolute()`` answers only for the host: on Windows it calls
+    ``/home/me/voice.wav`` relative, on Linux it calls ``D:\\vocal\\v.wav``
+    relative. Either answer silently rebases a perfectly good absolute path
+    under the workspace and then reports the wrong file as missing — so a
+    config file written on one OS cannot be read on the other. Recognised as
+    absolute: a POSIX root (``/media/...``), a Windows drive (``D:\\...`` or
+    ``D:/...``), and a UNC share (``\\\\server\\share`` / ``//server/share``).
+    """
+    text = str(value).strip().replace("\\", "/")
+    if not text:
+        return False
+    return text.startswith("/") or bool(_DRIVE_PREFIX_RE.match(text))
+
+
+def resolve_portable_path(value: str, base: Path) -> Path:
+    """Resolve a user-configured path string against *base*.
+
+    The contract for every path a human types into a config file:
+
+    * absolute in either OS's spelling is taken as-is (see
+      :func:`is_portable_absolute`);
+    * anything else is relative **to the config file's own directory**, not to
+      the current working directory — an agent runs commands from wherever it
+      happens to be, and a relative media path must not follow it around;
+    * ``~`` expands;
+    * backslashes are normalised to ``/``, so one config file works on Windows
+      and Linux. (A POSIX filename containing a literal backslash is legal but
+      pathological, and is not supported here.)
+
+    An absolute path from the other OS is returned unchanged rather than
+    rebased, so it simply does not exist on this host — a visible, honest
+    failure instead of silently reading some other file.
+    """
+    text = str(value).strip().replace("\\", "/")
+    if not text:
+        raise UnsafePathComponentError("configured path must not be empty")
+    if "\x00" in text:
+        raise UnsafePathComponentError("configured path contains a null byte")
+    candidate = Path(text).expanduser()
+    if is_portable_absolute(text) or candidate.is_absolute():
+        return candidate
+    return Path(base) / candidate
 
 
 def portable_prefix_template_arg(value: str) -> str:

@@ -164,6 +164,34 @@ rather than an assertion.** Both changes are breaking.
 - `narration-check` now runs the contract, the quality lints, and panel coverage
   in one report.
 
+### Changed
+
+- **The voice-clone reference and the music bed are configured once, and
+  their paths work on both operating systems.** `config.system.json` →
+  `tts.speaker_wav` and `bgm.file` / `bgm.directory` are used whenever
+  `--speaker-wav` / `--background-music` are omitted — including from the MCP
+  server, where `add_bgm` no longer requires `background_music` at all. Each
+  value accepts a Windows absolute path (`D:/vocal/n.wav`, `D:\vocal\n.wav`,
+  UNC shares), a Linux absolute path, or a path relative to
+  `config.system.json` itself.
+
+  Relative values anchor to the **config file's directory**, not the working
+  directory: an agent runs commands from wherever it happens to be, and
+  `"vocal/narrator.wav"` has to mean the same file every time. Absolute paths
+  are resolved by `path_safety.resolve_portable_path()` rather than
+  `Path.is_absolute()`, which answers only for the host — on Windows it calls
+  `/home/me/v.wav` relative and on Linux it calls `D:\vocal\v.wav` relative,
+  and either wrong answer silently rebases a good path under the workspace and
+  then reports the wrong file as missing. A path that is absolute on the
+  *other* OS is now left absolute and simply reported missing, which is an
+  honest failure instead of a wrong file.
+
+- `doctor` gained a **Configured media** block (`media` in `--json`) reporting
+  the resolved voice-clone WAV and music bed with an exists flag for each.
+  Both settings fail silently otherwise: IndexTTS quietly falls back to Kokoro
+  when the reference is missing, and a video renders perfectly well with no
+  bed — so the first signal used to be listening to a finished render.
+
 ### Fixed
 
 - **`setup` registered no workspace on a fresh clone, disabling the guard

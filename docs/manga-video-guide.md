@@ -149,6 +149,36 @@ for agents — never rely on cwd defaults):
 
 Item selection everywhere: `--items 01 02 05-08` or `--item-range 01-12`.
 
+### The two configured media paths
+
+The narrator voice and the music bed are the two inputs a channel sets once
+rather than per run. Put them in `config.system.json` beside the workspace:
+
+```json
+{
+  "tts": { "engine": "auto", "speaker_wav": "vocal/narrator.wav" },
+  "bgm": { "directory": "bgm", "file": null, "volume_db": -30 }
+}
+```
+
+- `tts.speaker_wav` — the IndexTTS voice-clone reference, used whenever
+  `--speaker-wav` is omitted. Missing ⇒ `--tts auto` silently uses Kokoro.
+- `bgm.file` (one track) or `bgm.directory` (first audio file in it), used
+  whenever `--background-music` is omitted. Missing ⇒ the video renders with
+  no bed.
+
+Each value accepts a **Windows absolute path** (`D:/vocal/n.wav`,
+`D:\vocal\n.wav`, `\\nas\share\n.wav`), a **Linux absolute path**
+(`/home/me/vocal/n.wav`), or a path **relative to `config.system.json`
+itself** — never to the current directory, so the same config resolves the
+same way from any cwd. One config file works unchanged on both OSes; a path
+that is absolute on the *other* OS is left absolute and simply reported
+missing rather than quietly rebased under the workspace.
+
+`mediaconductor doctor` prints a **Configured media** block with the resolved
+path and whether each file exists — check it before a long render, because
+both failures are silent.
+
 **Safety rules an agent must follow:**
 
 - Never create/delete/rename files inside `data/library/` items except
