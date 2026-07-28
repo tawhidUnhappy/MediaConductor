@@ -148,24 +148,25 @@ def test_configured_speaker_wav_keeps_an_absolute_path(tmp_path, monkeypatch):
     assert resolved.lower() == "d:/voices/narrator.wav"
 
 
-def test_configured_background_music_file_wins_and_resolves(tmp_path, monkeypatch):
+def test_configured_background_music_resolves_relative_to_the_config(
+    tmp_path, monkeypatch
+):
     import mediaconductor.defaults as defaults
 
     workspace = _write_system_config(
-        tmp_path, monkeypatch, '{"bgm": {"file": "bgm/bed.wav", "directory": "bgm"}}')
-    (workspace / "bgm").mkdir()
-    (workspace / "bgm" / "bed.wav").write_bytes(b"RIFF")
-    assert defaults.configured_background_music() == workspace / "bgm" / "bed.wav"
-
-
-def test_configured_background_music_directory_picks_a_track(tmp_path, monkeypatch):
-    import mediaconductor.defaults as defaults
-
-    workspace = _write_system_config(
-        tmp_path, monkeypatch, '{"bgm": {"directory": "music"}}')
+        tmp_path, monkeypatch, '{"bgm": {"file": "music/bed.wav"}}')
     (workspace / "music").mkdir()
-    (workspace / "music" / "a.mp3").write_bytes(b"ID3")
-    assert defaults.configured_background_music() == workspace / "music" / "a.mp3"
+    (workspace / "music" / "bed.wav").write_bytes(b"RIFF")
+    assert defaults.configured_background_music() == workspace / "music" / "bed.wav"
+
+
+def test_configured_background_music_keeps_an_absolute_path(tmp_path, monkeypatch):
+    import mediaconductor.defaults as defaults
+
+    _write_system_config(
+        tmp_path, monkeypatch, '{"bgm": {"file": "D:/music/theme.wav"}}')
+    resolved = str(defaults.configured_background_music()).replace("\\", "/")
+    assert resolved.lower() == "d:/music/theme.wav"
 
 
 def test_a_missing_configured_track_reports_none_rather_than_a_wrong_file(
@@ -178,41 +179,44 @@ def test_a_missing_configured_track_reports_none_rather_than_a_wrong_file(
     assert defaults.default_background_music() is None
 
 
-# ── Reporting what the user configured, not what we fell back to ─────────────
+# ── Nothing is guessed ───────────────────────────────────────────────────────
+# Folder scanning was removed: picking "the first audio file in bgm/" made the
+# bed under a finished video depend on directory ordering, and no fallback
+# location may be invented on the user's behalf.
 
-def test_an_empty_music_folder_is_reported_as_an_empty_music_folder(
-    tmp_path, monkeypatch
-):
-    """Reporting the fallback path hides the real problem.
-
-    The user sets bgm.directory, the folder is empty, and naming
-    `media/background-music.wav` — a path they never wrote — sends them
-    looking in the wrong place.
-    """
+def test_unset_music_is_unset_not_a_guessed_location(tmp_path, monkeypatch):
     import mediaconductor.defaults as defaults
 
-    workspace = _write_system_config(
-        tmp_path, monkeypatch, '{"bgm": {"directory": "bgm"}}')
+    workspace = _write_system_config(tmp_path, monkeypatch, '{"bgm": {"volume_db": -30}}')
+    # A folder that the old fallback would have happily scanned.
     (workspace / "bgm").mkdir()
+    (workspace / "bgm" / "whatever.wav").write_bytes(b"RIFF")
 
-    source = defaults.background_music_source()
-    assert source["kind"] == "directory"
-    assert Path(source["source"]) == workspace / "bgm"
-    assert source["track"] is None
-    assert "no audio file" in source["problem"]
+    assert defaults.configured_background_music() is None
+    assert defaults.default_background_music() is None
+    assert defaults.background_music_source()["source"] is None
 
 
-def test_a_configured_track_is_reported_as_found(tmp_path, monkeypatch):
+def test_unset_speaker_wav_is_unset_not_a_guessed_location(tmp_path, monkeypatch):
     import mediaconductor.defaults as defaults
 
-    workspace = _write_system_config(
-        tmp_path, monkeypatch, '{"bgm": {"directory": "bgm"}}')
-    (workspace / "bgm").mkdir()
-    (workspace / "bgm" / "bed.wav").write_bytes(b"RIFF")
+    workspace = _write_system_config(tmp_path, monkeypatch, '{"tts": {"engine": "auto"}}')
+    (workspace / "media").mkdir()
+    (workspace / "media" / "speaker-reference.wav").write_bytes(b"RIFF")
 
-    source = defaults.background_music_source()
-    assert source["problem"] is None
-    assert Path(source["track"]) == workspace / "bgm" / "bed.wav"
+    assert defaults.default_speaker_wav() is None
+
+
+def test_the_removed_directory_key_fails_loudly(tmp_path, monkeypatch):
+    """Silently ignoring a stale key would leave a video with no bed and no
+    explanation — the exact failure the key was removed to prevent."""
+    import mediaconductor.defaults as defaults
+
+    _write_system_config(tmp_path, monkeypatch, '{"bgm": {"directory": "bgm"}}')
+    with pytest.raises(defaults.ConfiguredMediaError, match="no longer supported"):
+        defaults.configured_background_music()
+    # doctor still reports rather than crashing.
+    assert "no longer supported" in defaults.background_music_source()["problem"]
 
 
 def test_a_missing_configured_file_names_that_file(tmp_path, monkeypatch):
@@ -221,6 +225,5 @@ def test_a_missing_configured_file_names_that_file(tmp_path, monkeypatch):
     _write_system_config(
         tmp_path, monkeypatch, '{"bgm": {"file": "D:/music/gone.wav"}}')
     source = defaults.background_music_source()
-    assert source["kind"] == "file"
     assert source["source"].replace("\\", "/").lower() == "d:/music/gone.wav"
     assert source["problem"] == "file not found"

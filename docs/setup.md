@@ -179,20 +179,21 @@ produced for a real channel usually want:
 
   ```json
   {
-    "tts": { "engine": "auto", "speaker_wav": "vocal/narrator.wav" },
-    "bgm": { "file": null, "directory": "bgm", "volume_db": -30 }
+    "tts": { "engine": "auto", "speaker_wav": "D:/vocal/narrator.wav" },
+    "bgm": { "file": "D:/music/theme.wav", "volume_db": -30 }
   }
   ```
 
   | Setting | What it is | If it's missing |
   |---|---|---|
   | `tts.speaker_wav` | a clean 10–30 s sample of the narrator, cloned by IndexTTS | `--tts auto` falls back to Kokoro |
-  | `bgm.file` *or* `bgm.directory` | one track, or a folder whose first track is used | the video renders with no bed |
+  | `bgm.file` | the exact music track to use | the video renders with no bed |
 
-  Paths may be **absolute** (`D:/vocal/n.wav`, `/home/me/vocal/n.wav`, UNC
-  shares) or **relative to `config.system.json` itself** — never to the
-  current directory, so one config works from any cwd and on either OS.
-  `--speaker-wav` / `--background-music` override per run.
+  Each is **one exact file you name** — nothing is auto-discovered, and
+  unset simply means unset. Paths may be **absolute** (`D:/vocal/n.wav`,
+  `/home/me/vocal/n.wav`, UNC shares) or **relative to `config.system.json`
+  itself** — never to the current directory, so one config works from any cwd
+  and on either OS. `--speaker-wav` / `--background-music` override per run.
 
   Check what resolved before a long render depends on it:
 

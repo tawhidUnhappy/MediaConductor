@@ -1,11 +1,19 @@
 """Default media paths used by the video and TTS workflows.
 
-The two the user actually sets are the IndexTTS voice-clone reference
-(``tts.speaker_wav``) and the background music (``bgm.file`` /
-``bgm.directory``) in ``config.system.json``. Both accept a Windows absolute
-path, a Linux absolute path, or a path relative to the config file — see
+The two the user sets are the IndexTTS voice-clone reference
+(``tts.speaker_wav``) and the background music (``bgm.file``) in
+``config.system.json``. **Each is one exact file, named by the user.** They
+accept a Windows absolute path, a Linux absolute path, or a path relative to
+the config file — see
 :func:`mediaconductor.path_safety.resolve_portable_path` for why the host's
 own ``Path.is_absolute()`` is not good enough.
+
+Nothing is guessed. There is no folder scanning and no conventional-location
+fallback: an earlier version picked "the first audio file in ``bgm/``" and
+fell back to ``media/background-music.wav``, which meant the bed under a
+finished video depended on directory ordering, and a report naming that
+fallback pointed at a path the user had never written. Unset means unset —
+the render simply has no music, and says so.
 """
 
 from __future__ import annotations
@@ -16,9 +24,6 @@ from pathlib import Path
 from mediaconductor.config import SYSTEM_CONFIG_FILE
 from mediaconductor.path_safety import UnsafePathComponentError, resolve_portable_path
 
-DEFAULT_BACKGROUND_MUSIC = Path("media/background-music.wav")
-DEFAULT_BACKGROUND_MUSIC_DIR = Path("bgm")
-DEFAULT_SPEAKER_WAV = Path("media/speaker-reference.wav")
 # -30 keeps the bed comfortably in the background for long-form recap
 # watching (previously -26, then -28, both still read as too present over a
 # full video per viewer feedback). -26 to -22 suits punchier or sparser edits
@@ -28,7 +33,6 @@ DEFAULT_NARRATION_VOLUME = 1.2
 DEFAULT_TTS_ENGINE = "auto"
 DEFAULT_MANGA_VIDEO_AUDIO_SOURCE = "faded"
 DEFAULT_MANGA_VIDEO_AUDIO_FADE_MS = 8.0
-_MUSIC_EXTS = {".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 
 
 def _system_config() -> dict:
@@ -61,19 +65,19 @@ def project_path(value: str | Path) -> Path:
         return config_dir() / "__invalid_configured_path__"
 
 
-def _pick_music_file(path: Path) -> Path | None:
-    if path.is_file():
-        return path
-    if path.is_dir():
-        for candidate in sorted(path.iterdir()):
-            if candidate.is_file() and candidate.suffix.lower() in _MUSIC_EXTS:
-                return candidate
-    return None
+class ConfiguredMediaError(ValueError):
+    """A config media key is set to something unusable (e.g. a removed key)."""
 
 
-def default_speaker_wav() -> Path:
-    cfg = _system_config().get("tts", {})
-    return project_path(cfg.get("speaker_wav") or DEFAULT_SPEAKER_WAV)
+def default_speaker_wav() -> Path | None:
+    """The configured voice-clone reference, or None when unset.
+
+    None means "no voice configured", not "look somewhere sensible" — an
+    implicit ``media/speaker-reference.wav`` fallback only ever produced a
+    confusing "not found" for a path the user never chose.
+    """
+    value = _system_config().get("tts", {}).get("speaker_wav")
+    return project_path(value) if str(value or "").strip() else None
 
 
 def default_tts_engine() -> str:
@@ -106,65 +110,45 @@ def default_manga_video_audio_fade_ms() -> float:
     return value if value > 0 else DEFAULT_MANGA_VIDEO_AUDIO_FADE_MS
 
 
-def configured_background_music() -> Path:
+def configured_background_music() -> Path | None:
+    """The configured music track, or None when unset.
+
+    One exact file the user named. ``bgm.directory`` is deliberately gone:
+    picking "the first audio file in a folder" made the bed under a finished
+    video depend on directory ordering, and nothing in the render reported
+    which track had won.
+    """
     cfg = _system_config().get("bgm", {})
-    explicit = cfg.get("file") or cfg.get("path")
-    directory = cfg.get("directory") or cfg.get("dir")
-
-    if explicit:
-        chosen = _pick_music_file(project_path(explicit))
-        if chosen is not None:
-            return chosen
-
-    if directory:
-        chosen = _pick_music_file(project_path(directory))
-        if chosen is not None:
-            return chosen
-
-    # Fall back to the conventional folders — resolved against the config
-    # file too, so a command run from another directory finds the same bed.
-    for fallback in (DEFAULT_BACKGROUND_MUSIC, DEFAULT_BACKGROUND_MUSIC_DIR):
-        chosen = _pick_music_file(project_path(fallback))
-        if chosen is not None:
-            return chosen
-
-    return project_path(cfg.get("file") or DEFAULT_BACKGROUND_MUSIC)
+    if cfg.get("directory") or cfg.get("dir"):
+        raise ConfiguredMediaError(
+            "config.system.json -> bgm.directory is no longer supported: a folder "
+            "scan makes the music bed depend on directory ordering. Set bgm.file "
+            "to the exact track instead (any absolute path on this machine, or a "
+            "path relative to config.system.json)."
+        )
+    value = cfg.get("file") or cfg.get("path")
+    return project_path(value) if str(value or "").strip() else None
 
 
 def default_background_music() -> Path | None:
+    """The configured track, but only when it actually exists on disk."""
     path = configured_background_music()
-    return path if path.is_file() else None
+    return path if path is not None and path.is_file() else None
 
 
 def background_music_source() -> dict:
-    """What the user configured, and what it resolved to — reported separately.
+    """What is configured and whether it is usable, for reporting.
 
-    ``configured_background_music()`` falls through to the conventional
-    folders when the configured one yields nothing, which makes it a bad
-    thing to show a user: they set ``bgm.directory: "bgm"``, the folder is
-    empty, and the report names ``media/background-music.wav`` — a path they
-    never wrote, so the real problem (an empty folder) stays hidden.
+    Kept separate from :func:`configured_background_music` so ``doctor`` can
+    say *why* there is no bed without raising on a stale key.
     """
-    cfg = _system_config().get("bgm", {})
-    explicit = cfg.get("file") or cfg.get("path")
-    directory = cfg.get("directory") or cfg.get("dir")
-
-    if explicit:
-        source, kind = project_path(explicit), "file"
-    elif directory:
-        source, kind = project_path(directory), "directory"
-    else:
-        source, kind = project_path(DEFAULT_BACKGROUND_MUSIC_DIR), "default directory"
-
-    track = _pick_music_file(source)
-    if track is None and (explicit or directory):
-        # Configured but unusable: say so about the configured path itself.
-        return {"kind": kind, "source": str(source), "track": None,
-                "problem": ("file not found" if kind == "file"
-                            else f"no audio file in {source.name}/"
-                                 if source.is_dir() else "folder not found")}
-    if track is None:
-        track = default_background_music()
-    return {"kind": kind, "source": str(source),
-            "track": str(track) if track else None,
-            "problem": None if track else "no music configured"}
+    try:
+        path = configured_background_music()
+    except ConfiguredMediaError as exc:
+        return {"source": None, "track": None, "problem": str(exc)}
+    if path is None:
+        return {"source": None, "track": None,
+                "problem": "not set — add bgm.file, or pass --background-music per run"}
+    if not path.is_file():
+        return {"source": str(path), "track": None, "problem": "file not found"}
+    return {"source": str(path), "track": str(path), "problem": None}

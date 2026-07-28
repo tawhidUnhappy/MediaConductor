@@ -18,15 +18,20 @@ def test_default_background_music_uses_explicit_file(tmp_path, monkeypatch):
     assert defaults.default_background_music() == music
 
 
-def test_default_background_music_picks_first_file_from_directory(tmp_path, monkeypatch):
+def test_a_directory_is_refused_rather_than_scanned(tmp_path, monkeypatch):
+    """Folder pickup is gone: which track ended up under a finished video
+    depended on directory ordering, and nothing reported which one won."""
+    import pytest
+
     cfg = tmp_path / "config.system.json"
     bgm_dir = tmp_path / "bgm"
     bgm_dir.mkdir()
-    (bgm_dir / "b_track.wav").write_bytes(b"b")
     (bgm_dir / "a_track.mp3").write_bytes(b"a")
     _write_system_config(cfg, {"directory": str(bgm_dir), "volume_db": -26})
     monkeypatch.setattr(defaults, "SYSTEM_CONFIG_FILE", cfg)
-    assert defaults.default_background_music() == bgm_dir / "a_track.mp3"
+
+    with pytest.raises(defaults.ConfiguredMediaError, match="no longer supported"):
+        defaults.default_background_music()
 
 
 def test_manga_video_audio_defaults_to_faded_eight_ms(tmp_path, monkeypatch):

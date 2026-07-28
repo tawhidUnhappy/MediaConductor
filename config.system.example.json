@@ -1,18 +1,17 @@
 {
   "//": "Copy to config.system.json and edit. Every setting is optional.",
-  "// paths": "Absolute (D:/vocal/n.wav or /home/me/vocal/n.wav) or relative to this file (vocal/n.wav).",
+  "// paths": "Each is one exact file. Absolute (D:/vocal/n.wav or /home/me/vocal/n.wav) or relative to this file (vocal/n.wav). Nothing is auto-discovered.",
   "// check": "Run `mediaconductor doctor` to see what each path resolved to. Reference: docs/setup.md",
 
   "tts": {
-    "//": "Narrator voice. speaker_wav = a clean 10-30s sample to clone. No file means Kokoro.",
+    "//": "Narrator voice. speaker_wav = a clean 10-30s sample to clone. Unset means Kokoro.",
     "engine": "auto",
-    "speaker_wav": "vocal/narrator.wav"
+    "speaker_wav": "D:/vocal/narrator.wav"
   },
 
   "bgm": {
-    "//": "Music bed. Set file for one track, or directory to use the first track in it.",
-    "file": null,
-    "directory": "bgm",
+    "//": "Music bed. file = the exact track to use. Unset means no music.",
+    "file": "D:/music/theme.wav",
     "volume_db": -30
   },
 

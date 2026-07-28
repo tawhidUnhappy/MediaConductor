@@ -57,7 +57,13 @@ def shard_item_names(names: list[str], shards: int) -> list[list[str]]:
 def main() -> int:
     args = parse_args()
     args.gpu_workers = clamp_gpu_workers(args.gpu_workers)
-    speaker_wav = (args.speaker_wav or _default_speaker_wav()).resolve()
+    configured = args.speaker_wav or _default_speaker_wav()
+    if configured is None:
+        print("[FATAL] IndexTTS needs a voice-clone reference. Set "
+              "config.system.json -> tts.speaker_wav to the exact WAV, or pass "
+              "--speaker-wav <path>.")
+        return 1
+    speaker_wav = configured.resolve()
     project_root = args.project_root.resolve()
 
     selected = item_dirs(project_root, merge_item_selection(args.items, args.item_range))

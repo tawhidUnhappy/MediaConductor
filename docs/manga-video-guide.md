@@ -156,16 +156,15 @@ rather than per run. Put them in `config.system.json` beside the workspace:
 
 ```json
 {
-  "tts": { "engine": "auto", "speaker_wav": "vocal/narrator.wav" },
-  "bgm": { "directory": "bgm", "file": null, "volume_db": -30 }
+  "tts": { "engine": "auto", "speaker_wav": "D:/vocal/narrator.wav" },
+  "bgm": { "file": "D:/music/theme.wav", "volume_db": -30 }
 }
 ```
 
 - `tts.speaker_wav` — the IndexTTS voice-clone reference, used whenever
   `--speaker-wav` is omitted. Missing ⇒ `--tts auto` silently uses Kokoro.
-- `bgm.file` (one track) or `bgm.directory` (first audio file in it), used
-  whenever `--background-music` is omitted. Missing ⇒ the video renders with
-  no bed.
+- `bgm.file` — the exact music track, used whenever `--background-music` is
+  omitted. Missing ⇒ the video renders with no bed.
 
 Each value accepts a **Windows absolute path** (`D:/vocal/n.wav`,
 `D:\vocal\n.wav`, `\\nas\share\n.wav`), a **Linux absolute path**

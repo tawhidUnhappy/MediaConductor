@@ -221,8 +221,13 @@ def main() -> int:
         video_out = (args.output or default_bgm_output(video_in, args.music_volume_db)).resolve()
 
     requested_music = args.background_music or configured_background_music()
+    if requested_music is None:
+        raise FileNotFoundError(
+            "No background music. Set config.system.json -> bgm.file to the exact "
+            "track, or pass --background-music <path>."
+        )
     if args.background_music is None:
-        print(f"[bgm] using default background music: {requested_music}", flush=True)
+        print(f"[bgm] using configured background music: {requested_music}", flush=True)
     music = requested_music
     if not requested_music.is_file():
         raise FileNotFoundError(f"Background music not found: {requested_music}")

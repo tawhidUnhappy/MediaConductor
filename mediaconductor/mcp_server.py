@@ -300,14 +300,22 @@ def _enforce_workspace_policy(
         _require_allowed_path(PROJECT_ROOT, "configured workspace", allowed_roots)
     if tool in {"add_bgm", "run_full_pipeline"} and not arguments.get("background_music"):
         if tool != "run_full_pipeline" or not arguments.get("no_background_music"):
-            from mediaconductor.defaults import configured_background_music
-            _require_allowed_path(
-                configured_background_music(), "configured background music", allowed_roots
+            from mediaconductor.defaults import (
+                ConfiguredMediaError,
+                configured_background_music,
             )
+            try:
+                configured_music = configured_background_music()
+            except ConfiguredMediaError as exc:
+                raise ValueError(str(exc)) from None
+            if configured_music is not None:
+                _require_allowed_path(
+                    configured_music, "configured background music", allowed_roots
+                )
     if tool == "run_full_pipeline" and not arguments.get("speaker_wav"):
         from mediaconductor.defaults import default_speaker_wav
         speaker = default_speaker_wav()
-        if speaker.is_file():
+        if speaker is not None and speaker.is_file():
             _require_allowed_path(speaker, "configured speaker WAV", allowed_roots)
 
 

@@ -882,13 +882,15 @@ def _configured_media() -> dict:
         "config_file": str(SYSTEM_CONFIG_FILE),
         "config_file_exists": SYSTEM_CONFIG_FILE.is_file(),
         "tts_engine": default_tts_engine(),
-        "speaker_wav": str(speaker),
-        "speaker_wav_exists": speaker.is_file(),
-        # What was configured, and the track it actually yielded — reported
-        # apart so an empty folder reads as an empty folder.
-        "background_music_source": music["source"],
-        "background_music_kind": music["kind"],
+        "speaker_wav": str(speaker) if speaker else None,
+        "speaker_wav_exists": bool(speaker and speaker.is_file()),
+        "speaker_wav_problem": (
+            None if speaker and speaker.is_file()
+            else "not set — add tts.speaker_wav, or pass --speaker-wav per run"
+            if speaker is None else "file not found"
+        ),
         "background_music": music["track"],
+        "background_music_source": music["source"],
         "background_music_exists": music["track"] is not None,
         "background_music_problem": music["problem"],
     }
@@ -945,20 +947,18 @@ def doctor_main() -> int:
         print(f"  [-- ] no config.system.json at {media['config_file']}")
         print("        Optional — copy config.system.example.json to set a voice-clone")
         print("        reference and a music bed instead of passing them every run.")
-    mark = "ok " if media["speaker_wav_exists"] else "-- "
-    print(f"  [{mark}] voice clone {media['speaker_wav']}")
-    if not media["speaker_wav_exists"]:
-        print("        not found — IndexTTS needs this; without it --tts auto "
-              "falls back to Kokoro")
-
-    if media["background_music_exists"]:
-        print(f"  [ok ] music bed   {media['background_music']}")
-    else:
-        # Name the path the user configured, not the fallback they never wrote.
-        print(f"  [-- ] music bed   {media['background_music_source']} "
-              f"({media['background_music_kind']})")
-        print(f"        {media['background_music_problem']} — videos render "
-              f"with no bed until a track is there")
+    for label, path_key, exists_key, problem_key, consequence in (
+        ("voice clone", "speaker_wav", "speaker_wav_exists", "speaker_wav_problem",
+         "--tts auto falls back to Kokoro"),
+        ("music bed", "background_music_source", "background_music_exists",
+         "background_music_problem", "videos render with no bed"),
+    ):
+        if media[exists_key]:
+            print(f"  [ok ] {label:11s} {media[path_key]}")
+        else:
+            # Name the path the user configured — never a guessed one.
+            print(f"  [-- ] {label:11s} {media[path_key] or '(not set)'}")
+            print(f"        {media[problem_key]}; {consequence}")
     print(f"        tts engine: {media['tts_engine']}")
     print()
     print(f"Install a tool with:  {CLI_NAME} install-tool <name>")

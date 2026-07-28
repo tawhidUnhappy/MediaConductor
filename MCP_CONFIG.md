@@ -196,8 +196,8 @@ The narrator voice-clone reference and the music bed are set once in
 
 ```json
 {
-  "tts": { "engine": "auto", "speaker_wav": "vocal/narrator.wav" },
-  "bgm": { "directory": "bgm", "file": null, "volume_db": -30 }
+  "tts": { "engine": "auto", "speaker_wav": "D:/vocal/narrator.wav" },
+  "bgm": { "file": "D:/music/theme.wav", "volume_db": -30 }
 }
 ```
 
@@ -314,7 +314,7 @@ The catalog exposes **49 tools** from `mediaconductor/command_spec.py`. Every to
 | `generate_audio` | `project_root`, `audio_root` | Kokoro TTS per panel. Long-running. |
 | `render_videos` | `project_root`, `audio_root`, `output_root` | Render item videos from panels + audio. Long-running. |
 | `build_long_video` | `project_root`, `output_root` | Join item videos into one long video. Long-running. |
-| `add_bgm` | `project_root`, `output_root` | Mix background music into joined video. `background_music` is optional — defaults to `config.system.json` → `bgm.file` / `bgm.directory`. |
+| `add_bgm` | `project_root`, `output_root` | Mix background music into joined video. `background_music` is optional — defaults to `config.system.json` → `bgm.file`. |
 | `run_full_pipeline` | `project_root`, `audio_root`, `output_root` | Complete pipeline: audio → fade → render → join/BGM/normalize → validate. `speaker_wav` and `background_music` default to `config.system.json` (`tts.speaker_wav`, `bgm.*`). Long-running. |
 
 ### Validation & QA (4)

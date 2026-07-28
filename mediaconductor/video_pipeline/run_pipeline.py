@@ -58,10 +58,16 @@ def resolve_tts_engine(choice: str, speaker_wav: Path | None) -> str:
         print("[tts:auto] index-tts found, but model checkpoints are missing -> Kokoro")
         print(f"           (re-run: {CLI_NAME} install-tool index-tts)")
         return "kokoro"
-    ref = (speaker_wav or _default_speaker_wav()).resolve()
-    if not ref.is_file():
+    configured = speaker_wav or _default_speaker_wav()
+    if configured is None:
         print("[tts:auto] GPU + IndexTTS ready, but no speaker reference WAV -> Kokoro")
-        print(f"           (expected {ref}; set config.system.json -> tts.speaker_wav or pass --speaker-wav)")
+        print("           (set config.system.json -> tts.speaker_wav to the exact WAV, "
+              "or pass --speaker-wav)")
+        return "kokoro"
+    ref = configured.resolve()
+    if not ref.is_file():
+        print("[tts:auto] GPU + IndexTTS ready, but the speaker reference WAV is missing -> Kokoro")
+        print(f"           (configured: {ref})")
         return "kokoro"
     print(f"[tts:auto] NVIDIA GPU + IndexTTS installed -> IndexTTS (speaker: {ref.name})")
     return "indextts"
