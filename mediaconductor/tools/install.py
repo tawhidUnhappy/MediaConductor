@@ -898,6 +898,11 @@ def _configured_media() -> dict:
         "speaker_wav_exists": bool(
             speaker and speaker.is_file() and _speaker_problem(speaker) is None),
         "speaker_wav_problem": _speaker_problem(speaker),
+        # A configured voice that the selected engine cannot use is a silent
+        # mismatch: Kokoro has one fixed voice and ignores the reference
+        # entirely, so the render sounds nothing like the sample and nothing
+        # says why.
+        "speaker_wav_ignored": bool(speaker and default_tts_engine() == "kokoro"),
         "background_music": music["track"],
         "background_music_source": music["source"],
         "background_music_exists": music["track"] is not None,
@@ -964,6 +969,11 @@ def doctor_main() -> int:
     ):
         if media[exists_key]:
             print(f"  [ok ] {label:11s} {media[path_key]}")
+            if path_key == "speaker_wav" and media["speaker_wav_ignored"]:
+                print("        NOTE: tts.engine is 'kokoro', which has one fixed "
+                      "voice and ignores this reference.")
+                print("              Set tts.engine to 'auto' or 'indextts' to "
+                      "actually clone it.")
         else:
             # Name the path the user configured — never a guessed one.
             print(f"  [-- ] {label:11s} {media[path_key] or '(not set)'}")

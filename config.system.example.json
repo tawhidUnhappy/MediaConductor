@@ -1,40 +1,34 @@
 {
-  "//": "Copy to config.system.json and edit. Every setting is optional.",
-  "// paths": "Each is one exact file. Absolute (D:/vocal/n.wav or /home/me/vocal/n.wav) or relative to this file (vocal/n.wav). Nothing is auto-discovered.",
-  "// formats": "Any mainstream audio format: wav, mp3, m4a, aac, flac, ogg, opus, wma, aiff and anything else ffmpeg reads.",
-  "// check": "Run `mediaconductor doctor` to see what each path resolved to. Reference: docs/setup.md",
+  "//": "Copy to config.system.json. Every setting is optional; these are the defaults. What each one does: docs/setup.md#config-reference",
 
   "tts": {
-    "//": "Narrator voice. speaker_wav = a clean 10-30s sample to clone. Unset means Kokoro.",
     "engine": "auto",
-    "speaker_wav": "D:/vocal/narrator.wav"
+    "speaker_wav": null
   },
 
   "bgm": {
-    "//": "Music bed. file = the exact track to use. Unset means no music.",
-    "file": "D:/music/theme.wav",
+    "file": null,
     "volume_db": -30
   },
 
   "download_defaults": {
-    "//": "MangaDex fetch. Leave download_delay alone - the politeness spacing is deliberate.",
     "translated_language": "en",
+    "use_data_saver": false,
     "download_delay": 0.5
   },
 
   "manga_video": {
-    "//": "Keep audio_source 'faded'. Raw clip edges click; 'raw' is for diagnosis only.",
     "audio_source": "faded",
     "audio_fade_ms": 8.0
   },
 
   "cut_page": {
-    "//": "Panel reading order, used only when the source language is unknown.",
     "reading_direction": "rtl"
   },
 
   "paths": {
-    "//": "Renames data/library/ if you want a different folder name.",
-    "library_subdir": "library"
+    "library_subdir": "library",
+    "panels_subdir": "panels",
+    "audio_subdir": "audio"
   }
 }

@@ -175,7 +175,8 @@ Nothing below is required — the pipeline runs without them — but recaps
 produced for a real channel usually want:
 
 - **A narrator voice and a music bed.** Copy `config.system.example.json` to
-  `config.system.json` and fill in two paths:
+  `config.system.json` and set two paths — see the
+  [config reference](#config-reference) below for every setting:
 
   ```json
   {
@@ -184,30 +185,14 @@ produced for a real channel usually want:
   }
   ```
 
-  | Setting | What it is | If it's missing |
-  |---|---|---|
-  | `tts.speaker_wav` | a clean 10–30 s sample of the narrator, cloned by IndexTTS | `--tts auto` falls back to Kokoro |
-  | `bgm.file` | the exact music track to use | the video renders with no bed |
-
-  Each is **one exact file you name** — nothing is auto-discovered, and
-  unset simply means unset. Paths may be **absolute** (`D:/vocal/n.wav`,
-  `/home/me/vocal/n.wav`, UNC shares) or **relative to `config.system.json`
-  itself** — never to the current directory, so one config works from any cwd
-  and on either OS. `--speaker-wav` / `--background-music` override per run.
-
-  **Any mainstream audio format works** for both — wav, mp3, m4a, aac, flac, ogg, opus, wma, aiff, and anything
-  else ffmpeg reads. A non-WAV voice reference is transcoded to PCM once and
-  cached, because IndexTTS decodes the prompt through librosa/torchaudio and
-  their codec support varies by machine.
-
-  Check what resolved before a long render depends on it:
+  Both fail *silently* when unset or wrong: IndexTTS drops to Kokoro and the
+  bed just goes missing, and both look like success until you listen. Check
+  what resolved before a long render depends on it:
 
   ```bash
   mediaconductor doctor     # "Configured media" — the path, and whether it exists
   ```
 
-  Both settings fail *silently* otherwise: IndexTTS drops to Kokoro and the
-  bed just goes missing, and both look like success until you listen.
 - **YouTube upload**: place one downloaded Desktop-app client JSON at the
   `shared_client_file` reported by `mediaconductor youtube-profiles --json`.
   Each named profile keeps its own token/channel; the first live status/upload
@@ -221,6 +206,47 @@ produced for a real channel usually want:
   project name `download --url` derives from the manga title (the CLI
   prints an `[INFO]` when that happens; agents should pass `--name`
   explicitly instead).
+
+### Config reference
+
+`config.system.json` holds machine-wide defaults. **Every setting is
+optional** — the file itself is optional, and the values below are the
+defaults. These are all of them; nothing else in the file is read.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `tts.engine` | `"auto"` | `auto` (IndexTTS when GPU + model + `speaker_wav` are all present, else Kokoro), or force `indextts` / `kokoro`. |
+| `tts.speaker_wav` | `null` | Voice-clone reference for IndexTTS: a clean 10–30 s sample of the narrator. Ignored by Kokoro, which has a fixed voice. |
+| `bgm.file` | `null` | The music bed. Unset means the video renders with no music. |
+| `bgm.volume_db` | `-30` | How far the bed sits **below** the measured narration loudness. Keep within −20…−32. |
+| `download_defaults.translated_language` | `"en"` | MangaDex translation language. |
+| `download_defaults.use_data_saver` | `false` | Fetch MangaDex's smaller data-saver images instead of originals. |
+| `download_defaults.download_delay` | `0.5` | Seconds between image downloads. **Leave it alone** — the spacing is MangaDex politeness, not a speed knob. |
+| `manga_video.audio_source` | `"faded"` | `faded` uses the 8 ms edge-faded derivatives (raw clip edges click). `raw` is a diagnostic override. |
+| `manga_video.audio_fade_ms` | `8.0` | Length of those edge fades. |
+| `cut_page.reading_direction` | `"rtl"` | Panel order fallback, used only when the source language is unknown; `download` normally records it in `manga.json`. |
+| `paths.library_subdir` | `"library"` | Renames `data/library/`. |
+| `paths.panels_subdir` | `"panels"` | Renames the per-chapter panel folder. |
+| `paths.audio_subdir` | `"audio"` | Renames the per-chapter audio folder. |
+
+**The two media paths** (`tts.speaker_wav`, `bgm.file`) are each **one exact
+file you name** — nothing is auto-discovered, and unset means unset. Each
+accepts:
+
+- a **Windows absolute path** — `D:/vocal/n.wav`, `D:\vocal\n.wav`, or a UNC share `\\nas\music\n.wav`;
+- a **Linux absolute path** — `/home/me/vocal/n.wav`;
+- a path **relative to `config.system.json` itself** — `vocal/n.wav`, never
+  relative to the current directory, so one config works from any cwd.
+
+Both take **any mainstream audio format**: wav, mp3, m4a, aac, flac, ogg,
+opus, wma, aiff, and anything else ffmpeg reads. A non-WAV voice reference is
+transcoded to PCM once and cached, because IndexTTS decodes the prompt
+through librosa/torchaudio and their codec support varies by machine.
+
+`--speaker-wav` / `--background-music` override the configured values per run.
+
+Render settings (resolution, fps, encoder, background style, blur) are **CLI
+flags** on `mediaconductor video` / `video-render`, not config keys.
 
 ### Fix loop summary
 
