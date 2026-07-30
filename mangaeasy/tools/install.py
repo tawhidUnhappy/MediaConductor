@@ -123,7 +123,16 @@ TOOLS: dict[str, ToolSpec] = {
         env_deps=[
             "torch>=2.5.0",
             "torchvision>=0.20.0",
-            "transformers>=4.41,<5.0",
+            # Upper bound is load-bearing, not caution. transformers 4.50
+            # removed the GenerationMixin fallback from PreTrainedModel:
+            # models must now inherit GenerationMixin explicitly to get
+            # .generate(). magiv3's remote code is Florence-2 derived and
+            # predates that — `Florence2LanguageForConditionalGeneration`
+            # inherits only Florence2LanguagePreTrainedModel — so on 4.50+
+            # every detection died with "object has no attribute 'generate'"
+            # deep inside the model's own generate() call. We do not control
+            # that file; it is downloaded from the Hub at run time.
+            "transformers>=4.41,<4.50",
             "accelerate>=1.12.0",
             "safetensors>=0.4.0",
             "timm>=0.9.0",
@@ -534,6 +543,57 @@ def _required_model_files_present(spec: ToolSpec, dest: Path) -> bool:
     )
 
 
+def _install_torch_cuda_runtime(
+    venv_python: Path, index_url: str, dest: Path, log: LogFn
+) -> None:
+    """Install the ``nvidia-*`` runtime libraries the swapped-in torch needs.
+
+    The CUDA swap above uses ``--no-deps`` on purpose, so uv cannot re-resolve
+    and upgrade unrelated pins (numpy in particular). The cost is that any
+    NVIDIA runtime library the *new* torch requires and the *old* one did not
+    is simply never installed — the env looks complete and then `import torch`
+    dies on a missing shared object.
+
+    That is not hypothetical: torch 2.11+cu128 added a dependency on
+    ``nvidia-nvshmem-cu12``, so IndexTTS installed cleanly and every run failed
+    with ``ImportError: libnvshmem_host.so.3: cannot open shared object file``.
+
+    Rather than hardcode that one package, read the requirements from the torch
+    wheel actually installed and add whichever ``nvidia-*`` ones are missing —
+    still ``--no-deps``, so nothing else in the resolution can move.
+    """
+    read_requires = (
+        "import importlib.metadata as m;"
+        "print('\\n'.join(r.split(';')[0].strip()"
+        " for r in (m.requires('torch') or [])"
+        " if r.lower().startswith('nvidia-')))"
+    )
+    try:
+        result = _run_capture([str(venv_python), "-c", read_requires], dest)
+    except Exception as exc:                                    # noqa: BLE001
+        log(f"[warn] could not read torch's CUDA runtime requirements ({exc}); skipping")
+        return
+
+    wanted = [line.strip() for line in result.splitlines() if line.strip()]
+    if not wanted:
+        return
+    log(f"Ensuring torch's CUDA runtime libraries ({len(wanted)} package(s))…")
+    _run(
+        ["uv", "pip", "install", "--python", str(venv_python),
+         *wanted, "--index-url", index_url, "--no-deps"],
+        log, cwd=dest, env=tool_env(),
+    )
+
+
+def _run_capture(cmd: list[str], cwd: Path) -> str:
+    """Run *cmd* for its stdout, under the isolated tool environment."""
+    result = runtime.run(
+        cmd, cwd=cwd, env=tool_env(), check=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    return result.stdout or ""
+
+
 def _verify_tool_python(dest: Path, import_check: str, log: LogFn) -> None:
     cmd = [*python_command(dest), "-c", f"import {import_check}; print('ok: {import_check}')"]
     _run(cmd, log, cwd=dest, env=tool_env())
@@ -594,6 +654,7 @@ def _install_uv_project(
              "--no-deps"],
             log, cwd=dest, env=tool_env(),
         )
+        _install_torch_cuda_runtime(venv_python, index_url, dest, log)
 
     # Note: torchaudio 2.8+ uses torchcodec for save() but torchcodec ships
     # Linux-only wheels. On Windows we patch torchaudio.save() in tts.py with
