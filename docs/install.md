@@ -1,7 +1,27 @@
 # Installing mangaEasy
 
 mangaEasy is a CLI and MCP server for manga, manhwa, and webtoon recap
-video production. These are the three supported installation paths.
+video production. These are the supported installation paths.
+
+**Want everything in one folder and nothing on the system?** Use
+[portable-setup.md](portable-setup.md) instead — one script, no prerequisites
+beyond bash/curl (or PowerShell), and every cache, model and binary stays
+inside the install directory. Options 1–3 below install normally, sharing the
+system's `PATH` and uv/Hugging Face caches.
+
+---
+
+## Option 0 — Portable, fully isolated (no prerequisites)
+
+```bash
+git clone https://github.com/tawhidUnhappy/mangaEasy.git
+cd mangaEasy
+./bootstrap.sh          # Windows: powershell -ExecutionPolicy Bypass -File bootstrap.ps1
+```
+
+Downloads a portable `uv`, a private Python, the dependencies and portable
+ffmpeg into the folder. Full detail, per-OS download links and an
+agent-followable procedure: [portable-setup.md](portable-setup.md).
 
 ---
 

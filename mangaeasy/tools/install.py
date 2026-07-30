@@ -838,13 +838,20 @@ def doctor(*, check_updates: bool = False, mode: str | None = None) -> dict:
 
     # Persistent state escaping the workspace is invisible until something
     # goes looking for it weeks later; surface it in the readiness report.
+    from mangaeasy.isolation import isolation_report
     from mangaeasy.workspace import layout_report, workspace_problems
 
     layout = layout_report()
+    isolation = isolation_report()
 
     return {
         "tools_home": str(tools_home()),
         "mode": mode,
+        # Whether this install is actually self-contained. A cache pointing at
+        # $HOME is the difference between "delete the folder" and hunting down
+        # 80 GB of models later, and nothing else in this report would show it.
+        "isolated": isolation["isolated"],
+        "isolation": isolation,
         "workspace_root": layout["workspace_root"],
         "workspace_ok": layout["ok"],
         "workspace_problems": workspace_problems(),
@@ -930,6 +937,23 @@ def doctor_main() -> int:
         for problem in report["workspace_problems"]:
             print(f"  [warn] {problem}")
         print(f"  Full report: {CLI_NAME} workspace-layout --json\n")
+
+    isolation = report["isolation"]
+    print("Isolation:")
+    if isolation["isolated"]:
+        print(f"  [ok ] every cache and root resolves inside {isolation['install_root']}")
+        print("        deleting that folder removes this install completely")
+    else:
+        print(f"  [warn] {len(isolation['escaping'])} path(s) resolve OUTSIDE "
+              f"{isolation['install_root']}:")
+        for variable, value in isolation["escaping"].items():
+            print(f"         {variable} -> {value}")
+        if isolation["share_caches"]:
+            print("        MANGAEASY_SHARE_CACHES is set, so ambient cache locations win.")
+            print("        Unset it to keep every download inside the install folder.")
+        else:
+            print(f"        Fix: eval \"$({CLI_NAME} env --sh)\" , or launch via ./run.sh")
+    print()
 
     print("Prerequisites:")
     for exe, where in report["executables"].items():

@@ -45,10 +45,16 @@ def test_long_chapter_stays_under_the_command_line_limit(tmp_path, monkeypatch):
     argv = captured[0]
     assert sum(len(part) + 1 for part in argv) < WINDOWS_COMMAND_LIMIT
 
-    # The graph travels as a file, not as an argument.
-    assert "-filter_complex_script" in argv
+    # The graph travels as a file, not as an argument. Which flag spells that
+    # depends on the ffmpeg in use: FFmpeg 8 removed `-filter_complex_script`
+    # in favour of the generic `-/filter_complex`, so both are accepted here —
+    # what must never appear is the inline `-filter_complex`, which is what
+    # blows the Windows argv limit this test exists to guard.
+    script_flags = [flag for flag in ("-filter_complex_script", "-/filter_complex")
+                    if flag in argv]
+    assert len(script_flags) == 1, f"expected exactly one filter-script flag, got {script_flags}"
     assert "-filter_complex" not in argv
-    script = Path(argv[argv.index("-filter_complex_script") + 1])
+    script = Path(argv[argv.index(script_flags[0]) + 1])
     assert script.is_file()
 
     # And the graph itself is still complete and correct.

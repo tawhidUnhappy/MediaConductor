@@ -6,6 +6,7 @@ name every top-level package so a new package can't appear undocumented."""
 import re
 from pathlib import Path
 
+from mangaeasy.brand import CLI_NAME, LEGACY_CLI_NAME
 from mangaeasy.cli import COMMANDS
 
 REPO = Path(__file__).resolve().parents[1]
@@ -20,6 +21,7 @@ DOCS = [
     REPO / "docs" / "multi-agent.md",
     REPO / "docs" / "thumbnail.md",
     REPO / "docs" / "install.md",
+    REPO / "docs" / "portable-setup.md",
     REPO / "AGENTS.md",
     REPO / "CLAUDE.md",
     REPO / ".claude" / "skills" / "manga-recap" / "SKILL.md",
@@ -36,6 +38,7 @@ LINK_CHECKED_DOCS = [
     REPO / "docs" / "manga-quality-design.md",
     REPO / "docs" / "operate" / "crop-verify-narrate.md",
     REPO / "docs" / "setup.md",
+    REPO / "docs" / "portable-setup.md",
     *sorted((REPO / "skills").rglob("*.md")),
 ]
 
@@ -48,10 +51,13 @@ PROFILE_AWARE_MANGA_DOCS = [
 # markdown [text](target) where target is a relative path (not http/anchor)
 LINK_RE = re.compile(r"\]\((?!https?://|#|mailto:)([^)]+)\)")
 
-# `mangaeasy <token>` (or its legacy alias) where token looks like a subcommand (lowercase,
-# digits, hyphens). Placeholders (`<command>`), flags (`--help`), version
-# numbers, and prose ("mangaEasy CLI") don't match.
-COMMAND_RE = re.compile(r"(?:mangaeasy|mangaeasy) ([a-z][a-z0-9-]*)")
+# `mangaeasy <token>` (or its legacy alias) where token looks like a subcommand
+# (lowercase, digits, hyphens). Placeholders (`<command>`), flags (`--help`),
+# version numbers, and prose ("mangaEasy CLI") don't match. Both spellings come
+# from brand.py so a future rename cannot leave this regex behind.
+COMMAND_RE = re.compile(
+    rf"(?:{CLI_NAME}|{LEGACY_CLI_NAME}) ([a-z][a-z0-9-]*)"
+)
 
 KNOWN_NON_COMMANDS = {"help", "version"}  # CLI built-ins
 

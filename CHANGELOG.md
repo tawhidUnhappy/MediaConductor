@@ -24,8 +24,65 @@ fixes are not.
   - The MCP server name and PyPI distribution are `mangaeasy`; the PyInstaller
     spec is `packaging/mangaeasy.spec` and builds `mangaEasy` / `mangaEasy.app`.
 
+### Added
+
+- **A fully-isolated, zero-prerequisite install.** `bootstrap.sh` /
+  `bootstrap.ps1` need only bash+curl+tar or PowerShell 5 — not even uv. They
+  download a SHA-256-verified portable uv, a private Python, the dependencies
+  and portable ffmpeg/git-lfs, all inside the install folder. Nothing is written
+  to `~/.cache`, `~/.local`, `%LOCALAPPDATA%` or `/usr`, and no `PATH` entry or
+  shell profile is touched: delete the folder and the machine is as it was. See
+  [docs/portable-setup.md](docs/portable-setup.md), which also carries the
+  per-OS download links, an offline procedure and an agent-followable checklist.
+- `mangaeasy env` prints that environment for a shell (`--sh`/`--bat`/`--ps1`/
+  `--json`) so `uv` run by hand inherits it, and `--check` exits non-zero when
+  anything resolves outside the install folder. `where --json` and `doctor` now
+  report isolation too.
+- `mangaeasy tool-downloads` publishes the portable ffmpeg/uv/git-lfs URLs and
+  digests per OS/arch, generated from the same table the downloader verifies
+  against — so a machine with no outbound GitHub access, or an agent doing the
+  fetching, cannot be given a stale link.
+
+### Changed
+
+- **Caches are pinned inside the install folder, and now that actually covers
+  `uv sync`.** `tool_env()` already redirected HF/torch/uv caches for external
+  tool subprocesses, but the main process was unpinned and — the real leak —
+  `uv sync` runs *before any of our Python does*. It is what downloads the
+  interpreter and every wheel, so a fresh setup still wrote ~270 MB to
+  `~/.cache/uv` and `~/.local/share/uv/python`. `mangaeasy/isolation.py` is now
+  the single definition; it is applied at CLI startup and exported in shell by
+  `scripts/isolate.sh` / `scripts/isolate.cmd` before uv is invoked.
+  `tests/test_isolation.py` asserts the two halves agree, because a silent drift
+  here is invisible until a home directory fills up. `MANGAEASY_SHARE_CACHES=1`
+  still opts out.
+- **Core binaries are portable-first.** `ensure_core_tools()` downloads
+  ffmpeg/uv/git-lfs into `runtime/tools/_vendor/` instead of accepting a copy
+  already on `PATH`. A system binary breaks the "delete the folder" promise and
+  makes renders depend on whichever encoders that particular build carries.
+  `bootstrap-tools --system-ok` restores the old behaviour for constrained or
+  offline machines.
+
 ### Fixed
 
+- **Renders died instead of falling back when a hardware encoder was present but
+  unusable.** `ffmpeg -encoders` lists what the binary was *compiled with*, not
+  what it can *open*, and encoder selection trusted the list. The vendored
+  FFmpeg is a rolling `master` build, so it can require a newer NVENC API than
+  the installed driver offers ("Required: 13.1 Found: 13.0"); selection picked
+  `h264_nvenc` and every segment failed on a machine whose libx264 path was
+  fine. `encoder_works()` now probes each candidate with a one-frame encode
+  (cached per process) and says why it skipped one, so "it used the CPU" is
+  distinguishable from "there is no GPU". An explicitly requested encoder is
+  still never substituted.
+- **Long filter graphs broke on current ffmpeg.** FFmpeg 8 *removed*
+  `-filter_complex_script` in favour of the generic `-/filter_complex`, so
+  building the joined narration WAV aborted with "Unrecognized option" before
+  doing any work. `filter_script_args()` picks the spelling this ffmpeg accepts;
+  both must keep working, since the vendored build is rolling master while a
+  distro or Homebrew ffmpeg may be 6.x or 7.x. Passing the graph as a file is
+  not optional — inline, a 160-panel chapter exceeds Windows' 32,767-char argv
+  limit.
 - **Text drawn onto images was unreadable on Linux and macOS.** Six modules
   loaded fonts by bare name (`arialbd.ttf`, `impact.ttf`) or from hardcoded
   Debian/Windows paths. Pillow resolves a bare name only through the host font

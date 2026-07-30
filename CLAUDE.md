@@ -23,6 +23,7 @@ This file is for **changing mangaEasy itself**. For *using* it, begin with
 | CLI/MCP contract for agents | [docs/ai-guide.md](docs/ai-guide.md) |
 | Quality design: what is automated, what needs eyes and ears | [docs/manga-quality-design.md](docs/manga-quality-design.md) |
 | Fresh clone/machine setup + verification | [docs/setup.md](docs/setup.md) |
+| Fully-isolated / portable install (nothing on the system) | [docs/portable-setup.md](docs/portable-setup.md) |
 | Produce a recap series (URL → uploads) | [.claude/skills/manga-recap/SKILL.md](.claude/skills/manga-recap/SKILL.md) |
 | Manga CLI/MCP reference | [docs/manga-video-guide.md](docs/manga-video-guide.md) |
 | Crop → verify → narrate loop details | [docs/operate/crop-verify-narrate.md](docs/operate/crop-verify-narrate.md) |
@@ -37,7 +38,7 @@ Each package has its own README.md with entry points and gotchas.
 
 | Stage | Package / module | What it does |
 |---|---|---|
-| core | `cli.py`, `command_spec.py`, `runtime.py`, `config.py`, `layout.py`, `paths.py`, `library_scan.py`, `series_plan.py`, `mcp_server.py`, `jobs.py`, `workboard.py`, `qa_loop.py`, `workspace.py` | dispatch, shared command schemas, self-spawning, config, **the one on-disk folder map**, batch planning, MCP server, background jobs, multi-agent board, resolved-root reporting + `workspace-reset` |
+| core | `cli.py`, `command_spec.py`, `runtime.py`, `config.py`, `layout.py`, `paths.py`, `isolation.py`, `fonts.py`, `library_scan.py`, `series_plan.py`, `mcp_server.py`, `jobs.py`, `workboard.py`, `qa_loop.py`, `workspace.py` | dispatch, shared command schemas, self-spawning, config, **the one on-disk folder map**, **the one cache-pinning definition**, **the one font resolver**, batch planning, MCP server, background jobs, multi-agent board, resolved-root reporting + `workspace-reset` |
 | gates | `reviews.py`, `panel_decisions.py`, `rights.py` | hash-bound crop/narration/final-video approvals, per-panel omission decisions, the fail-closed rights manifest |
 | acquire | `download/` | MangaDex fetch (polite, resumable, writes `manga.json`) |
 | acquire | `panels/` | crop: `webtoon-split`, `page-split` (MAGI), cutcheck, overrides, remap |
@@ -102,6 +103,26 @@ Each package has its own README.md with entry points and gotchas.
   `tool_env()` **force-pins** HF/torch/uv caches under `<install>/runtime/`
   (opt-out: `MANGAEASY_SHARE_CACHES=1`). `ensure_vendored_path()` at the top
   of cli.py makes bare `"ffmpeg"`-style calls resolve to vendored binaries.
+- **Isolation** (`mangaeasy/isolation.py`): the single definition of which
+  cache variables are pinned and where. `apply()` runs at cli.py startup so
+  mangaEasy's own process — not just tool subprocesses — writes nothing outside
+  the install; `tool_env()` composes it. The catch is that `uv sync` downloads
+  the interpreter and every wheel *before any Python of ours runs*, so the same
+  values must also be exported in shell: `scripts/isolate.sh` /
+  `scripts/isolate.cmd` (sourced by run.sh/run.bat/bootstrap.*) do that, and
+  `tests/test_isolation.py` asserts the shell and Python halves still agree.
+  `shell_exports()` renders them for a user's own shell (`mangaeasy env --sh`),
+  `isolation_report()` backs `mangaeasy env --check`, `where` and `doctor`.
+  **Add a cache variable in isolation.py and the shell files together**, or one
+  tool's downloads quietly land in `$HOME` again.
+- **Portable-first binaries**: `ensure_core_tools()` downloads ffmpeg/uv/git-lfs
+  into `runtime/tools/_vendor/` rather than accepting a system copy
+  (`bootstrap-tools --system-ok` opts out). A system binary breaks "delete the
+  folder and nothing remains", and makes renders depend on whichever encoders
+  that build happens to carry. `bootstrap.sh` / `bootstrap.ps1` need no
+  prerequisites at all: they fetch a SHA-256-verified portable uv first, then a
+  folder-local Python. `tool-downloads --json` publishes the per-OS URLs and
+  digests from the same table the downloader verifies against.
 
 ## Data layout
 
@@ -129,7 +150,9 @@ data/                         ← THE deletable folder. Nothing else is producti
   work/                       scratch incl. jobs/ — video-clean-work clears it
 runtime/                      ← survives a reset; re-creatable with `setup`
   tools/                      isolated AI tool envs (install-tool)
-  cache/                      hf/ torch/ uv/ uv_python/ triton/ torchinductor/ ...
+  tools/_vendor/<tool>/bin/   portable ffmpeg/ffprobe, uv/uvx, git-lfs
+  cache/                      hf/ torch/ uv/ uv_python/ triton/ torchinductor/ xdg/ ...
+                              every one pinned here by isolation.py — nothing in $HOME
   state/workspace.json        which workspace this install points at
   secrets/youtube/            gitignored OAuth tokens
 bgm/ vocal/                   user-owned licensed music and narrator references

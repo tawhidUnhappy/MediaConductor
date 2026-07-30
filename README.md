@@ -54,6 +54,18 @@ Requirements for a source clone are Git and
 core executables into the application data folder. NVIDIA is optional; CPU
 fallbacks work but panel detection and voice cloning are much slower.
 
+### Or: one folder, nothing on the system
+
+`./bootstrap.sh` (macOS/Linux) or `bootstrap.ps1` (Windows) needs **no**
+prerequisites beyond bash+curl / PowerShell — not even uv. It downloads a
+portable uv, a private Python, the dependencies and portable ffmpeg into the
+install folder, and pins every cache (uv wheels, uv interpreters, Hugging Face
+models, torch/Triton) there too. Nothing is written to `~/.cache`, `~/.local`
+or `%LOCALAPPDATA%`, and no `PATH` entry is added; delete the folder and the
+machine is as it was. `mangaeasy env --check` verifies it, `mangaeasy doctor`
+reports it. See [docs/portable-setup.md](docs/portable-setup.md) for per-OS
+download links, an offline procedure, and an agent-followable checklist.
+
 Install the command globally instead:
 
 ```bash

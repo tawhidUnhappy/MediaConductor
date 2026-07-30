@@ -104,6 +104,22 @@ def main() -> int:
         emit_result(dry_run=True, profile=profile, mode=args.mode, gpu=gpu, tools=tools)
         return 0
 
+    # 0. Materialise the cache tree first. Every download after this point is
+    #    directed into it, and some tools fail confusingly rather than
+    #    helpfully when handed a cache path whose parent does not exist.
+    from mangaeasy.isolation import ensure_cache_dirs, isolation_report
+
+    ensure_cache_dirs()
+    isolation = isolation_report()
+    print(f"Install root: {isolation['install_root']}  (everything is written inside it)")
+    if not isolation["isolated"]:
+        print("[WARN] these paths resolve OUTSIDE the install folder and will scatter "
+              "downloads across this machine:", file=sys.stderr)
+        for variable, value in isolation["escaping"].items():
+            print(f"       {variable} -> {value}", file=sys.stderr)
+        print(f"       Launch via ./run.sh, or eval \"$({CLI_NAME} env --sh)\" first.",
+              file=sys.stderr)
+
     # 1. Core binaries — everything after this (git clone, uv sync, hf download)
     #    may rely on them, so a failure here is fatal.
     print("\n=== Core binaries ===")

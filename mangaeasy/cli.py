@@ -20,6 +20,7 @@ import sys
 
 from mangaeasy import __version__
 from mangaeasy.brand import CLI_NAME, LEGACY_CLI_NAME, PRODUCT_NAME, mirror_legacy_environment
+from mangaeasy.isolation import apply as apply_isolation
 from mangaeasy.tools.vendored import ensure_vendored_path
 
 # Legacy MANGAEASY_* configuration keeps working: mirror it onto the new
@@ -31,6 +32,11 @@ mirror_legacy_environment()
 # see mangaeasy/tools/vendored.py. Pure filesystem check, no network access,
 # safe to run unconditionally on every invocation.
 ensure_vendored_path()
+
+# Pin every cache (uv, Hugging Face, torch, Triton, ...) inside this install's
+# own folder before any command runs, so this process and everything it spawns
+# write nowhere else — see mangaeasy/isolation.py. String work only.
+apply_isolation()
 
 
 def _force_utf8_stdio() -> None:
@@ -71,6 +77,8 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "smoke-test":           ("mangaeasy.tools.smoke",                          "main",        "Setup",            "Prove the install works: build and verify a tiny real video (run after setup)."),
     "install-tool":         ("mangaeasy.tools.install",                        "main",        "Setup",            "Install a manga-production AI tool (Kokoro, IndexTTS, MAGI, or DeepSeek OCR)."),
     "bootstrap-tools":      ("mangaeasy.tools.vendored",                       "bootstrap_main", "Setup",         "Download ffmpeg/uv/git-lfs into this install's own tools dir (the setup step runs this when they're missing)."),
+    "tool-downloads":       ("mangaeasy.tools.vendored",                       "downloads_main", "Setup",         "Print the exact portable ffmpeg/uv/git-lfs download URL + SHA-256 for each OS/arch (--json), for manual or agent-driven setup."),
+    "env":                  ("mangaeasy.isolation",                            "main",        "Setup",            "Print the environment that keeps every cache inside this install folder (--sh/--bat/--ps1/--json, --check)."),
 
     # ── Background jobs (the right way to run anything long) ─────────────────
     "job-start":            ("mangaeasy.jobs",                                 "start_main",  "Jobs",             "Start a schema-validated long-running tool as a detached job (--tool NAME --arguments-json OBJECT)."),

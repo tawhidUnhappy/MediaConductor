@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 from mangaeasy import runtime
@@ -88,6 +90,7 @@ def validate_video_stream(path: Path, *, width: int | None = None, height: int |
         print(f"WARNING: unexpected video height for {path}: {stream}", flush=True)
 
 
+@lru_cache(maxsize=1)
 def available_encoders() -> set[str]:
     try:
         result = runtime.run(
@@ -108,14 +111,109 @@ def available_encoders() -> set[str]:
     return encoders
 
 
+@lru_cache(maxsize=8)
+def encoder_works(encoder: str) -> bool:
+    """Whether *encoder* can actually encode a frame on this machine right now.
+
+    ``ffmpeg -encoders`` lists what the binary was **compiled with**, which is
+    not the same as what it can **use**. A hardware encoder that is present in
+    the build still fails to open when the driver is too old for its NVENC API
+    version, when the GPU has no encode silicon, when a container does not map
+    the encode libraries in, or when every encode session is already taken.
+
+    That gap was reachable in practice: the vendored FFmpeg is a rolling
+    ``master`` build, so it can require a newer NVENC API than the installed
+    driver provides (seen as "Driver does not support the required nvenc API
+    version. Required: 13.1 Found: 13.0"). Selection saw ``h264_nvenc`` in the
+    list, chose it, and every render died on the first segment — on a machine
+    whose libx264 path was fine.
+
+    So probe it: one frame from a synthetic source straight to null. Costs a
+    few tens of milliseconds, cached per process, and only ever runs for
+    ``--encoder auto``.
+    """
+    try:
+        runtime.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error",
+                "-f", "lavfi", "-i", "color=c=black:s=64x64:d=1",
+                "-frames:v", "1", "-c:v", encoder,
+                "-f", "null", os.devnull,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except Exception:
+        return False
+    return True
+
+
+@lru_cache(maxsize=1)
+def supports_filter_complex_script() -> bool:
+    """Whether this ffmpeg still accepts the legacy ``-filter_complex_script``.
+
+    Long filter graphs must be passed as a *file*: at ~150 chars per panel a
+    160-panel chapter pushes argv past Windows' 32,767-char limit and ffmpeg
+    never starts (WinError 206). The option that does that was renamed —
+    ``-filter_complex_script FILE`` became the generic ``-/filter_complex
+    FILE`` and the old spelling was **removed** in FFmpeg 8, not merely
+    deprecated. Passing it to a current build aborts with "Unrecognized option"
+    before any work happens.
+
+    Both spellings have to keep working: the vendored build is a rolling
+    ``master`` (new spelling), while a distro or Homebrew ffmpeg a user already
+    has may be 6.x or 7.x (old spelling only).
+    """
+    try:
+        result = runtime.run(
+            ["ffmpeg", "-hide_banner", "-h", "full"],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except Exception:
+        return False
+    return "-filter_complex_script" in (result.stdout or "")
+
+
+def filter_script_args(script: Path) -> list[str]:
+    """argv fragment that reads a filter_complex graph from *script*."""
+    if supports_filter_complex_script():
+        return ["-filter_complex_script", str(script)]
+    return ["-/filter_complex", str(script)]
+
+
+@lru_cache(maxsize=4)
 def choose_h264_encoder(requested: str) -> str:
+    """Resolve ``--encoder``. ``auto`` picks the fastest encoder that *works*.
+
+    An explicit request is honoured as given: someone naming an encoder wants
+    that encoder, and silently substituting another would hide a real
+    misconfiguration behind a slow render.
+
+    Cached because this is called once per rendered segment: without it a
+    160-panel chapter re-ran ``ffmpeg -encoders`` plus a probe per candidate
+    160 times, and printed the same three "unusable encoder" warnings 160
+    times — burying the render log it was meant to explain.
+    """
     if requested != "auto":
         return requested
     encoders = available_encoders()
     for candidate in ("h264_nvenc", "h264_amf", "h264_qsv", "h264_videotoolbox"):
-        if candidate in encoders:
+        if candidate not in encoders:
+            continue
+        if encoder_works(candidate):
             print(f"Auto video encoder: {candidate}", flush=True)
             return candidate
+        # Present but unusable — say why, because "it used the CPU and took
+        # 40 minutes" is otherwise indistinguishable from "there is no GPU".
+        print(f"[warn] {candidate} is built into ffmpeg but cannot open on this "
+              f"machine (driver/GPU/session limit) — skipping it.", flush=True)
     print("Auto video encoder: libx264", flush=True)
     return "libx264"
 

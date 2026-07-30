@@ -401,12 +401,160 @@ def fetch_git_lfs(log: LogFn) -> bool:
     return ok
 
 
+def download_manifest(
+    system: str | None = None,
+    arch: str | None = None,
+    *,
+    all_platforms: bool = False,
+) -> dict:
+    """Every portable core-binary download, as URL + SHA-256 per OS/arch.
+
+    Published as a command (``mangaeasy tool-downloads --json``) because the
+    setup path has a bootstrap problem: someone — or an agent — on a machine
+    with nothing installed needs the exact URL for *their* platform before any
+    of this code can run. Keeping that list in one place means the documented
+    links cannot drift from the ones the downloader actually uses.
+
+    ``ffmpeg`` publishes rolling ``latest`` builds, so its digest is verified
+    against a checksum manifest fetched at download time rather than pinned
+    here; the macOS provider publishes none at all.
+    """
+    detected_system, detected_arch = _platform_arch()
+    entries: list[dict] = []
+
+    for (asset_system, asset_arch), (asset, sha256) in sorted(UV_ASSETS.items()):
+        entries.append({
+            "tool": "uv",
+            "system": asset_system,
+            "arch": asset_arch,
+            "version": UV_VERSION,
+            "url": f"https://github.com/astral-sh/uv/releases/download/{UV_VERSION}/{asset}",
+            "sha256": sha256,
+            "binaries": ["uv.exe", "uvx.exe"] if asset_system == "windows" else ["uv", "uvx"],
+        })
+    for (asset_system, asset_arch), (asset, exe_name, sha256) in sorted(GIT_LFS_ASSETS.items()):
+        entries.append({
+            "tool": "git-lfs",
+            "system": asset_system,
+            "arch": asset_arch,
+            "version": GIT_LFS_VERSION,
+            "url": f"https://github.com/git-lfs/git-lfs/releases/download/v{GIT_LFS_VERSION}/{asset}",
+            "sha256": sha256,
+            "binaries": [exe_name],
+        })
+    for asset_system, asset_arch, url, note in (
+        ("windows", "x64",
+         "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip",
+         "digest verified against the release's checksums.sha256 at download time"),
+        ("linux", "x64",
+         "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz",
+         "digest verified against the release's checksums.sha256 at download time"),
+        ("linux", "arm64",
+         "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linuxarm64-gpl.tar.xz",
+         "digest verified against the release's checksums.sha256 at download time"),
+        ("darwin", "arm64",
+         "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip",
+         "provider publishes no checksums; ffprobe.zip is a second download"),
+        ("darwin", "x64",
+         "https://ffmpeg.martin-riedl.de/redirect/latest/macos/amd64/release/ffmpeg.zip",
+         "provider publishes no checksums; ffprobe.zip is a second download"),
+    ):
+        entries.append({
+            "tool": "ffmpeg",
+            "system": asset_system,
+            "arch": asset_arch,
+            "version": "latest",
+            "url": url,
+            "sha256": None,
+            "note": note,
+            "binaries": (["ffmpeg.exe", "ffprobe.exe"] if asset_system == "windows"
+                         else ["ffmpeg", "ffprobe"]),
+        })
+
+    # Default to this machine — the caller asking "what do I download" almost
+    # always means "here". `all_platforms` is for docs and offline mirroring.
+    want_system = system or detected_system
+    want_arch = arch or detected_arch
+    if not all_platforms:
+        entries = [e for e in entries
+                   if e["system"] == want_system and e["arch"] == want_arch]
+
+    return {
+        "this_system": detected_system,
+        "this_arch": detected_arch,
+        "selected_system": None if all_platforms else want_system,
+        "selected_arch": None if all_platforms else want_arch,
+        "install_dir": str(tools_home() / "_vendor"),
+        "downloads": entries,
+    }
+
+
+def downloads_main() -> int:
+    """`mangaeasy tool-downloads` — where the portable binaries come from."""
+    import argparse
+    import json
+
+    from mangaeasy.brand import CLI_NAME
+
+    parser = argparse.ArgumentParser(
+        prog=f"{CLI_NAME} tool-downloads",
+        description="Print the portable ffmpeg/uv/git-lfs downloads this install "
+                    "uses, with SHA-256 digests. `bootstrap-tools` fetches them "
+                    "automatically; this is for manual, offline or agent-driven setup.",
+    )
+    parser.add_argument("--json", action="store_true", dest="as_json",
+                        help="Emit the manifest as a single JSON object on stdout.")
+    parser.add_argument("--all", action="store_true",
+                        help="Every platform, not just this machine's.")
+    parser.add_argument("--system", choices=("windows", "linux", "darwin"),
+                        help="Filter to one operating system.")
+    parser.add_argument("--arch", choices=("x64", "arm64"), help="Filter to one architecture.")
+    args = parser.parse_args()
+
+    manifest = download_manifest(args.system, args.arch, all_platforms=args.all)
+
+    if args.as_json:
+        print(json.dumps(manifest, ensure_ascii=False))
+        return 0
+
+    print(f"This machine: {manifest['this_system']}/{manifest['this_arch']}")
+    if manifest["selected_system"] is None:
+        print("Showing: every supported platform (--all)")
+    elif (manifest["selected_system"], manifest["selected_arch"]) != (
+            manifest["this_system"], manifest["this_arch"]):
+        print(f"Showing: {manifest['selected_system']}/{manifest['selected_arch']}")
+    print(f"Installed into: {manifest['install_dir']}/<tool>/bin/\n")
+    for entry in manifest["downloads"]:
+        print(f"{entry['tool']} {entry['version']} — {entry['system']}/{entry['arch']}")
+        print(f"  url    : {entry['url']}")
+        print(f"  sha256 : {entry['sha256'] or '(' + entry.get('note', 'not pinned') + ')'}")
+        print(f"  extract: {', '.join(entry['binaries'])}")
+        print()
+    print(f"Everything above is fetched for you by: {CLI_NAME} bootstrap-tools")
+    return 0
+
+
 def bootstrap_main() -> int:
     """`mangaeasy bootstrap-tools` — fetch ffmpeg/uv/git-lfs into this
     install's own tools dir. The installers deliberately don't bundle these
     binaries to keep downloads small; the Setup step (or a dev on a checkout)
     runs this to grab them."""
-    results = ensure_core_tools(print)
+    import argparse
+
+    from mangaeasy.brand import CLI_NAME
+
+    parser = argparse.ArgumentParser(
+        prog=f"{CLI_NAME} bootstrap-tools",
+        description="Download portable ffmpeg/ffprobe, uv/uvx and git-lfs into this "
+                    "install's own tools dir, so none of them has to exist on the system.",
+    )
+    parser.add_argument("--system-ok", action="store_true",
+                        help="Accept a copy already on PATH instead of downloading a "
+                             "portable one. Faster, but the install is no longer "
+                             "self-contained and renders depend on that system build.")
+    args = parser.parse_args()
+
+    results = ensure_core_tools(print, prefer_portable=not args.system_ok)
     ok = all(results.values())
     for name, success in results.items():
         status = "ok" if success else "FAILED (see warning above)"
@@ -417,23 +565,27 @@ def bootstrap_main() -> int:
     return 0 if ok else 1
 
 
-def ensure_core_tools(log: LogFn) -> dict[str, bool]:
-    """Fetch whatever core binaries (ffmpeg, uv, git-lfs) aren't already on
-    PATH and aren't already vendored. Used by `mangaeasy bootstrap-tools`
-    (manual/CI) and as a same-process fallback when something needed at
-    runtime is missing entirely."""
+def ensure_core_tools(log: LogFn, *, prefer_portable: bool = True) -> dict[str, bool]:
+    """Fetch the core binaries (ffmpeg, uv, git-lfs) into this install.
+
+    Portable-first by default: a copy already on PATH is *not* accepted,
+    because a system binary is outside the install folder — it breaks the
+    "delete the folder and nothing remains" promise, it makes renders depend on
+    whatever encoders that particular build happens to have, and it silently
+    changes behaviour when the host upgrades it. Already-vendored binaries are
+    detected and not re-downloaded, so re-running stays cheap.
+
+    ``prefer_portable=False`` (``bootstrap-tools --system-ok``) restores the
+    older "use what's on PATH" behaviour for constrained or offline machines.
+    """
+    def _needed(*executables: str) -> bool:
+        if prefer_portable:
+            return True
+        return not all(shutil.which(exe) for exe in executables)
+
     results = {}
-    if shutil.which("ffmpeg") and shutil.which("ffprobe"):
-        results["ffmpeg"] = True
-    else:
-        results["ffmpeg"] = fetch_ffmpeg(log)
-    if shutil.which("uv") and shutil.which("uvx"):
-        results["uv"] = True
-    else:
-        results["uv"] = fetch_uv(log)
-    if shutil.which("git-lfs"):
-        results["git-lfs"] = True
-    else:
-        results["git-lfs"] = fetch_git_lfs(log)
+    results["ffmpeg"] = fetch_ffmpeg(log) if _needed("ffmpeg", "ffprobe") else True
+    results["uv"] = fetch_uv(log) if _needed("uv", "uvx") else True
+    results["git-lfs"] = fetch_git_lfs(log) if _needed("git-lfs") else True
     ensure_vendored_path()
     return results

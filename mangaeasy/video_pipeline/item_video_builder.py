@@ -19,6 +19,7 @@ from mangaeasy.video_pipeline.item_assets import (
 from mangaeasy.video_pipeline.ffmpeg_tools import (
     choose_h264_encoder,
     ffconcat_path,
+    filter_script_args,
     h264_encoder_args,
     run,
     validate_video_stream,
@@ -244,7 +245,7 @@ def build_item_narration_wav(
     run(
         [
             "ffmpeg", "-hide_banner", "-y", *inputs,
-            "-filter_complex_script", str(filter_script),
+            *filter_script_args(filter_script),
             "-map", "[a]", "-c:a", "pcm_s16le", str(output_path),
         ]
     )

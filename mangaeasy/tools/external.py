@@ -139,9 +139,9 @@ def python_command(tool_dir: Path) -> list[str]:
 
 def _share_caches() -> bool:
     """True when the user opts into inheriting ambient cache locations."""
-    return os.environ.get("MANGAEASY_SHARE_CACHES", "").strip().lower() in (
-        "1", "true", "yes", "on",
-    )
+    from mangaeasy.isolation import share_caches
+
+    return share_caches()
 
 
 def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
@@ -168,29 +168,14 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     venv instead of the tool's, which then can't find what it just
     "successfully" installed.
     """
-    from mangaeasy.layout import cache_dir
+    from mangaeasy.isolation import isolation_env
 
-    env = dict(base or os.environ)
+    # mangaeasy.isolation owns which variables are pinned and where — the same
+    # definition the launchers export before `uv sync`, so the shell side and
+    # the Python side cannot drift apart.
+    env = isolation_env(base or os.environ)
     env.pop("VIRTUAL_ENV", None)
     env.pop("PYTHONHOME", None)
-    hf_cache = cache_dir("hf")
-    # Force these under runtime/cache so an inherited global HF_HOME/UV_CACHE_DIR
-    # can't leak downloads out of the install folder (opt out with
-    # MANGAEASY_SHARE_CACHES=1, which reverts them to setdefault semantics).
-    set_cache = env.setdefault if _share_caches() else env.__setitem__
-    set_cache("HF_HOME", str(hf_cache))
-    set_cache("HF_HUB_CACHE", str(hf_cache / "hub"))
-    set_cache("TRANSFORMERS_CACHE", str(hf_cache / "hub"))
-    set_cache("TORCH_HOME", str(cache_dir("torch")))
-    set_cache("UV_CACHE_DIR", str(cache_dir("uv")))
-    set_cache("UV_PYTHON_INSTALL_DIR", str(cache_dir("uv_python")))
-    set_cache("XDG_CACHE_HOME", str(cache_dir("xdg")))
-    set_cache("TRITON_CACHE_DIR", str(cache_dir("triton")))
-    set_cache("TORCHINDUCTOR_CACHE_DIR", str(cache_dir("torchinductor")))
-    set_cache("TORCH_EXTENSIONS_DIR", str(cache_dir("torch_extensions")))
-    env.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
-    env.setdefault("HF_XET_HIGH_PERFORMANCE", "1")
-    env.setdefault("TOKENIZERS_PARALLELISM", "false")
 
     espeak_root = Path("C:/Program Files/eSpeak NG")
     if espeak_root.exists():
@@ -271,7 +256,7 @@ def where_main() -> int:
     import json
 
     from mangaeasy import __version__
-    from mangaeasy.layout import data_root
+    from mangaeasy.layout import cache_root, data_root
     from mangaeasy.tools.vendored import vendored_bin_dirs
 
     parser = argparse.ArgumentParser(description="Show this install's resolved paths.")
@@ -304,6 +289,15 @@ def where_main() -> int:
                          "MANGAEASY_TOOLS_DIR", "MANGAEASY_DATA_ROOT")
         },
     }
+    # The first question after "where does it put things" is "does any of it
+    # land outside the folder" — answer both in one call rather than two.
+    from mangaeasy.isolation import isolation_report
+
+    isolation = isolation_report()
+    info["isolated"] = isolation["isolated"]
+    info["cache_root"] = str(cache_root())
+    info["caches"] = isolation["caches"]
+    info["escaping"] = isolation["escaping"]
     if args.as_json:
         print(json.dumps(info, ensure_ascii=False))
         return 0
