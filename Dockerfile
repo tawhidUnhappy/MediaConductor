@@ -4,7 +4,7 @@ FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    MEDIACONDUCTOR_ROOT=/data
+    MANGAEASY_ROOT=/data
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg git git-lfs ca-certificates \
@@ -16,5 +16,5 @@ COPY . /app
 RUN uv sync --frozen --no-dev
 
 VOLUME ["/data"]
-ENTRYPOINT ["/app/.venv/bin/mediaconductor"]
+ENTRYPOINT ["/app/.venv/bin/mangaeasy"]
 CMD ["mcp", "--allow-root", "/data"]

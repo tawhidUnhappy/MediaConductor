@@ -11,15 +11,15 @@ title.** The first and third are judgement, and no command does them for you.
 
 ```bash
 # 1. shortlist panels worth opening, with contact sheets
-mediaconductor thumbnail-candidates --project-root data/library/<P> --item-range 01-12 --json
+mangaeasy thumbnail-candidates --project-root data/library/<P> --item-range 01-12 --json
 
 # 2. compose from the one you chose
-mediaconductor thumbnail-compose --base data/library/<P>/03/panels/03_014_02.jpg \
+mangaeasy thumbnail-compose --base data/library/<P>/03/panels/03_014_02.jpg \
     --output data/output/<P>/thumb.png --preset label-arrow --text "VILLAIN" \
     --badge "1-12" --check
 
 # 3. check the title candidates
-mediaconductor title-check "REINCARNATED As VILLAIN But He Just Wants Peace - Manga Recap"
+mangaeasy title-check "REINCARNATED As VILLAIN But He Just Wants Peace - Manga Recap"
 ```
 
 ## 1. Finding the panel
@@ -62,7 +62,7 @@ repeated element in the reference set, and it works because it answers
 "which one?" before the viewer has to parse the picture.
 
 ```bash
-mediaconductor thumbnail-compose --base panel.jpg --output thumb.png \
+mangaeasy thumbnail-compose --base panel.jpg --output thumb.png \
   --preset label-arrow --text "VILLAIN" --badge "1-12" --check
 ```
 
@@ -91,7 +91,7 @@ is the default and is what makes it read as manga lettering rather than a
 caption pasted on top.
 
 ```bash
-mediaconductor thumbnail-compose --base panel.jpg --output thumb.png \
+mangaeasy thumbnail-compose --base panel.jpg --output thumb.png \
   --preset bubble --text "YOU'RE MINE" --check
 ```
 
@@ -106,7 +106,7 @@ reversal, useless for anything subtler — the comparison has to be legible as
 two states in a single glance.
 
 ```bash
-mediaconductor thumbnail-compose --base weak.jpg --base strong.jpg \
+mangaeasy thumbnail-compose --base weak.jpg --base strong.jpg \
   --output thumb.png --preset split --text "WEAK" --text "STRONG" \
   --badge "1-3" --badge-corner top-center --check
 ```
@@ -152,13 +152,13 @@ reads as explicit or as a sexualized minor — most recap source material has
 teenage leads, so that last one is a live constraint, not a formality. **Open
 the PNG at full size and look at it.** A clean `--check` is not a review.
 
-`mediaconductor youtube-thumbnail` replaces a thumbnail on an already-published
+`mangaeasy youtube-thumbnail` replaces a thumbnail on an already-published
 video without re-uploading, so a weak choice is cheap to fix; a published
 misleading one is not.
 
 ## 3. Titles
 
-`mediaconductor title-check --pattern` prints the house pattern in full. The
+`mangaeasy title-check --pattern` prints the house pattern in full. The
 short version:
 
 ```
@@ -188,7 +188,7 @@ Generate several candidates from the approved story beats and check them
 together:
 
 ```bash
-mediaconductor title-check "candidate one" "candidate two" "candidate three" --json
+mangaeasy title-check "candidate one" "candidate two" "candidate three" --json
 ```
 
 `title-check` validates shape only. **A title that passes can still be a

@@ -1,7 +1,7 @@
 {
   "mcpServers": {
-    "media-conductor": {
-      "command": "mediaconductor",
+    "mangaeasy": {
+      "command": "mangaeasy",
       "args": ["mcp", "--allow-root", "D:/MediaProjects"]
     }
   }

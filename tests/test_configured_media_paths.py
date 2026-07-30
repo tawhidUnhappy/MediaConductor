@@ -15,7 +15,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
 
-from mediaconductor.path_safety import (
+from mangaeasy.path_safety import (
     UnsafePathComponentError,
     is_portable_absolute,
     resolve_portable_path,
@@ -125,14 +125,14 @@ def _write_system_config(tmp_path: Path, monkeypatch, payload: str) -> Path:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     (workspace / "config.system.json").write_text(payload, encoding="utf-8")
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     monkeypatch.setattr(defaults, "SYSTEM_CONFIG_FILE", workspace / "config.system.json")
     return workspace
 
 
 def test_configured_speaker_wav_resolves_relative_to_the_config(tmp_path, monkeypatch):
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     workspace = _write_system_config(
         tmp_path, monkeypatch, '{"tts": {"speaker_wav": "vocal/narrator.wav"}}')
@@ -140,7 +140,7 @@ def test_configured_speaker_wav_resolves_relative_to_the_config(tmp_path, monkey
 
 
 def test_configured_speaker_wav_keeps_an_absolute_path(tmp_path, monkeypatch):
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     _write_system_config(
         tmp_path, monkeypatch, '{"tts": {"speaker_wav": "D:/voices/narrator.wav"}}')
@@ -151,7 +151,7 @@ def test_configured_speaker_wav_keeps_an_absolute_path(tmp_path, monkeypatch):
 def test_configured_background_music_resolves_relative_to_the_config(
     tmp_path, monkeypatch
 ):
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     workspace = _write_system_config(
         tmp_path, monkeypatch, '{"bgm": {"file": "music/bed.wav"}}')
@@ -161,7 +161,7 @@ def test_configured_background_music_resolves_relative_to_the_config(
 
 
 def test_configured_background_music_keeps_an_absolute_path(tmp_path, monkeypatch):
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     _write_system_config(
         tmp_path, monkeypatch, '{"bgm": {"file": "D:/music/theme.wav"}}')
@@ -172,7 +172,7 @@ def test_configured_background_music_keeps_an_absolute_path(tmp_path, monkeypatc
 def test_a_missing_configured_track_reports_none_rather_than_a_wrong_file(
     tmp_path, monkeypatch
 ):
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     _write_system_config(
         tmp_path, monkeypatch, '{"bgm": {"file": "/mnt/nas/does-not-exist.wav"}}')
@@ -185,7 +185,7 @@ def test_a_missing_configured_track_reports_none_rather_than_a_wrong_file(
 # location may be invented on the user's behalf.
 
 def test_unset_music_is_unset_not_a_guessed_location(tmp_path, monkeypatch):
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     workspace = _write_system_config(tmp_path, monkeypatch, '{"bgm": {"volume_db": -30}}')
     # A folder that the old fallback would have happily scanned.
@@ -198,7 +198,7 @@ def test_unset_music_is_unset_not_a_guessed_location(tmp_path, monkeypatch):
 
 
 def test_unset_speaker_wav_is_unset_not_a_guessed_location(tmp_path, monkeypatch):
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     workspace = _write_system_config(tmp_path, monkeypatch, '{"tts": {"engine": "auto"}}')
     (workspace / "media").mkdir()
@@ -210,7 +210,7 @@ def test_unset_speaker_wav_is_unset_not_a_guessed_location(tmp_path, monkeypatch
 def test_the_removed_directory_key_fails_loudly(tmp_path, monkeypatch):
     """Silently ignoring a stale key would leave a video with no bed and no
     explanation — the exact failure the key was removed to prevent."""
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     _write_system_config(tmp_path, monkeypatch, '{"bgm": {"directory": "bgm"}}')
     with pytest.raises(defaults.ConfiguredMediaError, match="no longer supported"):
@@ -220,7 +220,7 @@ def test_the_removed_directory_key_fails_loudly(tmp_path, monkeypatch):
 
 
 def test_a_missing_configured_file_names_that_file(tmp_path, monkeypatch):
-    import mediaconductor.defaults as defaults
+    import mangaeasy.defaults as defaults
 
     _write_system_config(
         tmp_path, monkeypatch, '{"bgm": {"file": "D:/music/gone.wav"}}')

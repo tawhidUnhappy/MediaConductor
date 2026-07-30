@@ -1,31 +1,31 @@
-# MediaConductor Manga Video guide
+# mangaEasy Manga Video guide
 
 This is the detailed document an AI assistant needs after selecting the
 `manga-video` mode. Story and Song agents should not load it. Repository
 development conventions live in `CLAUDE.md`; this file is about operating the
 manga pipeline from a shell.
 
-MediaConductor turns folders of images plus a narration script into narrated videos:
+mangaEasy turns folders of images plus a narration script into narrated videos:
 per-chapter ("item") videos, optionally joined into one long video with
 background music, ready for YouTube. Everything is driven by one command:
-`mediaconductor <subcommand>`. Source-checkout examples use
-`uv --project D:/MediaConductor run mediaconductor ...`, which resolves the
+`mangaeasy <subcommand>`. Source-checkout examples use
+`uv --project D:/mangaEasy run mangaeasy ...`, which resolves the
 checkout even while the agent works in `D:/MediaProjects`. Replace both roots
 with absolute local paths. A global uv-tool install may omit the uv prefix;
-`mangaeasy` remains only a 2.x compatibility alias.
+`mediaconductor` remains only a compatibility alias.
 
 **Orient yourself with two calls** (do this first on any machine):
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor where --json
-uv --project D:/MediaConductor run mediaconductor commands --mode manga-video --json --full
+uv --project D:/mangaEasy run mangaeasy where --json
+uv --project D:/mangaEasy run mangaeasy commands --mode manga-video --json --full
 ```
 
 `--full` includes each command's arguments (flag, type, required) and a
 `long_running` marker, so you never need to run per-command `--help` to build
 a command line.
 
-Prefer MCP? `uv --project D:/MediaConductor run mediaconductor mcp --mode manga-video --allow-root D:/MediaProjects`
+Prefer MCP? `uv --project D:/mangaEasy run mangaeasy mcp --mode manga-video --allow-root D:/MediaProjects`
 runs a scoped MCP stdio server with typed tools —
 see [MCP server](#mcp-server) below. The CLI and MCP expose the same engine.
 
@@ -38,44 +38,44 @@ file is the command reference underneath it.
 
 ## 1. Getting a working command
 
-All three modes keep the isolation promise: everything MediaConductor writes
+All three modes keep the isolation promise: everything mangaEasy writes
 stays under one data folder ("app root"), never scattered over the system.
 
 ### Mode 1 — uv tool install (recommended for agent environments)
 
 ```bash
-uv tool install git+https://github.com/tawhidUnhappy/MediaConductor.git
-mediaconductor --version
+uv tool install git+https://github.com/tawhidUnhappy/mangaEasy.git
+mangaeasy --version
 ```
 
 ### Mode 2 — source checkout
 
 ```bash
-git clone --depth 1 https://github.com/tawhidUnhappy/MediaConductor.git && cd MediaConductor
+git clone --depth 1 https://github.com/tawhidUnhappy/mangaEasy.git && cd mangaEasy
 uv sync
-uv run mediaconductor --version
+uv run mangaeasy --version
 ```
 
 ### Mode 3 — a frozen release build (no Python needed)
 
-Each GitHub release ships a self-contained frozen `mediaconductor` per OS.
-Unpack it and run the executable directly; MediaConductor is a CLI and MCP
+Each GitHub release ships a self-contained frozen `mangaeasy` per OS.
+Unpack it and run the executable directly; mangaEasy is a CLI and MCP
 server, not a GUI:
 
 ```bash
-./MediaConductor/mediaconductor --version
-./MediaConductor/mediaconductor commands --mode manga-video
+./mangaEasy/mangaeasy --version
+./mangaEasy/mangaeasy commands --mode manga-video
 ```
 
 To point a run at a specific data root (models, tools, projects), set
-`MEDIACONDUCTOR_ROOT` before the command:
+`MANGAEASY_ROOT` before the command:
 
 ```bash
-MEDIACONDUCTOR_ROOT="/data/mediaconductor" ./MediaConductor/mediaconductor library-list \
-  --project-root "/data/mediaconductor/library" --json
+MANGAEASY_ROOT="/data/mangaeasy" ./mangaEasy/mangaeasy library-list \
+  --project-root "/data/mangaeasy/library" --json
 ```
 
-Default data folders when `MEDIACONDUCTOR_ROOT` is unset: Windows = next to the exe;
+Default data folders when `MANGAEASY_ROOT` is unset: Windows = next to the exe;
 macOS = `~/Library/Application Support/mangaEasy`; Linux =
 `~/.local/share/mangaEasy`.
 
@@ -84,18 +84,18 @@ macOS = `~/Library/Application Support/mangaEasy`; Linux =
 One command provisions everything (GPU-aware; see [setup.md](setup.md)):
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor setup --mode manga-video
+uv --project D:/mangaEasy run mangaeasy setup --mode manga-video
                                  # add --dry-run to inspect the plan first
 ```
 
 Or piece by piece:
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor doctor --mode manga-video --json
-uv --project D:/MediaConductor run mediaconductor bootstrap-tools
+uv --project D:/mangaEasy run mangaeasy doctor --mode manga-video --json
+uv --project D:/mangaEasy run mangaeasy bootstrap-tools
                                  #   downloaded into the data folder, not system-wide
-uv --project D:/MediaConductor run mediaconductor install-tool index-tts
-uv --project D:/MediaConductor run mediaconductor install-tool kokoro-82m
+uv --project D:/mangaEasy run mangaeasy install-tool index-tts
+uv --project D:/mangaEasy run mangaeasy install-tool kokoro-82m
 ```
 
 `doctor --json` fields that matter: `executables.ffmpeg`/`ffprobe`
@@ -127,7 +127,7 @@ D:/MediaProjects/library/<project-name>/   <- --project-root
   02/ ...
 ```
 
-`uv --project D:/MediaConductor run mediaconductor library-list
+`uv --project D:/mangaEasy run mangaeasy library-list
 --project-root D:/MediaProjects --json` includes each project's `manga.json` as a
 `manga` field (`null` when absent), so you don't need to read the file
 yourself when scanning. Imported pages use the same concrete layout:
@@ -177,7 +177,7 @@ same way from any cwd. One config file works unchanged on both OSes; a path
 that is absolute on the *other* OS is left absolute and simply reported
 missing rather than quietly rebased under the workspace.
 
-`mediaconductor doctor` prints a **Configured media** block with the resolved
+`mangaeasy doctor` prints a **Configured media** block with the resolved
 path and whether each file exists — check it before a long render, because
 both failures are silent.
 
@@ -215,7 +215,7 @@ both failures are silent.
   the pro voiceover chain. Opt out per-stage with `--no-condition-bed`,
   `--no-eq-carve`, `--no-duck`.
 - `--gpu-workers` above 4 crashes consumer NVIDIA cards, so the CLI clamps
-  it to 4 with a warning (`MEDIACONDUCTOR_UNSAFE_GPU_WORKERS=1` overrides on
+  it to 4 with a warning (`MANGAEASY_UNSAFE_GPU_WORKERS=1` overrides on
   tested hardware); default is safe.
 - Everything works CPU-only; GPU is an optimization, not a requirement.
 - Production manga renders default to `--audio-source faded` with a symmetric
@@ -235,18 +235,18 @@ completion notifications, use those; otherwise (or from MCP) use the built-in
 job runner — it works everywhere, including frozen installs:
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/example","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output","items":["01-12"],"manual_review_confirmed":true,"tts":"auto","build_long_video":true,"normalize_audio":true,"no_background_music":true}'
-# -> {"ok": true, "job_id": "20260714-153000-video-a1b2c3d4", "poll": "mediaconductor job-status ..."}
-uv --project D:/MediaConductor run mediaconductor job-status 20260714-153000-video-a1b2c3d4 --json
+uv --project D:/mangaEasy run mangaeasy job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/example","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output","items":["01-12"],"manual_review_confirmed":true,"tts":"auto","build_long_video":true,"normalize_audio":true,"no_background_music":true}'
+# -> {"ok": true, "job_id": "20260714-153000-video-a1b2c3d4", "poll": "mangaeasy job-status ..."}
+uv --project D:/mangaEasy run mangaeasy job-status 20260714-153000-video-a1b2c3d4 --json
 # -> status running/succeeded/review_required/failed/orphaned, exit_code,
-#    last MEDIACONDUCTOR_PROGRESS,
-#    parsed MEDIACONDUCTOR_RESULT, log tail
-uv --project D:/MediaConductor run mediaconductor jobs --json
+#    last MANGAEASY_PROGRESS,
+#    parsed MANGAEASY_RESULT, log tail
+uv --project D:/mangaEasy run mangaeasy jobs --json
 ```
 
 The typed `--tool/--arguments-json` form is schema-validated and is what
 `commands --json --full` publishes. The positional compatibility form
-`uv --project D:/MediaConductor run mediaconductor job-start video [video flags...]`
+`uv --project D:/mangaEasy run mangaeasy job-start video [video flags...]`
 remains available to existing scripts.
 
 For typed or MCP manga build tools, set `manual_review_confirmed` to true only
@@ -259,7 +259,7 @@ rejected.
 
 The job survives your session: a detached supervisor writes the exit code and
 final result into `<work>/jobs/<id>.json` (override dir with
-`MEDIACONDUCTOR_JOBS_DIR` or `--jobs-dir`). If the machine slept or the supervisor
+`MANGAEASY_JOBS_DIR` or `--jobs-dir`). If the machine slept or the supervisor
 was killed, `job-status` reports `orphaned` instead of a forever-"running" lie
 — re-run the command (pipeline steps resume/skip completed work). GPU tools
 block-buffer stdout, so an empty log tail on a running job is normal; trust
@@ -279,8 +279,8 @@ block-buffer stdout, so an empty log tail on a running job is normal; trust
   (`job-start` always prints one JSON object). Check the `ok` field where
   present.
 - **Marker lines** inside human output (grep for them, ignore the rest):
-  - `MEDIACONDUCTOR_PROGRESS <n>/<total> [label]` — progress ticks.
-  - `MEDIACONDUCTOR_RESULT {"outputs": ["<abs path>", ...]}` — final line of a
+  - `MANGAEASY_PROGRESS <n>/<total> [label]` — progress ticks.
+  - `MANGAEASY_RESULT {"outputs": ["<abs path>", ...]}` — final line of a
     generation command (`video`, `video-render`, `video-join`,
     `video-add-bgm`, `video-normalize-audio`, `download`, `webtoon-split`,
     `page-split`, `thumbnail-compose`, `setup`); tells you exactly what was
@@ -292,9 +292,9 @@ block-buffer stdout, so an empty log tail on a running job is normal; trust
 
 ## 6. Command reference (groups)
 
-Run `uv --project D:/MediaConductor run mediaconductor commands --mode
+Run `uv --project D:/mangaEasy run mangaeasy commands --mode
 manga-video --json --full` for the always-current list and
-`uv --project D:/MediaConductor run mediaconductor <command> --help` for flags.
+`uv --project D:/mangaEasy run mangaeasy <command> --help` for flags.
 Highlights per group:
 
 **Setup** — `where`, `commands`, `doctor`, `setup` (one-command
@@ -353,7 +353,7 @@ AUDIO=$DATA/audio  OUT=$DATA/output  WORK=$DATA/work
 
 These are the defaults, so the `--audio-root` / `--output-root` / `--work-dir`
 flags below are only needed when you want something *other* than the standard
-layout. `mediaconductor where --json` prints the resolved `data_root` for the
+layout. `mangaeasy where --json` prints the resolved `data_root` for the
 install you are talking to.
 
 ### MangaDex URL → published recap series (the full loop)
@@ -365,31 +365,31 @@ agent skill: [`.claude/skills/manga-recap/SKILL.md`](../.claude/skills/manga-rec
 any agent). The short of it:
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor download --url "<mangadex url>" --all
-uv --project D:/MediaConductor run mediaconductor series-plan --project-root "$PROJ" --json
-uv --project D:/MediaConductor run mediaconductor style-detect --project-root "$PROJ" --source-subdir download --json
-uv --project D:/MediaConductor run mediaconductor webtoon-split --project-root "$PROJ" --item-range 01-12 --source-subdir download --work-dir "$WORK"
+uv --project D:/mangaEasy run mangaeasy download --url "<mangadex url>" --all
+uv --project D:/mangaEasy run mangaeasy series-plan --project-root "$PROJ" --json
+uv --project D:/mangaEasy run mangaeasy style-detect --project-root "$PROJ" --source-subdir download --json
+uv --project D:/mangaEasy run mangaeasy webtoon-split --project-root "$PROJ" --item-range 01-12 --source-subdir download --work-dir "$WORK"
 # Exit 3 is expected: open every source overlay and every crop at readable
 # resolution, clear every suspect, and re-split with --overrides if needed.
 # OCR is optional cross-evidence. Read the original panel for every line:
-uv --project D:/MediaConductor run mediaconductor panel-transcript --project-root "$PROJ" --item-range 01-12
-uv --project D:/MediaConductor run mediaconductor narration-check --project-root "$PROJ" --item-range 01-12 --json
-uv --project D:/MediaConductor run mediaconductor narration-review-sheets --project-root "$PROJ" --item-range 01-12 --work-dir "$WORK"
+uv --project D:/mangaEasy run mangaeasy panel-transcript --project-root "$PROJ" --item-range 01-12
+uv --project D:/mangaEasy run mangaeasy narration-check --project-root "$PROJ" --item-range 01-12 --json
+uv --project D:/mangaEasy run mangaeasy narration-review-sheets --project-root "$PROJ" --item-range 01-12 --work-dir "$WORK"
 # Exit 3 is expected again: manually approve every panel/narration pairing.
-uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" --work-dir "$WORK" \
+uv --project D:/mangaEasy run mangaeasy video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" --work-dir "$WORK" \
     --item-range 01-12 --tts auto --build-long-video --normalize-audio \
     --background-music <music>
-uv --project D:/MediaConductor run mediaconductor video-quality --project-root "$PROJ" --output-root "$OUT" --json
-uv --project D:/MediaConductor run mediaconductor thumbnail-compose --base "$PROJ/01/panels/<approved>.jpg" --output final_thumb.png \
+uv --project D:/mangaEasy run mangaeasy video-quality --project-root "$PROJ" --output-root "$OUT" --json
+uv --project D:/mangaEasy run mangaeasy thumbnail-compose --base "$PROJ/01/panels/<approved>.jpg" --output final_thumb.png \
     --text "3-5 PUNCHY WORDS"
 # Validate the video, then bind the approval to its exact bytes:
-uv --project D:/MediaConductor run mediaconductor manga-review final-video --project-root "$PROJ" --item-range 01-12 \
+uv --project D:/mangaEasy run mangaeasy manga-review final-video --project-root "$PROJ" --item-range 01-12 \
     --video "$OUT/<P>/<P>_full.mp4" --reviewer <name> \
     --rights-confirmed --voice-consent-confirmed --source-permission-confirmed
-uv --project D:/MediaConductor run mediaconductor manga-rights check --project-root "$PROJ"
-uv --project D:/MediaConductor run mediaconductor youtube-upload --profile <profile> --project-root "$PROJ" \
+uv --project D:/mangaEasy run mangaeasy manga-rights check --project-root "$PROJ"
+uv --project D:/mangaEasy run mangaeasy youtube-upload --profile <profile> --project-root "$PROJ" \
     --video "$OUT/<P>/<P>_full.mp4" --title "..." --thumbnail final_thumb.png --json
-uv --project D:/MediaConductor run mediaconductor series-mark-published --project-root "$PROJ" --items 01-12 \
+uv --project D:/mangaEasy run mangaeasy series-mark-published --project-root "$PROJ" --items 01-12 \
     --video-id <id>
 ```
 
@@ -398,31 +398,31 @@ uv --project D:/MediaConductor run mediaconductor series-mark-published --projec
 ```bash
 mkdir -p "$PROJ/01/panels"                # put images into panels/
 # write $PROJ/01/narration.json: [{"image": "<file in panels/>", "narration": "..."}]
-uv --project D:/MediaConductor run mediaconductor video-check  --project-root "$PROJ" --audio-root "$AUDIO" --items 01 --json
-uv --project D:/MediaConductor run mediaconductor video-audio  --project-root "$PROJ" --audio-root "$AUDIO" --items 01
-uv --project D:/MediaConductor run mediaconductor video-render --project-root "$PROJ" --audio-root "$AUDIO" \
+uv --project D:/mangaEasy run mangaeasy video-check  --project-root "$PROJ" --audio-root "$AUDIO" --items 01 --json
+uv --project D:/mangaEasy run mangaeasy video-audio  --project-root "$PROJ" --audio-root "$AUDIO" --items 01
+uv --project D:/mangaEasy run mangaeasy video-render --project-root "$PROJ" --audio-root "$AUDIO" \
     --output-root "$OUT" --work-dir "$WORK" --items 01
-# → MEDIACONDUCTOR_RESULT {"outputs": [".../items/item_01.mp4"], ...}
+# → MANGAEASY_RESULT {"outputs": [".../items/item_01.mp4"], ...}
 ```
 
 ### Batch chapters → one long video with background music
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" \
+uv --project D:/mangaEasy run mangaeasy video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" \
     --work-dir "$WORK" --item-range 01-12 --tts indextts \
     --build-long-video --normalize-audio \
     --background-music /abs/path/music.mp3 --music-volume-db -28
-uv --project D:/MediaConductor run mediaconductor video-chapters --project-root "$PROJ" \
+uv --project D:/mangaEasy run mangaeasy video-chapters --project-root "$PROJ" \
     --output-root "$OUT" --item-range 01-12
 ```
 
 ### Re-mix only the background music (cheap — no re-render/re-join)
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor video-add-bgm --project-root "$PROJ" --output-root "$OUT" \
+uv --project D:/mangaEasy run mangaeasy video-add-bgm --project-root "$PROJ" --output-root "$OUT" \
     --input /abs/path/joined.mp4 --output /abs/path/remixed.mp4 \
     --background-music /abs/path/other.mp3 --music-volume-db -28
-uv --project D:/MediaConductor run mediaconductor video-normalize-audio \
+uv --project D:/mangaEasy run mangaeasy video-normalize-audio \
     --input /abs/path/remixed.mp4 --replace --target-i -14 --target-tp -1.5
 # Pass both paths explicitly: standalone *_bgm_* outputs are not implicit join
 # candidates, and every music change requires a new final normalization pass.
@@ -431,23 +431,23 @@ uv --project D:/MediaConductor run mediaconductor video-normalize-audio \
 ### Resume an interrupted audio run
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor video-audio --project-root "$PROJ" --audio-root "$AUDIO" \
+uv --project D:/mangaEasy run mangaeasy video-audio --project-root "$PROJ" --audio-root "$AUDIO" \
     --item-range 01-12 --resume
 ```
 
 ### Audit & repair audio before a long build
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor video-audio-audit --project-root "$PROJ" --audio-root "$AUDIO" --json
-uv --project D:/MediaConductor run mediaconductor video-audio-audit --project-root "$PROJ" --audio-root "$AUDIO" --fix
-uv --project D:/MediaConductor run mediaconductor video-audio --project-root "$PROJ" --audio-root "$AUDIO"
+uv --project D:/mangaEasy run mangaeasy video-audio-audit --project-root "$PROJ" --audio-root "$AUDIO" --json
+uv --project D:/mangaEasy run mangaeasy video-audio-audit --project-root "$PROJ" --audio-root "$AUDIO" --fix
+uv --project D:/mangaEasy run mangaeasy video-audio --project-root "$PROJ" --audio-root "$AUDIO"
 ```
 
 ### Restore a previous audio take instead of regenerating
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor audio-takes-list --project-root "$PROJ" --audio-root "$AUDIO" --json
-uv --project D:/MediaConductor run mediaconductor audio-takes-restore --project-root "$PROJ" --audio-root "$AUDIO" --run run_0003
+uv --project D:/mangaEasy run mangaeasy audio-takes-list --project-root "$PROJ" --audio-root "$AUDIO" --json
+uv --project D:/mangaEasy run mangaeasy audio-takes-restore --project-root "$PROJ" --audio-root "$AUDIO" --run run_0003
 ```
 
 ## 8. Uploading to YouTube
@@ -459,11 +459,11 @@ profiles normally reuse it while keeping isolated tokens/channel caches. Never
 paste client or token JSON into an agent prompt. See [youtube.md](youtube.md).
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor youtube-profiles --json
-uv --project D:/MediaConductor run mediaconductor youtube-status --profile <profile> --verify --json
-uv --project D:/MediaConductor run mediaconductor youtube-upload --profile <profile> --video /abs/path/video.mp4 \
+uv --project D:/mangaEasy run mangaeasy youtube-profiles --json
+uv --project D:/mangaEasy run mangaeasy youtube-status --profile <profile> --verify --json
+uv --project D:/mangaEasy run mangaeasy youtube-upload --profile <profile> --video /abs/path/video.mp4 \
     --title "My Recap" --tags "manga,recap" --privacy private --json
-# → MEDIACONDUCTOR_RESULT {"profile": "...", "video_id": "...", "url": "https://youtu.be/...", "privacy": "private"}
+# → MANGAEASY_RESULT {"profile": "...", "video_id": "...", "url": "https://youtu.be/...", "privacy": "private"}
 ```
 
 Agent rules for uploads:
@@ -487,7 +487,7 @@ Agent rules for uploads:
 - Quota: one upload = 1,600 of 10,000 daily units (~6 uploads/day,
   resets midnight Pacific). A `quotaExceeded` error means wait, not retry.
 - Uploads are resumable and LONG-RUNNING; progress comes as
-  `MEDIACONDUCTOR_PROGRESS <bytes>/<total>` lines.
+  `MANGAEASY_PROGRESS <bytes>/<total>` lines.
 - `youtube-logout --profile <profile>` disconnects only that profile; never
   read or print the token files under
   `<install>/runtime/youtube/`.
@@ -496,38 +496,38 @@ Agent rules for uploads:
 
 | Variable | Meaning |
 |---|---|
-| `MEDIACONDUCTOR_ROOT` | Override the data root (app root) — where models, tools, and projects live. Set it to run against a specific install's data. |
-| `MEDIACONDUCTOR_HOME` | Override just the `runtime` data dir (default `<root>/runtime`). |
-| `MEDIACONDUCTOR_TOOLS_DIR` | Override where AI tool envs live. |
-| `MEDIACONDUCTOR_ITEMS_ROOT`, `MEDIACONDUCTOR_AUDIO_ROOT`, `MEDIACONDUCTOR_OUTPUT_ROOT`, `MEDIACONDUCTOR_WORK_DIR` | Defaults for the corresponding `--*-root` flags (bare legacy names `PROJECT_ROOT`/`AUDIO_ROOT`/`OUTPUT_ROOT`/`WORK_DIR` still honoured). Agents should pass explicit flags instead. |
-| `MEDIACONDUCTOR_JOBS_DIR` | Where `job-start` keeps job state/logs (default `<work>/jobs`). |
-| `MEDIACONDUCTOR_UNSAFE_GPU_WORKERS` | `1` disables the `--gpu-workers` clamp at 4 (only on hardware tested higher). |
+| `MANGAEASY_ROOT` | Override the data root (app root) — where models, tools, and projects live. Set it to run against a specific install's data. |
+| `MANGAEASY_HOME` | Override just the `runtime` data dir (default `<root>/runtime`). |
+| `MANGAEASY_TOOLS_DIR` | Override where AI tool envs live. |
+| `MANGAEASY_ITEMS_ROOT`, `MANGAEASY_AUDIO_ROOT`, `MANGAEASY_OUTPUT_ROOT`, `MANGAEASY_WORK_DIR` | Defaults for the corresponding `--*-root` flags (bare legacy names `PROJECT_ROOT`/`AUDIO_ROOT`/`OUTPUT_ROOT`/`WORK_DIR` still honoured). Agents should pass explicit flags instead. |
+| `MANGAEASY_JOBS_DIR` | Where `job-start` keeps job state/logs (default `<work>/jobs`). |
+| `MANGAEASY_UNSAFE_GPU_WORKERS` | `1` disables the `--gpu-workers` clamp at 4 (only on hardware tested higher). |
 | `KOKORO_ROOT`, `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `DEEPSEEK_OCR2_ROOT`, `Z_IMAGE_TURBO_ROOT` | Point at externally-managed tool envs (rarely needed). |
-| `MEDIACONDUCTOR_SHARE_CACHES` | `1` to let external-tool subprocesses inherit an ambient `HF_HOME`/`UV_CACHE_DIR`/… instead of the isolated ones (a shared cross-project cache). Off by default — see below. |
+| `MANGAEASY_SHARE_CACHES` | `1` to let external-tool subprocesses inherit an ambient `HF_HOME`/`UV_CACHE_DIR`/… instead of the isolated ones (a shared cross-project cache). Off by default — see below. |
 
 HF/torch/uv caches for external-tool subprocesses are **force-pinned** under
 the data folder (`<install>/runtime/{hf_cache,torch_cache,uv_cache}`), so a
 global `HF_HOME`/`UV_CACHE_DIR` you exported for other tools can't scatter
 multi-GB model downloads outside the install folder — deleting the folder
-really does leave nothing behind. Set `MEDIACONDUCTOR_SHARE_CACHES=1` to opt into
+really does leave nothing behind. Set `MANGAEASY_SHARE_CACHES=1` to opt into
 a shared ambient cache instead (models already downloaded there are then
 reused rather than re-fetched under `runtime`).
 
 ## 10. MCP server
 
 ```bash
-uv --project D:/MediaConductor run mediaconductor mcp --mode manga-video --allow-root D:/MediaProjects
+uv --project D:/mangaEasy run mangaeasy mcp --mode manga-video --allow-root D:/MediaProjects
 ```
 
-For a source checkout, register with `claude mcp add media-conductor-manga --
-uv --project D:/MediaConductor run mediaconductor mcp --mode manga-video --allow-root D:/MediaProjects` (or
-client config `{"command":"uv","args":["--project","D:/MediaConductor",
-"run","mediaconductor","mcp","--mode","manga-video","--allow-root","D:/MediaProjects"]}`; add `"env": {"MEDIACONDUCTOR_ROOT":
+For a source checkout, register with `claude mcp add mangaeasy-manga --
+uv --project D:/mangaEasy run mangaeasy mcp --mode manga-video --allow-root D:/MediaProjects` (or
+client config `{"command":"uv","args":["--project","D:/mangaEasy",
+"run","mangaeasy","mcp","--mode","manga-video","--allow-root","D:/MediaProjects"]}`; add `"env": {"MANGAEASY_ROOT":
 "..."}` to run against a specific install's data). The tool schemas come from
-the same table as `commands --json --full` (`mediaconductor/command_spec.py`), so
+the same table as `commands --json --full` (`mangaeasy/command_spec.py`), so
 CLI and MCP can't drift. Tool results are a JSON text block: `exit_code`,
 parsed `report` (for `--json` commands), parsed `result` (the
-`MEDIACONDUCTOR_RESULT` payload), and clipped `output`.
+`MANGAEASY_RESULT` payload), and clipped `output`.
 
 **Long-running tools must go through `job_start`** (returns a job id
 immediately) + `job_status` / `job_list` polling — a blocking `tools/call`
@@ -549,16 +549,16 @@ root. This is a same-user stdio guardrail, not an OS sandbox.
 
 | Symptom | Likely cause | Do |
 |---|---|---|
-| `ffmpeg`/`ffprobe` null in doctor | core tools not downloaded | `uv --project D:/MediaConductor run mediaconductor bootstrap-tools` |
-| `video-audio` fails to import kokoro | TTS env missing | `uv --project D:/MediaConductor run mediaconductor install-tool kokoro-82m` |
+| `ffmpeg`/`ffprobe` null in doctor | core tools not downloaded | `uv --project D:/mangaEasy run mangaeasy bootstrap-tools` |
+| `video-audio` fails to import kokoro | TTS env missing | `uv --project D:/mangaEasy run mangaeasy install-tool kokoro-82m` |
 | `video-render` "have no audio yet" | narration changed since audio was generated | `video-audio` again (skips existing), or `video-audio-audit --fix` first |
 | Long join fails validation | items missing audio/video | `video-check --json`, fix reported items |
 | Output seems stale/missing | it was archived | look in `old/run_NNNN/` next to the output; `audio-takes-list` for audio |
-| GPU crash with many workers | too many CUDA contexts | the CLI clamps `--gpu-workers` at 4; unset `MEDIACONDUCTOR_UNSAFE_GPU_WORKERS` |
+| GPU crash with many workers | too many CUDA contexts | the CLI clamps `--gpu-workers` at 4; unset `MANGAEASY_UNSAFE_GPU_WORKERS` |
 | Slow first model run | models downloading to the data folder | expected once; offline afterwards |
-| `unknown command` | typo | the error suggests near-matches; see `uv --project D:/MediaConductor run mediaconductor commands --mode manga-video --json --full` |
+| `unknown command` | typo | the error suggests near-matches; see `uv --project D:/mangaEasy run mangaeasy commands --mode manga-video --json --full` |
 
-Background music may live in a user-owned `bgm/` folder. MediaConductor ships
+Background music may live in a user-owned `bgm/` folder. mangaEasy ships
 no music or voice-cloning samples: set `bgm.file`/`--background-music` and
 `tts.speaker_wav`/`--speaker-wav` only to media you are licensed and authorized
 to use. Record its provenance with the project.

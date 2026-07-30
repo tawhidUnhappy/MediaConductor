@@ -73,7 +73,7 @@ Google Cloud setup (an agent must not invent or download their secret):
    its JSON file.
 3. Move that file, without pasting its contents into chat, to the exact
    `shared_client_file` reported by `youtube-profiles --json`. Its predefined
-   name is `youtube/client_secret.json` below MediaConductor's data root.
+   name is `youtube/client_secret.json` below mangaEasy's data root.
 4. Run live status/auth once per named profile. The browser's account chooser
    authorizes a different YouTube channel while the token stays isolated under
    that profile.

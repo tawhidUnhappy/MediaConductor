@@ -1,5 +1,5 @@
 [project]
-name = "media-conductor"
+name = "mangaeasy"
 version = "3.0.0"
 description = "Agent-native manga, manhwa, and webtoon recap video production with isolated AI tools"
 readme = "README.md"
@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 # No ML extras: torch/transformers/opencv live in the isolated external tool
-# envs (`mediaconductor install-tool <name>` / `mediaconductor setup`), never in the
+# envs (`mangaeasy install-tool <name>` / `mangaeasy setup`), never in the
 # main env. The old [ml]/[whisper]/[all] extras promised an install path the
 # architecture abandoned; nothing referenced them.
 
@@ -43,14 +43,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mediaconductor"]
+packages = ["mangaeasy"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"skills" = "mediaconductor/agent_skills"
+"skills" = "mangaeasy/agent_skills"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/mediaconductor",
+    "/mangaeasy",
     "/skills",
     "/AGENTS.md",
     "/CHANGELOG.md",
@@ -95,15 +95,15 @@ ignore = [
 ]
 
 [project.scripts]
-# The neutral product command plus the original compatibility alias.
-mediaconductor = "mediaconductor.cli:main"
-mangaeasy = "mediaconductor.cli:main"
+# The product command plus the compatibility alias for the previous name.
+mangaeasy = "mangaeasy.cli:main"
+mediaconductor = "mangaeasy.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/tawhidUnhappy/MediaConductor"
-Repository = "https://github.com/tawhidUnhappy/MediaConductor"
-Issues = "https://github.com/tawhidUnhappy/MediaConductor/issues"
+Homepage = "https://github.com/tawhidUnhappy/mangaEasy"
+Repository = "https://github.com/tawhidUnhappy/mangaEasy"
+Issues = "https://github.com/tawhidUnhappy/mangaEasy/issues"
 
 # Torch resolves from PyPI so the optional `ml` extra installs on any platform
 # (Windows/Linux/macOS, CPU or GPU). CUDA-specific torch builds are handled in
-# the isolated external tool envs by `mediaconductor install-tool`, never here.
+# the isolated external tool envs by `mangaeasy install-tool`, never here.

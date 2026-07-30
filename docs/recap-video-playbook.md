@@ -1,7 +1,7 @@
 # Manga recap video playbook — for AI agents
 
 This is the exact, end-to-end recipe used to produce a full YouTube manga
-recap video autonomously with MediaConductor (reference production: *Irozuku
+recap video autonomously with mangaEasy (reference production: *Irozuku
 Monochrome* ch. 1 — 9:05, 96 narrated panels, IndexTTS voice clone,
 uploaded with thumbnail/title/description/chapters). Follow it top to
 bottom. Everything here was learned the hard way in a real production;
@@ -9,7 +9,7 @@ the **bold warnings are the places it actually went wrong**.
 
 Read `docs/manga-video-guide.md` (manga-only CLI contract) and the repo
 `CLAUDE.md` first.
-All commands run from the install root (`uv run mediaconductor ...` in a dev
+All commands run from the install root (`uv run mangaeasy ...` in a dev
 checkout).
 
 **Working style — go idle between long steps.** Downloading, cropping, OCR,
@@ -29,22 +29,22 @@ through the rest.
 ## Phase 0 — Environment
 
 ```bash
-mediaconductor where --json      # resolved paths; run this first
-mediaconductor doctor --json     # ffmpeg/GPU/tool status
-mediaconductor tools --json      # which external tool envs are installed
+mangaeasy where --json      # resolved paths; run this first
+mangaeasy doctor --json     # ffmpeg/GPU/tool status
+mangaeasy tools --json      # which external tool envs are installed
 ```
 
 Install what's missing:
 
 ```bash
-mediaconductor install-tool magi-v3       # panel detection (needed for paged manga)
-mediaconductor install-tool index-tts     # default recap TTS: voice clone, slow, best quality
-# Kokoro installs the same way if absent: mediaconductor install-tool kokoro-82m
+mangaeasy install-tool magi-v3       # panel detection (needed for paged manga)
+mangaeasy install-tool index-tts     # default recap TTS: voice clone, slow, best quality
+# Kokoro installs the same way if absent: mangaeasy install-tool kokoro-82m
 ```
 
 For YouTube, place one Desktop-app client JSON at the shared path reported by
-`mediaconductor youtube-profiles --json`. Before publishing, select an explicit
-profile and run `mediaconductor youtube-status --profile <profile> --verify`;
+`mangaeasy youtube-profiles --json`. Before publishing, select an explicit
+profile and run `mangaeasy youtube-status --profile <profile> --verify`;
 the live call opens browser consent when that profile needs it. See
 `docs/youtube.md` for setup, profile isolation, and token permissions.
 
@@ -54,7 +54,7 @@ Set the `download` block of `config.json` (project root): MangaDex title
 URL, chapter number, `translated_language`. Then:
 
 ```bash
-mediaconductor download
+mangaeasy download
 ```
 
 Put/keep the raw pages in `data/library/<Project>/<item>/download/` (item =
@@ -64,7 +64,7 @@ zero-padded chapter, e.g. `01`). Page files are `01_00.jpg … 01_NN.jpg`.
 source record (MangaDex title URL, canonical title, per-chapter download
 info). Read it later when you need the manga's link or the official title,
 e.g. for the description's credits / "support the official release" section
-(`mediaconductor library-list --json` includes it as each project's `manga`
+(`mangaeasy library-list --json` includes it as each project's `manga`
 field).
 
 ## Phase 2–3 for webtoons — `webtoon-split`, then clear every flag
@@ -75,7 +75,7 @@ gutter-separated panels). Paged manga: skip to the MAGI phases below.
 One command replaces detection + cropping + verification-sheet generation:
 
 ```bash
-mediaconductor webtoon-split --project-root data/library/<Project> --item-range 01-19
+mangaeasy webtoon-split --project-root data/library/<Project> --item-range 01-19
 ```
 
 Per item it stitches `download/` into one tall strip, splits it at gutters
@@ -110,7 +110,7 @@ speech bubbles). This full-crop pass is mandatory; the following focused pass
 additionally catches risky cut locations:
 
 ```bash
-mediaconductor webtoon-cutcheck --project-root data/library/<Project> --item-range 01-19
+mangaeasy webtoon-cutcheck --project-root data/library/<Project> --item-range 01-19
 ```
 
 It reads the `<item>_ranges.json` manifests webtoon-split wrote and renders a
@@ -129,12 +129,12 @@ Collect every FIX into one overrides file with `webtoon-override` — it
 resolves all indices against the manifest, so never compute them by hand:
 
 ```bash
-mediaconductor webtoon-override --file work/overrides.json \
+mangaeasy webtoon-override --file work/overrides.json \
     --project-root data/library/<Project> --item 07 --merge-at-cut 23140
-mediaconductor webtoon-override --file work/overrides.json \
+mangaeasy webtoon-override --file work/overrides.json \
     --project-root data/library/<Project> --item 12 --merge-panels 5,6
 # reposition a bad cut = merge across it + force the right y:
-mediaconductor webtoon-override --file work/overrides.json \
+mangaeasy webtoon-override --file work/overrides.json \
     --project-root data/library/<Project> --item 02 --merge-at-cut 42186 --split-at 42394
 ```
 
@@ -157,13 +157,13 @@ them in narration) and the last sheet for trailing promo panels.
 ## Phase 2 — Panel detection (MAGI v3, paged manga)
 
 **This applies to paged manga.** Vertical webtoons don't need MAGI — use
-`mediaconductor webtoon-split` (previous section) instead.
+`mangaeasy webtoon-split` (previous section) instead.
 
 The repo ships a single-image adapter
-(`mediaconductor/assets/tools/detect_magi.py`, copied into the tool env by
+(`mangaeasy/assets/tools/detect_magi.py`, copied into the tool env by
 `install-tool`), but it reloads the model per call. For a whole chapter,
 load the model **once** and loop. Find the tool env via
-`mediaconductor tools --json`, then run this with the env's own python
+`mangaeasy tools --json`, then run this with the env's own python
 (`<tool dir>/.venv/Scripts/python.exe` on Windows):
 
 ```python
@@ -214,7 +214,7 @@ poison everything downstream (narration written against images the viewer
 never sees correctly). MAGI output is a proposal, not approval.
 
 Crop with the same reading-order algorithm the app uses
-(`_manga_reading_order()` in `mediaconductor/panels/ai.py` — RTL band-overlap
+(`_manga_reading_order()` in `mangaeasy/panels/ai.py` — RTL band-overlap
 topological sort). Working script (drop in a scratch dir):
 
 ```python
@@ -237,7 +237,7 @@ def clamp_box(raw, W, H):
     x2, y2 = max(0, min(x2, W)), max(0, min(y2, H))
     return {"x1": x1, "y1": y1, "x2": x2, "y2": y2} if x2 > x1 and y2 > y1 else None
 
-def reading_order(boxes):  # mirrors mediaconductor/panels/ai.py
+def reading_order(boxes):  # mirrors mangaeasy/panels/ai.py
     if len(boxes) <= 1: return list(boxes)
     cy = lambda b: (b["y1"] + b["y2"]) / 2; cx = lambda b: (b["x1"] + b["x2"]) / 2
     n = len(boxes); adj = {i: [] for i in range(n)}; deg = dict.fromkeys(range(n), 0)
@@ -328,8 +328,8 @@ you skimmed. While reading, note:
 ## Phase 4.5 — OCR the bubbles (`panel-transcript`) — OPTIONAL
 
 ```bash
-mediaconductor install-tool deepseek-ocr2   # one-time
-mediaconductor panel-transcript --project-root data/library/<Project> --item-range 01-07
+mangaeasy install-tool deepseek-ocr2   # one-time
+mangaeasy panel-transcript --project-root data/library/<Project> --item-range 01-07
 ```
 
 Writes `<item>/transcript.json` — every panel's bubble/caption text, shown as
@@ -357,7 +357,7 @@ the same SHA-256-bound crop bytes, drops removed panels, and invalidates changed
 crops without loading DeepSeek:
 
 ```bash
-mediaconductor panel-transcript --project-root data/library/<Project> --item-range 01-07 --seed-only
+mangaeasy panel-transcript --project-root data/library/<Project> --item-range 01-07 --seed-only
 ```
 
 Skipping this step leaves the transcript out of sync until the next normal
@@ -434,7 +434,7 @@ Rules learned in production:
 Validate inputs before burning GPU time:
 
 ```bash
-mediaconductor video-check --project-root data/library/<Project> --items 01 --json
+mangaeasy video-check --project-root data/library/<Project> --items 01 --json
 ```
 
 When you deliberately narrate a subset of panels (the normal case — hook/CTA
@@ -450,7 +450,7 @@ audio-related — missing audio for a *referenced* entry; see Phase 7.)
 **Then run the semantic pass — this is not optional:**
 
 ```bash
-mediaconductor narration-review-sheets --project-root data/library/<Project> --item-range 01-07
+mangaeasy narration-review-sheets --project-root data/library/<Project> --item-range 01-07
 ```
 
 Read every sheet and open every corresponding original crop at readable/full
@@ -462,7 +462,7 @@ command (no JSON editing; the stale WAV is pruned so the next audio run
 regenerates it):
 
 ```bash
-mediaconductor narration-edit --project-root data/library/<Project> --item 01 \
+mangaeasy narration-edit --project-root data/library/<Project> --item 01 \
     --set ch01_042.jpg "Rewritten line." --prune-audio
 ```
 
@@ -473,14 +473,14 @@ final whole-mix normalize:
 
 ```bash
 # IndexTTS voice clone (default, best quality; leave gpu-workers at default):
-mediaconductor video --project-root data/library/<Project> --items 01 \
+mangaeasy video --project-root data/library/<Project> --items 01 \
   --tts indextts --speaker-wav "<path to reference voice wav>" \
   --overwrite-audio --overwrite-video \
   --build-long-video --normalize-audio \
   --background-music "<path to music>" --music-volume-db -28
 
 # Kokoro fallback (fast, ~4x parallel on an RTX 3060 — do not exceed 4 gpu-workers):
-mediaconductor video --project-root data/library/<Project> --items 01 \
+mangaeasy video --project-root data/library/<Project> --items 01 \
   --tts kokoro --gpu-workers 4 \
   --build-long-video --normalize-audio \
   --background-music "<path to music>" --music-volume-db -28
@@ -523,7 +523,7 @@ mediaconductor video --project-root data/library/<Project> --items 01 \
   low for recaps (default 2) — wall-to-wall narration + a high ratio just
   makes the music uniformly quiet instead of dipping.
 - **Music QC is automatic** — `video-add-bgm` scans the track's 20 ms RMS
-  envelope before mixing (`mediaconductor/video_pipeline/music_bed.py`): splice
+  envelope before mixing (`mangaeasy/video_pipeline/music_bed.py`): splice
   holes (brief 25+ dB collapses mid-phrase — `silencedetect` can't see
   them) are cut out with short crossfades, silent lead/tail is trimmed,
   and when the track is defective or shorter than the video it's replaced
@@ -561,17 +561,17 @@ mediaconductor video --project-root data/library/<Project> --items 01 \
 - Run it in the background and **wait for the completion notification**;
   IndexTTS for ~100 panels is a long job (see "Working style" above — don't
   sit in a poll loop). If audio state is ever in doubt:
-  `mediaconductor video-audio-audit --project-root data/library/<Project> --json`.
+  `mangaeasy video-audio-audit --project-root data/library/<Project> --json`.
 
 The all-in-one command reports each enabled parent stage through
-`MEDIACONDUCTOR_PROGRESS`, so `job-status` remains useful during quiet TTS
+`MANGAEASY_PROGRESS`, so `job-status` remains useful during quiet TTS
 workers. It runs `video-validate` automatically as the final stage; use
 `--no-validate` only for a deliberate diagnostic build.
 
 ## Phase 7 — Verify the build (measure, don't assume)
 
 ```bash
-mediaconductor video-validate --project-root data/library/<Project> --items 01 --json
+mangaeasy video-validate --project-root data/library/<Project> --items 01 --json
 ```
 
 This command is a structural gate, not a visual, timing, click, or loudness
@@ -602,7 +602,7 @@ Then verify the actual MP4:
 ## Phase 8 — Chapter timestamps (exact, not guessed)
 
 Each panel is on screen for `ceil(wav_seconds × fps) / fps` (fps = 15,
-`frame_aligned_duration()` in `mediaconductor/video_pipeline/item_assets.py`),
+`frame_aligned_duration()` in `mangaeasy/video_pipeline/item_assets.py`),
 with no gaps. So cumulative WAV durations give frame-exact chapter marks:
 
 For a multi-item recap, prefer probing the MP4s that were actually joined and
@@ -611,9 +611,9 @@ paste (`00:00 Chapter 01`, and so on); JSON is available for publishing
 scripts:
 
 ```bash
-mediaconductor video-chapters --project-root data/library/<Project> \
+mangaeasy video-chapters --project-root data/library/<Project> \
   --output-root output --item-range 01-24
-mediaconductor video-chapters --project-root data/library/<Project> \
+mangaeasy video-chapters --project-root data/library/<Project> \
   --output-root output --item-range 01-24 --json
 ```
 
@@ -654,7 +654,7 @@ use must be listed in `rights.json` under `thumbnail_sources`, or
 Shortlist candidates first, then choose by opening them:
 
 ```bash
-mediaconductor thumbnail-candidates --project-root data/library/<P> \
+mangaeasy thumbnail-candidates --project-root data/library/<P> \
     --item-range 01-12 --json
 ```
 
@@ -681,7 +681,7 @@ not optional flavor):
 - Foreground face ≈ 30% of frame height; keep the payload out of the
   bottom-right corner, where the duration badge sits.
 
-Then add the signature markup with `mediaconductor thumbnail-compose`. Start
+Then add the signature markup with `mangaeasy thumbnail-compose`. Start
 from a preset that matches one of the three reference layouts and adjust it:
 
 | Preset | What it draws | Use when |
@@ -691,7 +691,7 @@ from a preset that matches one of the three reference layouts and adjust it:
 | `split` | two panels side by side, a label under each | a power reversal legible as two states at a glance (`WEAK` \| `STRONG`) |
 
 ```bash
-mediaconductor thumbnail-compose --base <approved-panel>.jpg \
+mangaeasy thumbnail-compose --base <approved-panel>.jpg \
     --output data/output/<P>/thumb.png \
     --preset label-arrow --text "VILLAIN" --badge "1-12" --check
 ```
@@ -741,7 +741,7 @@ badge. It knows nothing about whether the art is *right*; that is the
 render-and-look step below.
 
 A live video's thumbnail can be replaced without re-uploading:
-`mediaconductor youtube-thumbnail --profile <profile> --video-id <id>
+`mangaeasy youtube-thumbnail --profile <profile> --video-id <id>
 --image <png>`.
 
 Mandatory checks, all from real failures:
@@ -787,10 +787,10 @@ Mandatory checks, all from real failures:
 
 ```bash
 # Offline discovery: select the exact cached channel, never guess the profile:
-mediaconductor youtube-profiles --json
-mediaconductor youtube-status --profile <profile> --verify --json
+mangaeasy youtube-profiles --json
+mangaeasy youtube-status --profile <profile> --verify --json
 
-mediaconductor youtube-upload --profile <profile> \
+mangaeasy youtube-upload --profile <profile> \
   --video data/output/<Project>/<Project>_full_<timestamp>.mp4 \
   --title "<title>" --description-file description.txt \
   --tags "tag1,tag2,..." --thumbnail thumbnail.png \
@@ -852,7 +852,7 @@ mediaconductor youtube-upload --profile <profile> \
 - [ ] Every narration line checked against its original pixels/bubble tail;
       OCR treated only as an unverified cross-check
 - [ ] Hook = 4-ish late-chapter shock panels as renamed copies; CTA outro present
-- [ ] `mediaconductor video-check --json` ok before building
+- [ ] `mangaeasy video-check --json` ok before building
 - [ ] Faded per-panel derivatives audited; raw TTS unchanged; no edge clicks
 - [ ] Complete final MP4 validated; duration/timing sane,
       frames spot-checked, ≈ −14 LUFS and ≤ −1.5 dBTP

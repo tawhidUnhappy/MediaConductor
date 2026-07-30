@@ -2,7 +2,7 @@ from argparse import Namespace
 
 import pytest
 
-from mediaconductor.video_pipeline import audio_takes, cleanup_audio
+from mangaeasy.video_pipeline import audio_takes, cleanup_audio
 
 
 def _args(tmp_path, *, yes=False, purge=False):

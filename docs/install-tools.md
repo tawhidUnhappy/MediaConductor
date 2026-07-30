@@ -1,18 +1,18 @@
 # Installing the AI Tools
 
 The heavy AI models live in **isolated `uv` environments** so their
-torch/transformers stacks never conflict with the main `mediaconductor` install.
-`mediaconductor install-tool` provisions them from GitHub and Hugging Face.
+torch/transformers stacks never conflict with the main `mangaeasy` install.
+`mangaeasy install-tool` provisions them from GitHub and Hugging Face.
 
 ```bash
-mediaconductor install-tool               # list available tools
-mediaconductor install-tool index-tts     # install one
-mediaconductor install-tool deepseek-ocr2 # DeepSeek-OCR 2 panel/document OCR
-mediaconductor doctor                     # check what's installed
+mangaeasy install-tool               # list available tools
+mangaeasy install-tool index-tts     # install one
+mangaeasy install-tool deepseek-ocr2 # DeepSeek-OCR 2 panel/document OCR
+mangaeasy doctor                     # check what's installed
 ```
 
 All tools go into the managed folder `<install folder>/runtime/tools` (override with
-`MEDIACONDUCTOR_TOOLS_DIR`), so a globally-installed `mediaconductor` finds them from
+`MANGAEASY_TOOLS_DIR`), so a globally-installed `mangaeasy` finds them from
 any working directory. Re-running an install resumes interrupted downloads.
 Installer-managed snapshots remain on their immutable manifest revisions.
 The lightweight Hugging Face downloader is also provisioned through `uvx` at
@@ -62,11 +62,11 @@ What the installer does:
 4. Verifies `indextts.infer_v2` imports inside that env
 
 Requirements: git and uv. An NVIDIA GPU (CUDA 12.8+) makes synthesis much
-faster, but CPU-only machines work too — MediaConductor loads the model without the
+faster, but CPU-only machines work too — mangaEasy loads the model without the
 CUDA kernels automatically. The model download is large (several GB).
 
-Used by: `mediaconductor video` (the default engine when an NVIDIA GPU is present),
-`mediaconductor video-audio-indextts`, `mediaconductor index-tts`. Voice cloning needs a
+Used by: `mangaeasy video` (the default engine when an NVIDIA GPU is present),
+`mangaeasy video-audio-indextts`, `mangaeasy index-tts`. Voice cloning needs a
 speaker reference WAV: `config.system.json → tts.speaker_wav`
 (`tts.speaker_wav`) or `--speaker-wav`; no voice sample ships with the repository.
 
@@ -78,8 +78,8 @@ The installer therefore *authors* a small environment instead of cloning:
 
 1. Writes a minimal `pyproject.toml` (torch + transformers + pillow + numpy +
    einops + timm, with the torch build matching your hardware)
-2. Copies in `detect_magi.py` — the adapter MediaConductor calls for detection
-   (shipped inside the mediaconductor package)
+2. Copies in `detect_magi.py` — the adapter mangaEasy calls for detection
+   (shipped inside the mangaeasy package)
 3. `uv sync` and verifies `transformers` imports
 
 The model code and weights download from the current Hugging Face default
@@ -87,8 +87,8 @@ revision on the first detection run; this legacy first-use download is not
 immutable. Pass `--clone` if you also want the upstream
 `ragavsachdeva/magi` repo checked out for reference.
 
-Used by: panel detection in `mediaconductor page-split` (and anything calling
-`mediaconductor.panels.ai`).
+Used by: panel detection in `mangaeasy page-split` (and anything calling
+`mangaeasy.panels.ai`).
 
 ## deepseek-ocr2 (DeepSeek-OCR 2 panel/document OCR)
 
@@ -100,8 +100,8 @@ target, and downloads `deepseek-ai/DeepSeek-OCR-2` revision
 `aaa02f3811945a91062062994c5c4a3f4c0af2b0` into `deepseek-ocr2/model`.
 
 ```bash
-mediaconductor install-tool deepseek-ocr2
-mediaconductor deepseek-ocr2 --project-root data/library/<project> --item-range 01-24
+mangaeasy install-tool deepseek-ocr2
+mangaeasy deepseek-ocr2 --project-root data/library/<project> --item-range 01-24
 ```
 
 The run command scans `narration.json` and `narration_*.json` files, resolves
@@ -128,12 +128,12 @@ so the installer authors a small environment:
 The [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model
 weights download from Hugging Face automatically on the first run. That legacy
 first-use revision is not pinned by the installer. The default voice is
-**`af_heart`** (change with `--voice` on `mediaconductor video` /
+**`af_heart`** (change with `--voice` on `mangaeasy video` /
 `video-audio`). On Windows, install eSpeak NG for the widest language support —
-MediaConductor adds it to the tool's PATH automatically when present.
+mangaEasy adds it to the tool's PATH automatically when present.
 
-Used by: `mediaconductor video` (the default engine on machines without an NVIDIA
-GPU, or when IndexTTS isn't set up), `mediaconductor video-audio`.
+Used by: `mangaeasy video` (the default engine on machines without an NVIDIA
+GPU, or when IndexTTS isn't set up), `mangaeasy video-audio`.
 
 ## Manual installs / custom locations
 
@@ -145,4 +145,4 @@ GPU, or when IndexTTS isn't set up), `mediaconductor video-audio`.
   `INDEX_TTS_ROOT`, `MAGI_V3_ROOT`, `DEEPSEEK_OCR2_ROOT`,
   `Z_IMAGE_TURBO_ROOT`
 
-Check resolution any time with `mediaconductor tools` or `mediaconductor doctor`.
+Check resolution any time with `mangaeasy tools` or `mangaeasy doctor`.

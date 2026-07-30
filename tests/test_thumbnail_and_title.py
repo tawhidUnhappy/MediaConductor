@@ -14,13 +14,13 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from mediaconductor.images.thumbnail_candidates import score_image
-from mediaconductor.images.thumbnail_compose import (
+from mangaeasy.images.thumbnail_candidates import score_image
+from mangaeasy.images.thumbnail_compose import (
     check_composition,
     main as compose_main,
     preset_spec,
 )
-from mediaconductor.images.title_check import check_title
+from mangaeasy.images.title_check import check_title
 
 # The titles this channel has actually published — the calibration set. A
 # check that flags these as errors is miscalibrated, not strict.

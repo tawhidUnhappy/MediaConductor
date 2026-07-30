@@ -1,4 +1,4 @@
-from mediaconductor.video_pipeline.narration_sheets import (
+from mangaeasy.video_pipeline.narration_sheets import (
     _prune_review_sheets,
     _review_exit_code,
 )

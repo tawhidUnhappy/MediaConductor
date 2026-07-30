@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from mediaconductor.panels.overrides_tool import (
+from mangaeasy.panels.overrides_tool import (
     coalesce_merges,
     resolve_merge_at_cut,
     resolve_merge_panels,
 )
-from mediaconductor.video_pipeline.narration_edit import (
+from mangaeasy.video_pipeline.narration_edit import (
     sorted_insert_position,
     upsert,
     upsert_entry,

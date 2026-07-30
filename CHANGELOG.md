@@ -1,8 +1,62 @@
 # Changelog
 
+## Unreleased
+
+**The product is `mangaEasy` again, and every text-drawing command now renders
+the same on Linux, Windows and macOS.** The rename is breaking; the portability
+fixes are not.
+
+### Changed
+
+- **The Python package is now `mangaeasy`** (was `mediaconductor`). Entry
+  points, env vars, and stdout markers follow, and each keeps a working
+  compatibility path:
+  - The command is `mangaeasy`; `mediaconductor` remains installed as an alias.
+  - Env vars are `MANGAEASY_*`; `MEDIACONDUCTOR_*` values are mirrored at
+    startup and keep working, so no install silently relocates a model cache.
+  - Machine markers are `MANGAEASY_RESULT` / `MANGAEASY_PROGRESS`; scanners
+    still accept `MEDIACONDUCTOR_*` (tool scripts already copied into external
+    envs print them).
+  - Review records move to `<project>/.mangaeasy/manga-reviews.json`. Reads fall
+    back to `.mediaconductor/` and the next recorded review writes the merged
+    store forward — approvals are hash-bound production gates, so a project
+    reviewed under the old name must not land back behind them.
+  - The MCP server name and PyPI distribution are `mangaeasy`; the PyInstaller
+    spec is `packaging/mangaeasy.spec` and builds `mangaEasy` / `mangaEasy.app`.
+
+### Fixed
+
+- **Text drawn onto images was unreadable on Linux and macOS.** Six modules
+  loaded fonts by bare name (`arialbd.ttf`, `impact.ttf`) or from hardcoded
+  Debian/Windows paths. Pillow resolves a bare name only through the host font
+  search — in practice Windows — so off-Windows every one of them fell through
+  to `ImageFont.load_default()`, a face that ignores its size argument: a 48 px
+  panel-index overlay rendered about 41x8 px. Nothing crashed, so it never
+  surfaced as an error; the crop-review contact sheets and cutcheck strips the
+  production gates depend on simply could not be read, and thumbnails composed
+  at 104 pt came out with hairline text. `mangaeasy/fonts.py` is now the one
+  resolver: it searches the real per-OS font directories (including the
+  distro-specific layouts under `/usr/share/fonts`), then the TTF bundled in
+  `assets/fonts/`, and only then Pillow's default *at the requested size*. A
+  test asserts rendered width per call site, because the type alone no longer
+  distinguishes a real face from the fallback.
+- **`workspace-reset` and the `video-clean-*` commands could half-erase a tree
+  on Windows.** `shutil.rmtree` cannot delete a read-only file there — the
+  attribute is on the file, not the directory — so a delete aborted partway with
+  a `PermissionError` traceback, which is the state those commands exist to
+  avoid. They now use `utils.remove_tree()`, which clears the attribute and
+  retries; on Linux and macOS the handler is never reached.
+- `.bat` launchers are pinned to CRLF in `.gitattributes`. `* text=auto` was
+  normalising them to LF, which cmd.exe mis-parses in multi-line blocks.
+- `run.sh` now falls back to uv's known install locations (`~/.local/bin`,
+  `~/.cargo/bin`, Homebrew) when it is not yet on `PATH` — the same fallback
+  `run.bat` already had, and the common case right after installing uv or when
+  launching from a GUI shell. Added `run.command` so macOS Finder can launch the
+  bootstrap by double-click.
+
 ## 3.0.0 — 2026-07-26
 
-**MediaConductor is now a manga recap product only, and review is a record
+**mangaEasy is now a manga recap product only, and review is a record
 rather than an assertion.** Both changes are breaking.
 
 ### Removed
@@ -128,7 +182,7 @@ rather than an assertion.** Both changes are breaking.
   somewhere else. The split is deliberate in both directions: production state
   must be inside `data/` or the promise is false, and the 80 GB of tool
   environments must be outside it or a fresh start costs a re-download.
-  `mediaconductor/layout.py` is the single source of truth; `workspace-layout`
+  `mangaeasy/layout.py` is the single source of truth; `workspace-layout`
   reports where every root actually resolved and fails `--strict` when one
   escapes its tree. `data/README.md` explains the folder to whoever opens it
   in a file manager.
@@ -144,7 +198,7 @@ rather than an assertion.** Both changes are breaking.
   `PROJECT_ROOT`, `AUDIO_ROOT`, `OUTPUT_ROOT`, and `WORK_DIR` spellings are
   gone — names that generic already exist in plenty of shells, and a single
   inherited `WORK_DIR` silently relocated production state out of the
-  workspace. `MEDIACONDUCTOR_DATA_ROOT` (whole tree) and `MEDIACONDUCTOR_HOME`
+  workspace. `MANGAEASY_DATA_ROOT` (whole tree) and `MANGAEASY_HOME`
   (runtime tree) are the supported relocations; pointing them at overlapping
   trees is reported as an error, because a reset would otherwise delete the
   tool environments.
@@ -203,9 +257,9 @@ rather than an assertion.** Both changes are breaking.
   second-library-tree incident the registration mechanism exists to prevent,
   reintroduced by the check meant to guard it. Found by cloning onto a wiped
   disk and following `docs/setup.md` literally: after a clean `setup`,
-  `mediaconductor where` run from `C:\Users\me` reported
+  `mangaeasy where` run from `C:\Users\me` reported
   `data_root: C:\Users\me\data`. A workspace is now recognised by any of three
-  signals (`config.json`, an existing `data/`, or a MediaConductor source
+  signals (`config.json`, an existing `data/`, or a mangaEasy source
   checkout), `setup` creates `data/` before registering so the signal exists,
   and a failure to register now prints a loud warning instead of passing
   silently.
@@ -232,7 +286,7 @@ rather than an assertion.** Both changes are breaking.
 ### Added
 
 - Added `MCP_CONFIG.md` with ready-to-paste Windows MCP client blocks for a
-  source checkout or globally installed `mediaconductor` command.
+  source checkout or globally installed `mangaeasy` command.
 
 ### Changed
 
@@ -286,7 +340,7 @@ rather than an assertion.** Both changes are breaking.
   "run this first" resume command already shows them. Exposed as the
   `work_todo` MCP tool alongside the other four `work_*` tools. See
   `docs/multi-agent.md`'s new "Switching LLM providers mid-project" section
-  for the full handoff recipe (set `MEDIACONDUCTOR_AGENT` per model, leave a
+  for the full handoff recipe (set `MANGAEASY_AGENT` per model, leave a
   `handoff`-topic note before a session ends).
 
 ## 2.2.2 — 2026-07-18
@@ -342,7 +396,7 @@ rather than an assertion.** Both changes are breaking.
     survival, no window. Regression-tested.
   - `install-tool`'s winpty PTY allocates a console for its agent, which can
     also surface as a visible terminal. Pipe mode (windowless, same log
-    lines) is now the default; set `MEDIACONDUCTOR_INSTALL_PTY=1` to opt back
+    lines) is now the default; set `MANGAEASY_INSTALL_PTY=1` to opt back
     into PTY progress rendering.
 - `install-tool` skipped the model download entirely for tools that declare
   their snapshot only via `extra_models` (gemma-4 shipped without weights).
@@ -351,13 +405,13 @@ rather than an assertion.** Both changes are breaking.
 
 ### Added
 
-- **Local LLM: Gemma 4 E4B** (`mediaconductor install-tool gemma-4`,
+- **Local LLM: Gemma 4 E4B** (`mangaeasy install-tool gemma-4`,
   Apache-2.0). A revision-pinned GGUF snapshot (Q4_0 + vision projector,
   ~6 GB) served by a pinned llama.cpp release binary (Vulkan on GPUs, CPU
-  everywhere else; `MEDIACONDUCTOR_LLAMA_SERVER` overrides). Raw access via
-  `mediaconductor llm` (text + images, JSON-schema-constrained output,
+  everywhere else; `MANGAEASY_LLAMA_SERVER` overrides). Raw access via
+  `mangaeasy llm` (text + images, JSON-schema-constrained output,
   batch manifests). Installed by default with `setup --mode manga-video`.
-- **Assist commands** (`mediaconductor/assist/`) so small or text-only driver
+- **Assist commands** (`mangaeasy/assist/`) so small or text-only driver
   agents could produce vision-grounded manga drafts in that release:
   - `crop-qa` — Gemma-vision review of every flagged crop location (webtoon
     forced cuts/short panels, paged page overlays); prints the exact
@@ -389,7 +443,7 @@ rather than an assertion.** Both changes are breaking.
   `--force-style` overrides for deliberate mixed-format items.
 - **Commands run from a wrong cwd no longer scatter `library/` trees.**
   `setup` registers the workspace (`<data>/workspace.json`); workspace
-  resolution now tries `MEDIACONDUCTOR_PROJECT_ROOT` → a cwd containing
+  resolution now tries `MANGAEASY_PROJECT_ROOT` → a cwd containing
   `config.json` → the registered workspace → a source checkout's own root →
   cwd. `where --json` reports `workspace_root`, and `download` prints its
   resolved destination (with a loud warning outside any workspace) before
@@ -401,7 +455,7 @@ rather than an assertion.** Both changes are breaking.
 
 - **Blank console windows no longer pop up on Windows.** Every child process
   (ffmpeg, uv, git, external tool envs) now spawns through
-  `mediaconductor.runtime.run/popen`, which applies `CREATE_NO_WINDOW`
+  `mangaeasy.runtime.run/popen`, which applies `CREATE_NO_WINDOW`
   whenever the parent has no visible console — detached background jobs and
   MCP servers started by an editor were the common triggers. Linux/macOS are
   unaffected (the wrappers add nothing there). A repository-hygiene test now
@@ -443,10 +497,10 @@ rather than an assertion.** Both changes are breaking.
 
 ## 2.0.0 — 2026-07-15
 
-### MediaConductor platform
+### mangaEasy platform
 
 - Renamed the product, Python distribution, primary CLI, release artifacts,
-  and MCP identity to **MediaConductor**. The `mangaeasy` command and Python
+  and MCP identity to **mangaEasy**. The `mangaeasy` command and Python
   package remain compatibility surfaces for 2.x.
 - Added isolated Manga Video, AI Story, and Song Video modes, each with its
   own small MCP catalog, setup profile, Codex-compatible skill, and reference

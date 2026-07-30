@@ -1,6 +1,6 @@
 import numpy as np
 
-from mediaconductor.video_pipeline.preprocess_audio_fades import (
+from mangaeasy.video_pipeline.preprocess_audio_fades import (
     compute_adaptive_fade_out_ms,
     fade_filter,
 )

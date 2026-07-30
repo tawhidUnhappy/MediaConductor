@@ -6,17 +6,19 @@ from pathlib import Path
 
 import pytest
 
-from mediaconductor import defaults
-from mediaconductor.reviews import (
+from mangaeasy import defaults
+from mangaeasy.reviews import (
+    LEGACY_REVIEW_RECORD_RELATIVE_PATH,
     REVIEW_RECORD_RELATIVE_PATH,
     ReviewRecordError,
     check_review_records,
+    existing_review_record_path,
     load_review_store,
     record_crop_review,
     record_final_video_review,
     record_narration_review,
 )
-from mediaconductor.video_pipeline import run_pipeline
+from mangaeasy.video_pipeline import run_pipeline
 
 REVIEWED_AT = "2026-07-26T12:00:00+00:00"
 
@@ -233,3 +235,62 @@ def test_full_pipeline_accepts_current_reviews(tmp_path, monkeypatch):
     store = load_review_store(root)
     assert store["crop"]["01"]["input_digest"]
     assert store["narration"]["01"]["input_digest"]
+
+
+# ── Rename migration ──────────────────────────────────────────────────────────
+
+def test_records_written_before_the_rename_still_satisfy_the_gates(tmp_path):
+    """Approvals are hash-bound gates; a rename must not revoke them.
+
+    A project reviewed as MediaConductor has its store under
+    `.mediaconductor/`. If reads did not fall back there, every such project
+    would silently land back behind the crop/narration gate and need a full
+    re-review — the one outcome the record format exists to prevent.
+    """
+    root, _item = _project(tmp_path)
+    _approve_inputs(root)
+
+    current = root / REVIEW_RECORD_RELATIVE_PATH
+    legacy = root / LEGACY_REVIEW_RECORD_RELATIVE_PATH
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(current.read_text(encoding="utf-8"), encoding="utf-8")
+    current.unlink()
+    current.parent.rmdir()
+
+    assert existing_review_record_path(root) == legacy
+    report = check_review_records(root, ["01"], stages=("crop", "narration"))
+    assert report["ok"], report["problems"]
+    assert report["record_file"] == str(legacy)
+
+
+def test_the_current_record_wins_over_a_stale_legacy_one(tmp_path):
+    root, _item = _project(tmp_path)
+    _approve_inputs(root)
+
+    legacy = root / LEGACY_REVIEW_RECORD_RELATIVE_PATH
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(json.dumps({"schema_version": 1, "crop": {}, "narration": {},
+                                  "final_video": None}), encoding="utf-8")
+
+    assert existing_review_record_path(root) == root / REVIEW_RECORD_RELATIVE_PATH
+    assert check_review_records(root, ["01"], stages=("crop", "narration"))["ok"]
+
+
+def test_recording_a_review_migrates_the_store_to_the_new_path(tmp_path):
+    """The next write moves a legacy store forward instead of forking it."""
+    root, _item = _project(tmp_path)
+    _approve_inputs(root)
+
+    current = root / REVIEW_RECORD_RELATIVE_PATH
+    legacy = root / LEGACY_REVIEW_RECORD_RELATIVE_PATH
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(current.read_text(encoding="utf-8"), encoding="utf-8")
+    current.unlink()
+
+    record_narration_review(root, ["01"], reviewer="narration-reviewer",
+                            reviewed_at=REVIEWED_AT)
+
+    assert current.is_file(), "a new review must write to the current path"
+    store = load_review_store(root)
+    assert "01" in store["crop"], "the pre-rename crop approval must survive"
+    assert "01" in store["narration"]

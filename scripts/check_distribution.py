@@ -10,12 +10,12 @@ import zipfile
 
 MEDIA_SUFFIXES = {".avi", ".flac", ".m4a", ".mkv", ".mov", ".mp3", ".mp4", ".wav", ".webm"}
 WHEEL_REQUIRED = {
-    "mediaconductor/agent_skills/manga-video/SKILL.md",
-    "mediaconductor/agent_skills/manga-video/references/youtube-publishing.md",
-    "mediaconductor/assets/tools/batch_detect_magi.py",
-    "mediaconductor/assets/tools/detect_magi.py",
-    "mediaconductor/assets/prompts/narration.md",
-    "mediaconductor/assets/fonts/edosz.ttf",
+    "mangaeasy/agent_skills/manga-video/SKILL.md",
+    "mangaeasy/agent_skills/manga-video/references/youtube-publishing.md",
+    "mangaeasy/assets/tools/batch_detect_magi.py",
+    "mangaeasy/assets/tools/detect_magi.py",
+    "mangaeasy/assets/prompts/narration.md",
+    "mangaeasy/assets/fonts/edosz.ttf",
 }
 SDIST_REQUIRED_SUFFIXES = {
     "/AGENTS.md",
@@ -30,7 +30,7 @@ SDIST_REQUIRED_SUFFIXES = {
 # a removed pipeline's skill or adapter is a working install of a feature the
 # CLI no longer registers — the exact drift the registry tests exist to stop.
 FORBIDDEN_TOKENS = (
-    "ai-story", "song-video", "media-conductor/SKILL",
+    "ai-story", "song-video", "mangaeasy/SKILL",
     "ace_step", "generate_zimage", "separate_demucs", "transcribe_whisperx",
     "/story/", "/song/", "images/pdf", "images/convert", "images/watermark",
 )

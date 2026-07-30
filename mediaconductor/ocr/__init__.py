@@ -1,1 +1,0 @@
-"""OCR integrations for MediaConductor."""

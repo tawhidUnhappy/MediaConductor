@@ -1,6 +1,6 @@
 # AI agent guide
 
-MediaConductor produces manga, manhwa, and webtoon recap videos. One pipeline,
+mangaEasy produces manga, manhwa, and webtoon recap videos. One pipeline,
 one skill: [`../skills/manga-video/SKILL.md`](../skills/manga-video/SKILL.md).
 
 ## Orient from a folder or repository link
@@ -9,17 +9,17 @@ From the repository root:
 
 ```bash
 uv sync
-uv run mediaconductor modes --json
-uv run mediaconductor where --json
-uv run mediaconductor workspace-layout --json
-uv run mediaconductor setup --mode manga-video
+uv run mangaeasy modes --json
+uv run mangaeasy where --json
+uv run mangaeasy workspace-layout --json
+uv run mangaeasy setup --mode manga-video
 ```
 
 After setup, verify:
 
 ```bash
-uv run mediaconductor doctor --mode manga-video --json
-uv run mediaconductor commands --mode manga-video --json --full
+uv run mangaeasy doctor --mode manga-video --json
+uv run mangaeasy commands --mode manga-video --json --full
 ```
 
 The detailed operating manual is
@@ -39,7 +39,7 @@ Record cast, speaker, crop, and handoff decisions with `work-note` so another
 agent can resume without guessing. Before building, inspect every crop and
 narration review sheet and rerun the corresponding checks after each fix.
 
-Always run `mediaconductor where --json` first and confirm `workspace_root` and
+Always run `mangaeasy where --json` first and confirm `workspace_root` and
 `data_root` are the workspace you intend to fill. Everything you download or
 generate lands under `data_root` — `data/library/`, `data/audio/`,
 `data/audio_faded/`, `data/output/`, `data/review/`, `data/work/` — and
@@ -47,9 +47,9 @@ nothing production-related is written anywhere else. `runtime_home` holds the
 tool environments, caches and OAuth tokens; it is deliberately outside
 `data/`, so clearing productions never costs a multi-gigabyte re-download.
 
-`mediaconductor workspace-layout --json` proves it: every persistent root with
+`mangaeasy workspace-layout --json` proves it: every persistent root with
 the tree it must stay inside. A production root outside `data/` is a defect,
-not a preference. To hand a user a clean slate, use `mediaconductor
+not a preference. To hand a user a clean slate, use `mangaeasy
 workspace-reset` (dry run by default, `--confirm` to delete, `--keep-library`
 to keep the downloaded chapters) rather than deleting paths yourself.
 
@@ -58,7 +58,7 @@ to keep the downloaded chapters) rather than deleting paths yourself.
 Register one server:
 
 ```bash
-mediaconductor mcp --mode manga-video --allow-root <workspace>
+mangaeasy mcp --mode manga-video --allow-root <workspace>
 ```
 
 `--mode` is accepted for client-config compatibility; `manga-video` is the only
@@ -83,12 +83,12 @@ argument. Approvals are bound to the exact bytes they cover and are verified
 independently by the commands that need them:
 
 ```bash
-mediaconductor manga-review crop      --project-root data/library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review narration --project-root data/library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review final-video --project-root data/library/<P> --items 01 \
+mangaeasy manga-review crop      --project-root data/library/<P> --items 01 --reviewer NAME
+mangaeasy manga-review narration --project-root data/library/<P> --items 01 --reviewer NAME
+mangaeasy manga-review final-video --project-root data/library/<P> --items 01 \
     --video data/output/<P>/<P>_full.mp4 --reviewer NAME \
     --rights-confirmed --voice-consent-confirmed --source-permission-confirmed
-mediaconductor manga-review check     --project-root data/library/<P> --items 01
+mangaeasy manga-review check     --project-root data/library/<P> --items 01
 ```
 
 Re-cropping a panel, rewriting a line, or re-rendering the MP4 invalidates the
@@ -107,13 +107,14 @@ Machine-readable conventions remain stable for 2.x compatibility:
 
 - Exit code `0` means success, `1` means validation/runtime failure, `2` means
   invalid CLI use, and `3` means an artifact exists but QA approval is needed.
-- Generation emits `MEDIACONDUCTOR_RESULT {...}` and progress emits
-  `MEDIACONDUCTOR_PROGRESS current/total label`.
-- `MEDIACONDUCTOR_ROOT` and the other `MEDIACONDUCTOR_*` names remain supported so old
+- Generation emits `MANGAEASY_RESULT {...}` and progress emits
+  `MANGAEASY_PROGRESS current/total label`.
+- `MANGAEASY_ROOT` and the other `MANGAEASY_*` names are the documented
+  spelling; the previous `MEDIACONDUCTOR_*` names are still honoured so old
   installations do not silently move large model caches.
-- The legacy equivalents `mangaeasy where --json`,
+- The legacy equivalents `mediaconductor where --json`,
   `mediaconductor commands --json`, and `mediaconductor mcp` remain available.
 
-Manga agents can discover existing projects with `mediaconductor library-list
+Manga agents can discover existing projects with `mangaeasy library-list
 --json`; Story and Song projects are manifest-driven and should use their
 mode-specific skill instead.

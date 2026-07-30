@@ -1,6 +1,6 @@
 # Multi-agent production — coordination, resume, QA loops, reuse
 
-MediaConductor assumes any number of agents (or one agent across many interrupted
+mangaEasy assumes any number of agents (or one agent across many interrupted
 sessions) may work the same project. That "one agent across interrupted
 sessions" case explicitly includes **switching which LLM is driving** —
 Claude runs out of budget mid-batch, and GPT (or any other model) picks the
@@ -20,8 +20,8 @@ Every session — first or fiftieth, alone or with other agents (or other
 models) running — starts the same way:
 
 ```bash
-mediaconductor work-status --project-root data/library/<Project> --json   # where is everything?
-mediaconductor work-status --project-root data/library/<Project> --next   # what should I grab?
+mangaeasy work-status --project-root data/library/<Project> --json   # where is everything?
+mangaeasy work-status --project-root data/library/<Project> --next   # what should I grab?
 ```
 
 `work-status` derives each item's stage (`download → crop → narrate →
@@ -36,7 +36,7 @@ only the unclaimed, actionable tasks.
 Then loop:
 
 1. **Claim** the task before touching it:
-   `mediaconductor work-claim --project-root data/library/<P> --item 07 --stage narrate --agent me`
+   `mangaeasy work-claim --project-root data/library/<P> --item 07 --stage narrate --agent me`
    Exit 0 = yours (lease default 60 min); exit 1 = someone live holds it —
    pick another task. Long job still running? `--renew`. Done? `--release`.
    Expired leases are taken over automatically, so a crashed (or simply
@@ -44,14 +44,14 @@ Then loop:
 2. **Hold the GPU mutex around GPU model work.** `page-split`,
    `panel-transcript`, and TTS (`video` / `video-audio-indextts`) each load
    a multi-GB model — two at once on a consumer card is an OOM:
-   `mediaconductor work-claim --project-root data/library/<P> --resource gpu --agent me`
+   `mangaeasy work-claim --project-root data/library/<P> --resource gpu --agent me`
    (release it the moment the GPU step exits; NVENC rendering does not need
    it). Give it a `--ttl-minutes` that covers the whole job.
 3. **Write down what the next agent needs.** Character names, speaker
    conventions, tone decisions, warnings — the facts that otherwise die with
    your context window:
-   `mediaconductor work-note --project-root data/library/<P> --add "Labyris = red-haired knight, tsundere, calls Chrome 'onii-chan'" --topic characters`
-   Read the notebook before narrating anything: `mediaconductor work-note --project-root data/library/<P> --list`.
+   `mangaeasy work-note --project-root data/library/<P> --add "Labyris = red-haired knight, tsundere, calls Chrome 'onii-chan'" --topic characters`
+   Read the notebook before narrating anything: `mangaeasy work-note --project-root data/library/<P> --list`.
    Narration written by different agents must agree on names and voice — the
    notebook is how.
 4. **Track plan-level next steps on the shared todo list** — see
@@ -72,12 +72,12 @@ project instead of state inside one process, so it outlives any single
 context window or model:
 
 ```bash
-mediaconductor work-todo --project-root data/library/<P> --add "Redo ch10 thumbnail text" --topic publishing
-mediaconductor work-todo --project-root data/library/<P> --list
-mediaconductor work-todo --project-root data/library/<P> --start 3   # mark in_progress
-mediaconductor work-todo --project-root data/library/<P> --done 3    # mark done
-mediaconductor work-todo --project-root data/library/<P> --reopen 3  # undo a premature "done"
-mediaconductor work-todo --project-root data/library/<P> --remove 3  # no longer relevant — delete it
+mangaeasy work-todo --project-root data/library/<P> --add "Redo ch10 thumbnail text" --topic publishing
+mangaeasy work-todo --project-root data/library/<P> --list
+mangaeasy work-todo --project-root data/library/<P> --start 3   # mark in_progress
+mangaeasy work-todo --project-root data/library/<P> --done 3    # mark done
+mangaeasy work-todo --project-root data/library/<P> --reopen 3  # undo a premature "done"
+mangaeasy work-todo --project-root data/library/<P> --remove 3  # no longer relevant — delete it
 ```
 
 Open (non-done) todos also appear directly in `work-status`'s report (capped
@@ -97,14 +97,14 @@ ordinary multi-agent protocol above, applied across a vendor boundary
 instead of across two processes:
 
 1. **Identify the model in claims/notes/todos** by setting
-   `MEDIACONDUCTOR_AGENT` before it runs (e.g. `export
-   MEDIACONDUCTOR_AGENT=claude-fable` vs. `gpt-5.6`). Every claim, note, and
+   `MANGAEASY_AGENT` before it runs (e.g. `export
+   MANGAEASY_AGENT=claude-fable` vs. `gpt-5.6`). Every claim, note, and
    todo records who touched it, so a later agent can tell which decisions
    came from which model — useful when judging whether to trust a stylistic
    call (e.g. a narration tone choice) without re-deriving it.
 2. **Before a session ends — planned or forced —** leave a `handoff`-topic
    note describing exactly what was in flight, not just what stage you were
-   on: `mediaconductor work-note --project-root data/library/<P> --topic handoff
+   on: `mangaeasy work-note --project-root data/library/<P> --topic handoff
    --add "item 14 video-render was running in the background when I was cut
    off; check job-status before re-launching, don't assume it crashed."`
    Filesystem state plus a claim lease already recover *what stage* an item
@@ -133,11 +133,11 @@ if another live agent's claim covers any selected item at that stage.
 
 Project-level stages (`join`, `thumbnail`, `upload`) are single-agent by
 nature — claim them without `--item`:
-`mediaconductor work-claim --project-root data/library/<P> --stage join --agent me`.
+`mangaeasy work-claim --project-root data/library/<P> --stage join --agent me`.
 
 ## The fix-until-clean QA loop (built for small models)
 
-`mediaconductor work-qa` aggregates every machine-checkable gate over the
+`mangaeasy work-qa` aggregates every machine-checkable gate over the
 generated artifacts — crops exist, OCR coverage, narration structure
 (dangling images, empty text, intro/narration overlap), speakability and
 delivery/fluency lint, audio coverage + integrity, render freshness — into
@@ -145,7 +145,7 @@ one ordered problem list. **Every problem carries the exact fix command.** A
 small model needs no global judgment; the whole correction workflow is:
 
 ```bash
-until mediaconductor work-qa --project-root data/library/<P> --items 07 --errors-only --json; do
+until mangaeasy work-qa --project-root data/library/<P> --items 07 --errors-only --json; do
     # read problems[0].fix, run/apply it, repeat
 done
 ```
@@ -161,7 +161,7 @@ done
   listed artifact and original panel; detector confidence, OCR agreement,
   contact sheets, or another retry cannot approve them. Semantic narration QA
   (right speaker, one beat per panel) stays a vision-pass job:
-  `mediaconductor narration-review-sheets`, then read every sheet and original.
+  `mangaeasy narration-review-sheets`, then read every sheet and original.
 - `severity: "info"` = normal-but-worth-confirming (e.g. uncovered
   credits/banner panels).
 
@@ -172,26 +172,26 @@ timestamped long videos, hash-cached music beds). Before regenerating
 anything, check the inventory:
 
 ```bash
-mediaconductor work-artifacts --project-root data/library/<P> --json
+mangaeasy work-artifacts --project-root data/library/<P> --json
 ```
 
 Each category comes with its reuse hint — the important ones:
 
-- **item renders** are reused as-is by `video-join`; `mediaconductor video
+- **item renders** are reused as-is by `video-join`; `mangaeasy video
   --skip-audio` re-renders only stale items.
 - **TTS audio** is reused by any rerun without `--overwrite-audio`;
-  overwritten takes are archived — `mediaconductor audio-takes-list` /
-  `mediaconductor audio-takes-restore` bring an old take back without
+  overwritten takes are archived — `mangaeasy audio-takes-list` /
+  `mangaeasy audio-takes-restore` bring an old take back without
   regenerating.
 - **transcripts** (`<item>/transcript.json`) are optional, untrusted OCR
   cross-evidence. Reuse a row only while its `panel_sha256` still matches the
   current crop; consumers suppress stale or legacy-unbound OCR automatically.
-- **music beds** are cached by content hash; `mediaconductor video-add-bgm`
+- **music beds** are cached by content hash; `mangaeasy video-add-bgm`
   reuses them automatically.
 
 ## MCP
 
 All six commands are exposed as MCP tools (`work_status`, `work_claim`,
-`work_note`, `work_todo`, `work_qa`, `work_artifacts`) by `mediaconductor mcp`,
+`work_note`, `work_todo`, `work_qa`, `work_artifacts`) by `mangaeasy mcp`,
 so agent hosts get the same coordination surface as the CLI — including a
 host running a different model than the one that last touched the project.

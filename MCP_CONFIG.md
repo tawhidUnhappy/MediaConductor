@@ -1,6 +1,6 @@
-# MediaConductor MCP Configuration & Quick Setup
+# mangaEasy MCP Configuration & Quick Setup
 
-Set up MediaConductor MCP server in seconds by copying and pasting the configuration into your preferred AI client.
+Set up mangaEasy MCP server in seconds by copying and pasting the configuration into your preferred AI client.
 
 ---
 
@@ -15,19 +15,19 @@ Set up MediaConductor MCP server in seconds by copying and pasting the configura
 
 #### Option A: Source Checkout with `uv` (Recommended)
 
-Replace `D:/MediaConductor` with the path to your checkout and `D:/MediaProjects` with your media workspace path (use forward slashes `/` for path compatibility):
+Replace `D:/mangaEasy` with the path to your checkout and `D:/MediaProjects` with your media workspace path (use forward slashes `/` for path compatibility):
 
 ```json
 {
   "mcpServers": {
-    "media-conductor": {
+    "mangaeasy": {
       "command": "uv",
       "args": [
         "--project",
-        "D:/MediaConductor",
+        "D:/mangaEasy",
         "run",
         "--no-sync",
-        "mediaconductor",
+        "mangaeasy",
         "mcp",
         "--mode",
         "manga-video",
@@ -46,8 +46,8 @@ Skips `uv` dependency sync on launch to prevent Windows binary lock errors:
 ```json
 {
   "mcpServers": {
-    "media-conductor": {
-      "command": "D:/MediaConductor/.venv/Scripts/mediaconductor.exe",
+    "mangaeasy": {
+      "command": "D:/mangaEasy/.venv/Scripts/mangaeasy.exe",
       "args": [
         "mcp",
         "--mode",
@@ -59,17 +59,17 @@ Skips `uv` dependency sync on launch to prevent Windows binary lock errors:
   }
 }
 ```
-*(On macOS/Linux, change the command to `D:/MediaConductor/.venv/bin/mediaconductor`)*
+*(On macOS/Linux, change the command to `D:/mangaEasy/.venv/bin/mangaeasy`)*
 
-#### Option C: Globally Installed `mediaconductor`
+#### Option C: Globally Installed `mangaeasy`
 
-If `mediaconductor` is installed globally on your system `PATH`:
+If `mangaeasy` is installed globally on your system `PATH`:
 
 ```json
 {
   "mcpServers": {
-    "media-conductor": {
-      "command": "mediaconductor",
+    "mangaeasy": {
+      "command": "mangaeasy",
       "args": [
         "mcp",
         "--mode",
@@ -88,21 +88,21 @@ If `mediaconductor` is installed globally on your system `PATH`:
 
 **File Location:**
 - **Workspace-specific:** `.vscode/mcp.json` or `.cursor/mcp.json` in your project root
-- **Global Settings:** Open your client's MCP configuration settings tab and paste the `media-conductor` object below.
+- **Global Settings:** Open your client's MCP configuration settings tab and paste the `mangaeasy` object below.
 
 #### Paste block:
 
 ```json
 {
   "mcpServers": {
-    "media-conductor": {
+    "mangaeasy": {
       "command": "uv",
       "args": [
         "--project",
-        "D:/MediaConductor",
+        "D:/mangaEasy",
         "run",
         "--no-sync",
-        "mediaconductor",
+        "mangaeasy",
         "mcp",
         "--mode",
         "manga-video",
@@ -114,7 +114,7 @@ If `mediaconductor` is installed globally on your system `PATH`:
 }
 ```
 
-*(If adding to an existing `"mcpServers"` object, copy only the `"media-conductor": { ... }` block).*
+*(If adding to an existing `"mcpServers"` object, copy only the `"mangaeasy": { ... }` block).*
 
 ---
 
@@ -122,12 +122,12 @@ If `mediaconductor` is installed globally on your system `PATH`:
 
 #### Claude CLI:
 ```bash
-claude mcp add media-conductor -- uv --project D:/MediaConductor run --no-sync mediaconductor mcp --allow-root D:/MediaProjects
+claude mcp add mangaeasy -- uv --project D:/mangaEasy run --no-sync mangaeasy mcp --allow-root D:/MediaProjects
 ```
 
 #### Antigravity CLI (`agy`):
 ```bash
-agy mcp add media-conductor -- uv --project D:/MediaConductor run --no-sync mediaconductor mcp --allow-root D:/MediaProjects
+agy mcp add mangaeasy -- uv --project D:/mangaEasy run --no-sync mangaeasy mcp --allow-root D:/MediaProjects
 ```
 
 ---
@@ -137,25 +137,25 @@ agy mcp add media-conductor -- uv --project D:/MediaConductor run --no-sync medi
 Before starting the MCP server for the first time, sync the Python virtual environment once:
 
 ```bash
-uv sync --project D:/MediaConductor
+uv sync --project D:/mangaEasy
 ```
 
 To verify the installation outside of an MCP client:
 
 ```bash
-uv --project D:/MediaConductor run --no-sync mediaconductor modes --mode manga-video --json
+uv --project D:/mangaEasy run --no-sync mangaeasy modes --mode manga-video --json
 ```
 
 ---
 
 ## 📂 Multi-Workspace Configuration
 
-To allow MediaConductor to access multiple folders, repeat the `--allow-root` flag in `args`:
+To allow mangaEasy to access multiple folders, repeat the `--allow-root` flag in `args`:
 
 ```json
 "args": [
-  "--project", "D:/MediaConductor",
-  "run", "--no-sync", "mediaconductor", "mcp",
+  "--project", "D:/mangaEasy",
+  "run", "--no-sync", "mangaeasy", "mcp",
   "--mode", "manga-video",
   "--allow-root", "D:/MediaProjects",
   "--allow-root", "E:/OtherMangaWorkspace"
@@ -222,7 +222,7 @@ allowed roots is refused before the CLI is invoked.
 
 ## 🤖 LLM Self-Review & Agent Automation
 
-The MediaConductor MCP server supports **complete autonomous LLM operation**:
+The mangaEasy MCP server supports **complete autonomous LLM operation**:
 - Reviews (`crop`, `narration`, `final-video`) are recorded via content hash-bound records, not boolean flags.
 - An LLM agent performs the visual and narrative inspections itself, then records the approval using its agent identity via `manga_review`:
 
@@ -245,12 +245,12 @@ The MediaConductor MCP server supports **complete autonomous LLM operation**:
 ## 🛠️ Troubleshooting: "Access is denied" on Windows
 
 If launch fails with `Access is denied. (os error 5)` or `calling "initialize": EOF`:
-- This occurs when `uv run` attempts to reinstall binaries while `mediaconductor.exe` is already running in the background.
+- This occurs when `uv run` attempts to reinstall binaries while `mangaeasy.exe` is already running in the background.
 - **Solution 1:** Always ensure `--no-sync` is included in your `uv run` arguments.
-- **Solution 2:** Use the direct executable path (`.venv/Scripts/mediaconductor.exe`).
+- **Solution 2:** Use the direct executable path (`.venv/Scripts/mangaeasy.exe`).
 - **Solution 3:** Repair stale metadata once:
   ```powershell
-  uv sync --project D:/MediaConductor --reinstall-package media-conductor
+  uv sync --project D:/mangaEasy --reinstall-package mangaeasy
   ```
 
 ---
@@ -259,8 +259,8 @@ If launch fails with `Access is denied. (os error 5)` or `calling "initialize": 
 
 | Field | Value |
 | --- | --- |
-| `serverInfo.name` | `media-conductor` |
-| `serverInfo.version` | Installed `mediaconductor` version |
+| `serverInfo.name` | `mangaeasy` |
+| `serverInfo.version` | Installed `mangaeasy` version |
 | `protocolVersion` | `2025-11-25` (fallbacks: `2025-06-18`, `2024-11-05`) |
 | Capabilities | `tools` only |
 | Transport | stdio, newline-delimited JSON-RPC 2.0 |
@@ -269,7 +269,7 @@ If launch fails with `Access is denied. (os error 5)` or `calling "initialize": 
 
 ## 🛠️ Complete MCP Tool Catalog (49 Tools)
 
-The catalog exposes **49 tools** from `mediaconductor/command_spec.py`. Every tool call shells out to the CLI.
+The catalog exposes **49 tools** from `mangaeasy/command_spec.py`. Every tool call shells out to the CLI.
 
 ### Install & Environment (6)
 | Tool | Required | Purpose |

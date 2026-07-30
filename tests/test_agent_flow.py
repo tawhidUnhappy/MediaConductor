@@ -7,11 +7,11 @@ import json
 import pytest
 from PIL import Image
 
-from mediaconductor.download.mangadex import _chapter_sort_key, _slugify_project_name
-from mediaconductor.panels.style_detect import measure_item, style_guard, verdict_from_stats
-from mediaconductor.series_plan import build_plan, load_publish_json, mark_main, save_publish_json
-from mediaconductor.tools.setup import BASE_TOOLS, GPU_TOOLS, plan_tools
-from mediaconductor.video_pipeline.narration_check import check_item
+from mangaeasy.download.mangadex import _chapter_sort_key, _slugify_project_name
+from mangaeasy.panels.style_detect import measure_item, style_guard, verdict_from_stats
+from mangaeasy.series_plan import build_plan, load_publish_json, mark_main, save_publish_json
+from mangaeasy.tools.setup import BASE_TOOLS, GPU_TOOLS, plan_tools
+from mangaeasy.video_pipeline.narration_check import check_item
 
 
 # ── setup planning ──────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ def test_narration_check_fails_on_a_panel_nobody_decided_about(item):
 
 
 def test_narration_check_passes_once_the_omission_is_recorded(item):
-    from mediaconductor.panel_decisions import record_decisions
+    from mangaeasy.panel_decisions import record_decisions
 
     (item / "narration.json").write_text(json.dumps([
         {"image": "a.jpg", "narration": "one"},
@@ -161,7 +161,7 @@ def test_narration_check_passes_once_the_omission_is_recorded(item):
 
 
 def test_recorded_omission_is_invalidated_when_the_panel_changes(item):
-    from mediaconductor.panel_decisions import record_decisions
+    from mangaeasy.panel_decisions import record_decisions
 
     (item / "narration.json").write_text(json.dumps([
         {"image": "a.jpg", "narration": "one"},
@@ -293,7 +293,7 @@ def test_series_plan_readiness_requires_narration(tmp_path):
 def test_mark_published_records_account_and_replacement_provenance(tmp_path, monkeypatch):
     root = _make_project(tmp_path, ["01", "02"], narrated={"01", "02"})
     monkeypatch.setattr("sys.argv", [
-        "mediaconductor", "--project-root", str(root), "--items", "01-02",
+        "mangaeasy", "--project-root", str(root), "--items", "01-02",
         "--video-id", "new-video", "--profile", "manga",
         "--channel-id", "channel-123", "--replaces-video-id", "old-video",
     ])

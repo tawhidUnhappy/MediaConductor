@@ -19,7 +19,7 @@ config.system.json
 .pytest_cache/
 .ruff_cache/
 
-# The two data trees this install writes (see mediaconductor/layout.py):
+# The two data trees this install writes (see mangaeasy/layout.py):
 #   data/    everything downloaded or generated — delete it to start fresh
 #   runtime/ AI tool envs, HF/torch/uv caches, install state, OAuth tokens
 /data/

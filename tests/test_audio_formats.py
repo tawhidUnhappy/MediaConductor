@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from mediaconductor.audio.formats import (
+from mangaeasy.audio.formats import (
     SUPPORTED_AUDIO_EXTENSIONS,
     as_pcm_wav,
     describe_unsupported,
@@ -67,7 +67,7 @@ def test_wav_is_the_canonical_form_and_never_copied(tmp_path: Path):
 
 @pytest.mark.skipif(not HAS_FFMPEG, reason="ffmpeg is required to transcode")
 def test_a_non_wav_reference_is_transcoded_to_mono_pcm(tmp_path: Path):
-    from mediaconductor import runtime
+    from mangaeasy import runtime
 
     source = tmp_path / "narrator.mp3"
     runtime.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
@@ -84,7 +84,7 @@ def test_a_non_wav_reference_is_transcoded_to_mono_pcm(tmp_path: Path):
 @pytest.mark.skipif(not HAS_FFMPEG, reason="ffmpeg is required to transcode")
 def test_the_conversion_is_cached_across_runs(tmp_path: Path):
     """Re-decoding the same MP3 for every audio shard would be pure waste."""
-    from mediaconductor import runtime
+    from mangaeasy import runtime
 
     source = tmp_path / "narrator.mp3"
     runtime.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
@@ -101,7 +101,7 @@ def test_the_conversion_is_cached_across_runs(tmp_path: Path):
 @pytest.mark.skipif(not HAS_FFMPEG, reason="ffmpeg is required to transcode")
 def test_replacing_the_reference_invalidates_the_cached_conversion(tmp_path: Path):
     """Swapping the narrator's sample must not keep serving the old voice."""
-    from mediaconductor import runtime
+    from mangaeasy import runtime
 
     source = tmp_path / "narrator.mp3"
     cache = tmp_path / "cache"

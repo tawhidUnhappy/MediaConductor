@@ -1,6 +1,6 @@
 # YouTube account profiles
 
-MediaConductor can connect multiple YouTube channels at the same time. Give
+mangaEasy can connect multiple YouTube channels at the same time. Give
 each connection a short profile name, then select it explicitly for status,
 upload, listing, deletion, and thumbnail changes.
 
@@ -18,8 +18,8 @@ dots, spaces, and uppercase names are rejected.
 ## See what is connected
 
 ```bash
-mediaconductor youtube-profiles
-mediaconductor youtube-profiles --json
+mangaeasy youtube-profiles
+mangaeasy youtube-profiles --json
 ```
 
 `youtube-profiles --json` is the preferred discovery command for an AI agent.
@@ -43,17 +43,17 @@ Each user supplies their own free Google OAuth Desktop-app client:
 5. Click **Download JSON** for that Desktop-app client.
 
 One Google Cloud project and one downloaded client JSON can authorize any
-number of MediaConductor profiles. The OAuth client identifies the software;
+number of mangaEasy profiles. The OAuth client identifies the software;
 the separate browser grants identify the YouTube accounts/channels.
 
 ## Put the one client JSON at the shared path
 
-First ask MediaConductor for the exact platform-specific location:
+First ask mangaEasy for the exact platform-specific location:
 
 ```bash
-mediaconductor youtube-profiles --json
+mangaeasy youtube-profiles --json
 # Read shared_client_file, for example:
-# D:\MediaConductor\runtime\youtube\client_secret.json
+# D:\mangaEasy\runtime\youtube\client_secret.json
 ```
 
 Create the parent `youtube` directory if needed, then copy/move the downloaded
@@ -66,13 +66,13 @@ prompt or commit it. Existing installations already using
 Once the shared file exists, an LLM or user can call a live command directly:
 
 ```bash
-mediaconductor youtube-status --profile manga --verify --json
-mediaconductor youtube-status --profile song --verify --json
-mediaconductor youtube-status --profile manga-alt --verify --json
+mangaeasy youtube-status --profile manga --verify --json
+mangaeasy youtube-status --profile song --verify --json
+mangaeasy youtube-status --profile manga-alt --verify --json
 ```
 
 The first call for each new profile opens Google's consent page automatically.
-Choose the intended Google/YouTube account, approve once, and MediaConductor
+Choose the intended Google/YouTube account, approve once, and mangaEasy
 saves a distinct token and channel cache for that profile. The command then
 continues and returns the verified channel. Missing, expired, revoked, or
 API-rejected authorization triggers the same browser reauthorization and one
@@ -83,7 +83,7 @@ same name everywhere.
 
 For a headless worker, add `--no-auto-auth`; it fails actionably instead of
 opening a browser. Explicit setup remains available with
-`mediaconductor youtube-auth --profile NAME`, including `--no-browser` to print
+`mangaeasy youtube-auth --profile NAME`, including `--no-browser` to print
 the loopback consent URL. A named profile may optionally import its own client
 with `--client-secrets`, which overrides the shared client only for that
 profile.
@@ -125,7 +125,7 @@ issue, or Git repository.
 ## Publish with an explicit profile
 
 ```bash
-mediaconductor youtube-upload \
+mangaeasy youtube-upload \
   --profile manga \
   --video /absolute/output/recap.mp4 \
   --title "My Manga Recap - Chapters 1-24" \
@@ -146,12 +146,12 @@ production and authorize profiles before starting the worker.
 The same selection applies to maintenance commands:
 
 ```bash
-mediaconductor youtube-list --profile manga --limit 25 --json
-mediaconductor youtube-thumbnail --profile manga --video-id VIDEO_ID --image thumb.png --json
-mediaconductor youtube-delete --profile manga --video-id VIDEO_ID        # preview
-mediaconductor youtube-delete --profile manga --video-id VIDEO_ID --confirm --json
-mediaconductor youtube-logout --profile manga
-mediaconductor youtube-logout --profile manga --forget-client
+mangaeasy youtube-list --profile manga --limit 25 --json
+mangaeasy youtube-thumbnail --profile manga --video-id VIDEO_ID --image thumb.png --json
+mangaeasy youtube-delete --profile manga --video-id VIDEO_ID        # preview
+mangaeasy youtube-delete --profile manga --video-id VIDEO_ID --confirm --json
+mangaeasy youtube-logout --profile manga
+mangaeasy youtube-logout --profile manga --forget-client
 ```
 
 ## Replace an uploaded video
@@ -166,17 +166,17 @@ For an explicit deletion-first replacement:
 1. Verify identity before mutation:
 
    ```bash
-   mediaconductor youtube-status --profile manga --verify --json
-   mediaconductor youtube-list --profile manga --limit 25 --json
+   mangaeasy youtube-status --profile manga --verify --json
+   mangaeasy youtube-list --profile manga --limit 25 --json
    ```
 
    Match the live channel title/id and old video id/title exactly.
 2. Preview, confirm, and prove deletion:
 
    ```bash
-   mediaconductor youtube-delete --profile manga --video-id OLD_ID
-   mediaconductor youtube-delete --profile manga --video-id OLD_ID --confirm --json
-   mediaconductor youtube-list --profile manga --limit 25 --json
+   mangaeasy youtube-delete --profile manga --video-id OLD_ID
+   mangaeasy youtube-delete --profile manga --video-id OLD_ID --confirm --json
+   mangaeasy youtube-list --profile manga --limit 25 --json
    ```
 
 3. Upload the fully reviewed replacement with the same explicit profile.
@@ -217,7 +217,7 @@ call status/upload and wait for the user to approve Google's page.
 
 ## Permissions and YouTube policy
 
-MediaConductor requests video-management scopes so it can upload, edit, and
+mangaEasy requests video-management scopes so it can upload, edit, and
 delete the authenticated channel's videos. It does not request comment, live
 chat, or account-settings access.
 

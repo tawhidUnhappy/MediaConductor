@@ -1,4 +1,4 @@
-"""Docs can't rot silently: every `mediaconductor <command>` mentioned in the
+"""Docs can't rot silently: every `mangaeasy <command>` mentioned in the
 AI-facing docs must exist in the CLI's dispatch table, the repo's own
 navigation docs must not contain broken internal links, and CLAUDE.md must
 name every top-level package so a new package can't appear undocumented."""
@@ -6,7 +6,7 @@ name every top-level package so a new package can't appear undocumented."""
 import re
 from pathlib import Path
 
-from mediaconductor.cli import COMMANDS
+from mangaeasy.cli import COMMANDS
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -48,10 +48,10 @@ PROFILE_AWARE_MANGA_DOCS = [
 # markdown [text](target) where target is a relative path (not http/anchor)
 LINK_RE = re.compile(r"\]\((?!https?://|#|mailto:)([^)]+)\)")
 
-# `mediaconductor <token>` (or its legacy alias) where token looks like a subcommand (lowercase,
+# `mangaeasy <token>` (or its legacy alias) where token looks like a subcommand (lowercase,
 # digits, hyphens). Placeholders (`<command>`), flags (`--help`), version
 # numbers, and prose ("mangaEasy CLI") don't match.
-COMMAND_RE = re.compile(r"(?:mediaconductor|mediaconductor) ([a-z][a-z0-9-]*)")
+COMMAND_RE = re.compile(r"(?:mangaeasy|mangaeasy) ([a-z][a-z0-9-]*)")
 
 KNOWN_NON_COMMANDS = {"help", "version"}  # CLI built-ins
 
@@ -68,9 +68,9 @@ def test_docs_reference_only_real_commands():
 
 def test_docs_cover_the_agent_essentials():
     guide = DOCS[0].read_text(encoding="utf-8")
-    for needle in ("mediaconductor modes --json", "setup --mode", "doctor --mode",
-                   "commands --mode", "MEDIACONDUCTOR_RESULT", "MEDIACONDUCTOR_PROGRESS",
-                   "MEDIACONDUCTOR_ROOT", "mediaconductor mcp --mode", "exit code"):
+    for needle in ("mangaeasy modes --json", "setup --mode", "doctor --mode",
+                   "commands --mode", "MANGAEASY_RESULT", "MANGAEASY_PROGRESS",
+                   "MANGAEASY_ROOT", "mangaeasy mcp --mode", "exit code"):
         assert needle.lower() in guide.lower(), f"ai-guide.md is missing: {needle}"
 
 
@@ -84,9 +84,13 @@ def test_active_manga_docs_require_profile_aware_youtube_auth():
             "--no-auto-auth",
         ):
             assert needle in text, f"{doc.name} is missing profile-aware YouTube guidance: {needle}"
-        # Active docs must never teach the legacy CLI spelling.
-        assert "mangaeasy youtube-status" not in text
-        assert "mangaeasy youtube-upload" not in text
+        # Active docs must never teach the legacy CLI spelling. Derived from
+        # brand.py so the guard follows a rename instead of pinning the name
+        # the docs are supposed to use.
+        from mangaeasy.brand import LEGACY_CLI_NAME
+
+        assert f"{LEGACY_CLI_NAME} youtube-status" not in text
+        assert f"{LEGACY_CLI_NAME} youtube-upload" not in text
 
 
 def test_internal_doc_links_resolve():
@@ -105,7 +109,7 @@ def test_internal_doc_links_resolve():
 
 
 def _packages() -> list:
-    pkg_root = REPO / "mediaconductor"
+    pkg_root = REPO / "mangaeasy"
     return sorted(
         p for p in pkg_root.iterdir()
         if p.is_dir() and (p / "__init__.py").exists() and not p.name.startswith("_")
@@ -113,14 +117,14 @@ def _packages() -> list:
 
 
 def test_claude_md_names_every_top_level_package():
-    """A new mediaconductor/<pkg>/ can't appear without being named in CLAUDE.md's code map."""
+    """A new mangaeasy/<pkg>/ can't appear without being named in CLAUDE.md's code map."""
     claude_md = (REPO / "CLAUDE.md").read_text(encoding="utf-8")
     missing = [p.name for p in _packages() if p.name not in claude_md]
     assert not missing, f"CLAUDE.md does not mention packages: {missing}"
 
 
 def test_every_package_has_a_readme():
-    """Every mediaconductor/<pkg>/ must document itself with a README.md."""
+    """Every mangaeasy/<pkg>/ must document itself with a README.md."""
     missing = [p.name for p in _packages() if not (p / "README.md").exists()]
     assert not missing, f"packages missing a README.md: {missing}"
 
@@ -140,7 +144,7 @@ def test_bundled_mode_skills_work_without_a_source_checkout():
     assert "<mc>" in skill
     assert "globally installed" in skill
     assert "frozen" in skill
-    assert "uv --project D:/MediaConductor run mediaconductor" not in all_guidance
+    assert "uv --project D:/mangaEasy run mangaeasy" not in all_guidance
 
 
 def test_packaged_youtube_reference_is_self_contained():

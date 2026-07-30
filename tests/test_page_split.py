@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 from PIL import Image
 
-import mediaconductor.panels.page as page_module
-from mediaconductor.panels.ai import _manga_reading_order
-from mediaconductor.panels.page import (
+import mangaeasy.panels.page as page_module
+from mangaeasy.panels.ai import _manga_reading_order
+from mangaeasy.panels.page import (
     FULL_PAGE_AREA_FRAC,
     TALL_PANEL_ASPECT_RATIO,
     _split_exit_code,

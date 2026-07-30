@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from mediaconductor.tools import install
+from mangaeasy.tools import install
 
 
 def test_index_tts_skips_build_hostile_extras():

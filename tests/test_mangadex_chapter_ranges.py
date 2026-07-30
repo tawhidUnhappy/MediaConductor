@@ -2,7 +2,7 @@
 
 import pytest
 import argparse
-from mediaconductor.download.mangadex import (
+from mangaeasy.download.mangadex import (
     _parse_chapter_tokens,
     _chapter_token_arg,
 )

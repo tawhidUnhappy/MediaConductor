@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.mark.parametrize(
     "relative_path",
     [
-        # Everything downloaded or generated (mediaconductor/layout.py).
+        # Everything downloaded or generated (mangaeasy/layout.py).
         "data/library/Recap/01/panels/01_001_01.png",
         "data/audio/Recap/01/01_001_01.wav",
         "data/audio_faded/Recap/01/01_001_01.wav",
@@ -60,7 +60,7 @@ def test_sdist_allowlist_does_not_include_generated_projects():
 
 
 def test_no_raw_subprocess_spawns_outside_runtime():
-    """Every child process must go through mediaconductor.runtime.run/popen.
+    """Every child process must go through mangaeasy.runtime.run/popen.
 
     A raw subprocess spawn skips the CREATE_NO_WINDOW handling and pops a
     blank console window on Windows whenever the parent has no visible
@@ -68,7 +68,7 @@ def test_no_raw_subprocess_spawns_outside_runtime():
     owns the flags; assets/tools scripts run inside external envs and are
     launched (not spawned from) here.
     """
-    package = ROOT / "mediaconductor"
+    package = ROOT / "mangaeasy"
     forbidden = (
         "subprocess.run(", "subprocess.Popen(", "subprocess.call(",
         "subprocess.check_call(", "subprocess.check_output(",
@@ -84,6 +84,6 @@ def test_no_raw_subprocess_spawns_outside_runtime():
             if token in text:
                 offenders.append(f"{relative}: {token}")
     assert not offenders, (
-        "raw subprocess spawn(s) found; use mediaconductor.runtime.run/popen instead:\n"
+        "raw subprocess spawn(s) found; use mangaeasy.runtime.run/popen instead:\n"
         + "\n".join(offenders)
     )

@@ -7,12 +7,12 @@ import sys
 import time
 from pathlib import Path
 
-from mediaconductor.jobs import _effective_status, _save_state, _status_for_exit_code
+from mangaeasy.jobs import _effective_status, _save_state, _status_for_exit_code
 
 
 def run_cli(*args: str, cwd=None) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, "-m", "mediaconductor.cli", *args],
+        [sys.executable, "-m", "mangaeasy.cli", *args],
         capture_output=True, text=True, encoding="utf-8", timeout=120, cwd=cwd,
     )
 
@@ -148,7 +148,7 @@ def test_job_status_uses_id_but_rejects_even_contained_state_path(tmp_path):
     job_id = "20260715-120000-video-deadbeef"
     state_file = jobs_dir / f"{job_id}.json"
     outside_log = tmp_path / "must-not-be-read.txt"
-    outside_log.write_text('MEDIACONDUCTOR_RESULT {"secret":"do-not-read"}\n', encoding="utf-8")
+    outside_log.write_text('MANGAEASY_RESULT {"secret":"do-not-read"}\n', encoding="utf-8")
     state_file.write_text(json.dumps({
         "id": job_id,
         "command": "video",
@@ -194,8 +194,8 @@ def test_state_save_retries_transient_windows_replace_race(tmp_path, monkeypatch
             raise PermissionError("destination is briefly open by job-status")
         return real_replace(source, destination)
 
-    monkeypatch.setattr("mediaconductor.jobs.os.replace", flaky_replace)
-    monkeypatch.setattr("mediaconductor.jobs.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr("mangaeasy.jobs.os.replace", flaky_replace)
+    monkeypatch.setattr("mangaeasy.jobs.time.sleep", lambda _seconds: None)
 
     _save_state(state_file, {"status": "succeeded", "exit_code": 0})
 
@@ -209,7 +209,7 @@ def test_detached_supervisor_never_uses_detached_process_on_windows():
     Terminal: the console-less shim respawns the base interpreter, which
     allocates a brand-new (visible) console. Detachment must come from an own
     hidden console (CREATE_NO_WINDOW) instead — reproduced 2026-07-18."""
-    from mediaconductor.jobs import _detached_popen_kwargs
+    from mangaeasy.jobs import _detached_popen_kwargs
 
     kwargs = _detached_popen_kwargs()
     if sys.platform == "win32":
@@ -223,10 +223,10 @@ def test_detached_supervisor_never_uses_detached_process_on_windows():
 
 def test_install_run_defaults_to_pipe_not_pty(monkeypatch):
     """The winpty install PTY allocates a console that Windows 11 shows as a
-    blank terminal window; it must stay opt-in (MEDIACONDUCTOR_INSTALL_PTY)."""
-    from mediaconductor.tools import install
+    blank terminal window; it must stay opt-in (MANGAEASY_INSTALL_PTY)."""
+    from mangaeasy.tools import install
 
-    monkeypatch.delenv("MEDIACONDUCTOR_INSTALL_PTY", raising=False)
+    monkeypatch.delenv("MANGAEASY_INSTALL_PTY", raising=False)
     calls = []
     monkeypatch.setattr(install, "_run_pipe", lambda *a, **k: calls.append("pipe"))
     monkeypatch.setattr(install, "_run_pty_win32",
@@ -234,7 +234,7 @@ def test_install_run_defaults_to_pipe_not_pty(monkeypatch):
     install._run(["echo", "hi"], lambda *_: None, env={})
     assert calls == ["pipe"]
 
-    monkeypatch.setenv("MEDIACONDUCTOR_INSTALL_PTY", "1")
+    monkeypatch.setenv("MANGAEASY_INSTALL_PTY", "1")
     calls.clear()
     install._run(["echo", "hi"], lambda *_: None, env={})
     assert calls == (["pty"] if sys.platform == "win32" else ["pipe"])

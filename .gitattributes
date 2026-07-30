@@ -9,6 +9,14 @@
 *.css text eol=lf
 *.js text eol=lf
 *.html text eol=lf
+# macOS Finder runs .command through bash — LF, like any shell script.
+*.command text eol=lf
+# Windows shells are the exception: cmd.exe mis-parses multi-line blocks
+# (if/for bodies, labels) in a LF-only .bat, and `* text=auto` would otherwise
+# normalise these to LF on checkout for anyone with core.eol=lf.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
 *.wav binary
 *.mp3 binary
 *.flac binary

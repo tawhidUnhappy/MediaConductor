@@ -1,4 +1,4 @@
-"""Pure-logic tests for `webtoon-split` (mediaconductor.panels.webtoon).
+"""Pure-logic tests for `webtoon-split` (mangaeasy.panels.webtoon).
 
 Covers the three additions over plain gutter detection: auto-splitting merged
 mega-panels at quiet rows, rescuing content-bearing gaps, and manual range
@@ -10,8 +10,8 @@ from types import SimpleNamespace
 import numpy as np
 from PIL import Image
 
-import mediaconductor.panels.webtoon as webtoon_module
-from mediaconductor.panels.webtoon import (
+import mangaeasy.panels.webtoon as webtoon_module
+from mangaeasy.panels.webtoon import (
     _split_exit_code,
     apply_range_overrides,
     automatic_full_source_requires_override,

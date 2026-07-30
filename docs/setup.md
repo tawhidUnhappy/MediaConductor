@@ -3,15 +3,15 @@
 The short version, for a machine that already has `git` and `uv`:
 
 ```bash
-git clone https://github.com/tawhidUnhappy/MediaConductor.git
-cd MediaConductor
+git clone https://github.com/tawhidUnhappy/mangaEasy.git
+cd mangaEasy
 uv sync
-uv run mediaconductor setup --mode manga-video
-uv run mediaconductor smoke-test     # proves the install actually produces video
+uv run mangaeasy setup --mode manga-video
+uv run mangaeasy smoke-test     # proves the install actually produces video
 ```
 
 (Installed via `uv tool install` or a frozen release instead? Just run
-`mediaconductor setup --mode <mode>` then `mediaconductor smoke-test`.)
+`mangaeasy setup --mode <mode>` then `mangaeasy smoke-test`.)
 
 The rest of this page is the **agent runbook**: the exact sequence an LLM
 agent follows on a machine it has never seen, with a machine-checkable
@@ -46,13 +46,13 @@ re-check `uv --version`. `git` comes from the platform package manager
 
 > **Windows note:** never invoke bare `python` — on many machines it is the
 > Microsoft Store stub that opens a browser. Always go through
-> `uv run mediaconductor ...` / `uv run python ...`.
+> `uv run mangaeasy ...` / `uv run python ...`.
 
 ### Step 1 — Clone and sync the Python environment
 
 ```bash
-git clone https://github.com/tawhidUnhappy/MediaConductor.git
-cd MediaConductor
+git clone https://github.com/tawhidUnhappy/mangaEasy.git
+cd mangaEasy
 uv sync
 ```
 
@@ -60,8 +60,8 @@ uv sync
 included). Verify:
 
 ```bash
-uv run mediaconductor --version
-uv run mediaconductor where --json     # resolved data/tool paths for THIS install
+uv run mangaeasy --version
+uv run mangaeasy where --json     # resolved data/tool paths for THIS install
 ```
 
 **Run every subsequent command from the repo root.** Two roots are resolved
@@ -69,14 +69,14 @@ per install: `data/` (everything downloaded or generated —
 `data/library/`, `data/audio/`, `data/audio_faded/`, `data/output/`,
 `data/review/`, `data/work/`) and `runtime/` (tool envs, caches, state,
 OAuth tokens). Running from elsewhere is the classic "Failed to spawn:
-mediaconductor" / wrong-paths failure. `setup` registers this workspace so a
+mangaeasy" / wrong-paths failure. `setup` registers this workspace so a
 command started from the wrong directory still resolves back here, and
-`mediaconductor workspace-layout` shows exactly where each root landed.
+`mangaeasy workspace-layout` shows exactly where each root landed.
 
 ### Step 2 — Provision binaries, tool envs and models
 
 ```bash
-uv run mediaconductor setup --mode manga-video
+uv run mangaeasy setup --mode manga-video
 ```
 
 GPU-aware and profile-driven — what gets installed, in order:
@@ -100,8 +100,8 @@ GPU-aware and profile-driven — what gets installed, in order:
    | `magi-v3` | NVIDIA GPU | panel detection for paged manga | 4.3 GB |
    | `deepseek-ocr2` | NVIDIA GPU | panel OCR (`panel-transcript`) | 10.6 GB |
 
-4. **Readiness report** — the same data as `mediaconductor doctor --json`, plus
-   a `MEDIACONDUCTOR_RESULT` line with per-tool ok/failed status.
+4. **Readiness report** — the same data as `mangaeasy doctor --json`, plus
+   a `MANGAEASY_RESULT` line with per-tool ok/failed status.
 
 **Free disk needed: ~50 GB** for the full GPU profile — 30 GB of tool envs
 plus ~17 GB of `uv` build cache under `runtime/cache/uv/`. The cache is pure
@@ -111,12 +111,12 @@ touching an installed tool. The CPU profile (Kokoro only) needs ~10 GB.
 Useful variants:
 
 ```bash
-mediaconductor setup --mode manga-video --dry-run  # inspect the exact plan
-mediaconductor setup --minimal                     # core binaries only (fast)
-mediaconductor setup --all                         # every cataloged tool, GPU or not
-mediaconductor setup --mode manga-video --skip deepseek-ocr2  # repeatable skip
-mediaconductor setup --mode manga-video --skip-models         # envs now, weights later
-mediaconductor setup --mode manga-video --cpu  # or --cuda to force the torch target
+mangaeasy setup --mode manga-video --dry-run  # inspect the exact plan
+mangaeasy setup --minimal                     # core binaries only (fast)
+mangaeasy setup --all                         # every cataloged tool, GPU or not
+mangaeasy setup --mode manga-video --skip deepseek-ocr2  # repeatable skip
+mangaeasy setup --mode manga-video --skip-models         # envs now, weights later
+mangaeasy setup --mode manga-video --cpu  # or --cuda to force the torch target
 ```
 
 Expect the full GPU profile to take tens of minutes on a fast connection —
@@ -124,13 +124,13 @@ it is **idempotent and resumable**: if the run is interrupted (network,
 power), just rerun the same mode command; it skips what's done and resumes
 partial model downloads. One tool failing does not abort the others (exit
 code 1 + a named failure in the summary — fix with another `setup` run or
-`mediaconductor install-tool <name>`; per-tool options live in
+`mangaeasy install-tool <name>`; per-tool options live in
 [install-tools.md](install-tools.md)).
 
 ### Step 3 — Verify with `doctor --json` (the machine contract)
 
 ```bash
-uv run mediaconductor doctor --json
+uv run mangaeasy doctor --json
 ```
 
 One JSON object. Assert, for the profile you installed:
@@ -142,14 +142,14 @@ One JSON object. Assert, for the profile you installed:
 - For each tool you installed: `tools.<name>.installed == true`
   (`configured` true means the catalog entry itself is valid).
 
-Anything false → re-run `mediaconductor setup` (or `mediaconductor install-tool
+Anything false → re-run `mangaeasy setup` (or `mangaeasy install-tool
 <name>` for one tool) and check again. `doctor` is read-only and cheap; use
 it as the fix-loop oracle.
 
 ### Step 4 — Prove it end to end with `smoke-test`
 
 ```bash
-uv run mediaconductor smoke-test
+uv run mangaeasy smoke-test
 ```
 
 Builds a tiny throwaway project (two generated panels + narration),
@@ -164,7 +164,7 @@ Optionally prove the TTS toolchain too (downloads the Kokoro model on first
 use if `--skip-models` was used):
 
 ```bash
-uv run mediaconductor smoke-test --tts kokoro
+uv run mangaeasy smoke-test --tts kokoro
 ```
 
 `--keep` leaves `data/work/smoke_test/` behind for inspection on failure.
@@ -190,11 +190,11 @@ produced for a real channel usually want:
   what resolved before a long render depends on it:
 
   ```bash
-  mediaconductor doctor     # "Configured media" — the path, and whether it exists
+  mangaeasy doctor     # "Configured media" — the path, and whether it exists
   ```
 
 - **YouTube upload**: place one downloaded Desktop-app client JSON at the
-  `shared_client_file` reported by `mediaconductor youtube-profiles --json`.
+  `shared_client_file` reported by `mangaeasy youtube-profiles --json`.
   Each named profile keeps its own token/channel; the first live status/upload
   opens browser consent automatically for the channel owner and continues.
   Use `--no-auto-auth` only for a pre-authorized headless worker. See
@@ -246,17 +246,17 @@ through librosa/torchaudio and their codec support varies by machine.
 `--speaker-wav` / `--background-music` override the configured values per run.
 
 Render settings (resolution, fps, encoder, background style, blur) are **CLI
-flags** on `mediaconductor video` / `video-render`, not config keys.
+flags** on `mangaeasy video` / `video-render`, not config keys.
 
 ### Fix loop summary
 
 | Symptom | Fix |
 |---|---|
 | `uv: command not found` | Step 0 install, then open a fresh shell |
-| `Failed to spawn: mediaconductor` | you left the repo root — `cd` back before `uv run` |
-| `doctor` shows a tool `installed: false` | `mediaconductor install-tool <name>` or re-run `setup` |
-| model download interrupted / partial | re-run `mediaconductor setup` (resumes). A Hugging Face `CAS Client Error` / `error decoding response body` mid-download is a transient transfer failure, not a broken install — `doctor` names the missing file and the re-run fetches just that |
-| `ffmpeg not found` in smoke-test | `mediaconductor bootstrap-tools`, re-check `doctor` |
+| `Failed to spawn: mangaeasy` | you left the repo root — `cd` back before `uv run` |
+| `doctor` shows a tool `installed: false` | `mangaeasy install-tool <name>` or re-run `setup` |
+| model download interrupted / partial | re-run `mangaeasy setup` (resumes). A Hugging Face `CAS Client Error` / `error decoding response body` mid-download is a transient transfer failure, not a broken install — `doctor` names the missing file and the re-run fetches just that |
+| `ffmpeg not found` in smoke-test | `mangaeasy bootstrap-tools`, re-check `doctor` |
 | GPU expected but `cuda: false` | check `nvidia-smi` works on the host; fix drivers, re-run `setup --cuda` |
 | no GPU at all | fine — CPU profile: TTS = Kokoro, encoding = libx264; `page-split` needs `setup --all` and is slow on CPU |
 | disk pressure | `--skip deepseek-ocr2` saves ~10.6 GB, `--skip index-tts` ~10.6 GB; `--skip-models` defers model weights; `uv cache prune` reclaims most of `runtime/cache/uv/` afterwards |
@@ -273,20 +273,20 @@ Self-contained by design, in two folders:
 
 HF/torch/uv caches are force-pinned under `runtime/cache/` — a global
 `HF_HOME` will NOT leak downloads elsewhere; set
-`MEDIACONDUCTOR_SHARE_CACHES=1` if you want shared caches, see
+`MANGAEASY_SHARE_CACHES=1` if you want shared caches, see
 [external-tools.md](external-tools.md).
 
 Your `bgm/`, `vocal/` and config files sit beside both and are never written
-by MediaConductor, so a reset cannot take them with it.
+by mangaEasy, so a reset cannot take them with it.
 
 ```bash
-mediaconductor workspace-layout         # where each root actually resolved
-mediaconductor workspace-reset          # dry run: what a fresh start would clear
-mediaconductor workspace-reset --confirm
+mangaeasy workspace-layout         # where each root actually resolved
+mangaeasy workspace-reset          # dry run: what a fresh start would clear
+mangaeasy workspace-reset --confirm
 ```
 
-`MEDIACONDUCTOR_DATA_ROOT` relocates `data/` (e.g. onto a larger drive) and
-`MEDIACONDUCTOR_HOME` relocates `runtime/` (e.g. to share one tool tree
+`MANGAEASY_DATA_ROOT` relocates `data/` (e.g. onto a larger drive) and
+`MANGAEASY_HOME` relocates `runtime/` (e.g. to share one tool tree
 between checkouts). Point them at *different* trees — `workspace-layout`
 reports an overlap as an error, because a reset would otherwise delete the
 tool environments.
@@ -298,4 +298,4 @@ tool environments.
   (Claude Code loads it automatically) or
   [recap-video-playbook.md](recap-video-playbook.md).
 - CLI contract and full command catalog:
-  [ai-guide.md](ai-guide.md) / `mediaconductor commands --json`.
+  [ai-guide.md](ai-guide.md) / `mangaeasy commands --json`.

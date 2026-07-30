@@ -1,6 +1,6 @@
 # Crop → verify → see → narrate
 
-The core manga-video loop in MediaConductor: turn raw manga/webtoon pages into
+The core manga-video loop in mangaEasy: turn raw manga/webtoon pages into
 verified panel crops, look at every one, and write the narration script that
 drives the video. This is the **flagship operator doc** — self-contained, and
 the template every other operator doc is written to. When you have crops +
@@ -16,7 +16,7 @@ audio, video, thumbnail, and upload.
 Prerequisites: a project laid out as `data/library/<Project>/<item>/download/`
 (raw pages), one `item` per chapter (`01`, `02`, …). See
 [the data layout](../../CLAUDE.md) ("Data layout") for the full folder contract.
-Orient first with `mediaconductor where --json` and `mediaconductor doctor --json`.
+Orient first with `mangaeasy where --json` and `mangaeasy doctor --json`.
 
 ---
 
@@ -24,13 +24,13 @@ Orient first with `mediaconductor where --json` and `mediaconductor doctor --jso
 
 | Source shape | Use | Detector |
 |---|---|---|
-| **Vertical strip** — one endless scroll, panels separated by gutters (Korean/Chinese webtoons) | `mediaconductor webtoon-split` | gutter analysis (no GPU model) |
-| **Paged manga** — discrete pages, multiple panels per page (Japanese tankōbon, most scanlations) | `mediaconductor page-split` | MAGI v3 (needs `install-tool magi-v3`) |
+| **Vertical strip** — one endless scroll, panels separated by gutters (Korean/Chinese webtoons) | `mangaeasy webtoon-split` | gutter analysis (no GPU model) |
+| **Paged manga** — discrete pages, multiple panels per page (Japanese tankōbon, most scanlations) | `mangaeasy page-split` | MAGI v3 (needs `install-tool magi-v3`) |
 
 Let the machine measure first:
 
 ```bash
-mediaconductor style-detect --project-root data/library/<Project> --json
+mangaeasy style-detect --project-root data/library/<Project> --json
 ```
 
 It reports a per-item and overall verdict (`webtoon` / `paged` / `uncertain`)
@@ -44,7 +44,7 @@ than wide → webtoon. Roughly page-shaped images with panel grids → paged.
 ## Step 1A — Crop a **webtoon** (`webtoon-split`)
 
 ```bash
-mediaconductor webtoon-split --project-root data/library/<Project> --item-range 01-19
+mangaeasy webtoon-split --project-root data/library/<Project> --item-range 01-19
 ```
 
 Per item it stitches `download/` into one tall strip, splits at gutters, then
@@ -77,19 +77,19 @@ indices by hand (doing that by eye shipped one-off merges twice):
 
 ```bash
 # undo the bad auto-split cut at stitched y=31099 (from a cutcheck label):
-mediaconductor webtoon-override --file work/overrides.json \
+mangaeasy webtoon-override --file work/overrides.json \
     --project-root data/library/<Project> --item 01 --merge-at-cut 31099
 
 # fuse the panels labeled #29 and #30 on the current sheets:
-mediaconductor webtoon-override --file work/overrides.json \
+mangaeasy webtoon-override --file work/overrides.json \
     --project-root data/library/<Project> --item 01 --merge-panels 29,30
 
 # reposition a bad cut: merge across it, then force the right y:
-mediaconductor webtoon-override --file work/overrides.json \
+mangaeasy webtoon-override --file work/overrides.json \
     --project-root data/library/<Project> --item 02 \
     --merge-at-cut 42186 --split-at 42394
 
-mediaconductor webtoon-split --project-root data/library/<Project> --items 01 02 \
+mangaeasy webtoon-split --project-root data/library/<Project> --items 01 02 \
     --overrides work/overrides.json
 ```
 
@@ -107,13 +107,13 @@ Semantics under the hood (what the tool writes):
   repositioned cut.
 - `replace` swaps an item's whole range list (hand-edit only).
 
-Implementation: [mediaconductor/panels/webtoon.py](../../mediaconductor/panels/webtoon.py).
+Implementation: [mangaeasy/panels/webtoon.py](../../mangaeasy/panels/webtoon.py).
 
 ## Step 1B — Crop **paged manga** (`page-split`)
 
 ```bash
-mediaconductor install-tool magi-v3   # one-time; downloads the model on first run
-mediaconductor page-split --project-root data/library/<Project> --item-range 01-12 \
+mangaeasy install-tool magi-v3   # one-time; downloads the model on first run
+mangaeasy page-split --project-root data/library/<Project> --item-range 01-12 \
     --reading-direction rtl            # rtl = Japanese; ltr = Chinese/Korean
 ```
 
@@ -156,7 +156,7 @@ Overlapping override boxes are fine and often correct — for a diagonal panel
 border, overlap beats clipping a speech bubble. Re-run `page-split` for just
 that item; it re-detects but your override wins for the listed pages.
 
-Implementation: [mediaconductor/panels/page.py](../../mediaconductor/panels/page.py).
+Implementation: [mangaeasy/panels/page.py](../../mangaeasy/panels/page.py).
 MAGI env pins live in [the magi-v3 notes](../../CLAUDE.md) and are baked into
 `batch_detect_magi.py`.
 
@@ -169,7 +169,7 @@ crops on downscaled contact sheets shipped a video with half panels, fused
 panels and sliced speech bubbles that all had to be redone:
 
 ```bash
-mediaconductor webtoon-cutcheck --project-root data/library/<Project> --item-range 01-07
+mangaeasy webtoon-cutcheck --project-root data/library/<Project> --item-range 01-07
 ```
 
 It renders a source-resolution window (±650 px of context) around **every
@@ -225,8 +225,8 @@ Re-running a splitter renumbers every panel, orphaning `narration.json` and
 the per-panel WAVs. Never re-narrate to fix that:
 
 ```bash
-mediaconductor panels-remap --project-root data/library/<Project> --item-range 01-07   # dry run
-mediaconductor panels-remap --project-root data/library/<Project> --item-range 01-07 --apply
+mangaeasy panels-remap --project-root data/library/<Project> --item-range 01-07   # dry run
+mangaeasy panels-remap --project-root data/library/<Project> --item-range 01-07 --apply
 ```
 
 It locates each archived old panel's span in the stitched strip, maps old →
@@ -237,7 +237,7 @@ Refuse to `--apply` while the dry run reports orphans or bad locates; pass
 `--old-run` explicitly if the item was re-cropped more than once (the
 narration must match that archive). Afterwards, review every `shift`/`merge`
 panel with `narration-review-sheets --only-images ...` and rebuild with
-`mediaconductor video --overwrite-video` (stale item videos are also auto-detected
+`mangaeasy video --overwrite-video` (stale item videos are also auto-detected
 now, but be explicit).
 
 ---
@@ -259,8 +259,8 @@ beats; you can't hook a viewer on a story you skimmed. While reading, note:
 ## Step 3.5 — Optionally transcribe the bubbles (`panel-transcript`)
 
 ```bash
-mediaconductor install-tool deepseek-ocr2   # one-time
-mediaconductor panel-transcript --project-root data/library/<Project> --item-range 01-07
+mangaeasy install-tool deepseek-ocr2   # one-time
+mangaeasy panel-transcript --project-root data/library/<Project> --item-range 01-07
 ```
 
 This OCRs every panel into `<item>/transcript.json`, which the review sheets
@@ -348,13 +348,13 @@ Rules that hold across the pipeline:
 
 The full scriptwriting spec — speaker identification, speech types, tone — is
 the narration prompt at
-[mediaconductor/assets/prompts/narration.md](../../mediaconductor/assets/prompts/narration.md).
+[mangaeasy/assets/prompts/narration.md](../../mangaeasy/assets/prompts/narration.md).
 Feed it plus the panel images to an LLM, or write by hand.
 
 Validate before spending GPU time:
 
 ```bash
-mediaconductor video-check --project-root data/library/<Project> --items 01 --json
+mangaeasy video-check --project-root data/library/<Project> --items 01 --json
 ```
 
 When you deliberately narrate a subset, `video-check` returns `"ok": false`
@@ -369,7 +369,7 @@ text" warnings** (those become corrupt near-empty WAVs).
 are right. That pass is:
 
 ```bash
-mediaconductor narration-review-sheets --project-root data/library/<Project> --item-range 01-07
+mangaeasy narration-review-sheets --project-root data/library/<Project> --item-range 01-07
 ```
 
 Each sheet pairs a panel preview with the narration line that will be spoken
@@ -382,7 +382,7 @@ speech. Fix each bad line with one command — no JSON editing, and the stale WA
 is pruned so the next audio run regenerates it:
 
 ```bash
-mediaconductor narration-edit --project-root data/library/<Project> --item 01 \
+mangaeasy narration-edit --project-root data/library/<Project> --item 01 \
     --set ch01_005.jpg "Something ancient stirs inside the light." \
     --prune-audio
 ```
@@ -406,12 +406,12 @@ the video** (audio → render → join → BGM → thumbnail → upload).
 
 | Command | Role | Source |
 |---|---|---|
-| `webtoon-split` | crop vertical strips + verify sheets + ranges manifest | [panels/webtoon.py](../../mediaconductor/panels/webtoon.py) |
-| `webtoon-cutcheck` | full-res review windows for every forced cut / short panel | [panels/cutcheck.py](../../mediaconductor/panels/cutcheck.py) |
-| `webtoon-override` | build the overrides file with auto-resolved indices | [panels/overrides_tool.py](../../mediaconductor/panels/overrides_tool.py) |
-| `narration-edit` | upsert/delete narration lines + prune stale WAVs | [video_pipeline/narration_edit.py](../../mediaconductor/video_pipeline/narration_edit.py) |
-| `panels-remap` | carry narration + audio across a re-crop | [panels/remap.py](../../mediaconductor/panels/remap.py) |
-| `page-split` | crop paged manga (MAGI v3) + verify sheets | [panels/page.py](../../mediaconductor/panels/page.py) |
-| `panel-transcript` | optional unverified OCR cross-check for every panel | [ocr/panel_transcript.py](../../mediaconductor/ocr/panel_transcript.py) |
-| `narration-review-sheets` | panel + narration + unverified OCR sheets for semantic QA | [video_pipeline/narration_sheets.py](../../mediaconductor/video_pipeline/narration_sheets.py) |
-| `video-check` | validate item inputs before building (incl. unspeakable text) | [video_pipeline/check_items.py](../../mediaconductor/video_pipeline/check_items.py) |
+| `webtoon-split` | crop vertical strips + verify sheets + ranges manifest | [panels/webtoon.py](../../mangaeasy/panels/webtoon.py) |
+| `webtoon-cutcheck` | full-res review windows for every forced cut / short panel | [panels/cutcheck.py](../../mangaeasy/panels/cutcheck.py) |
+| `webtoon-override` | build the overrides file with auto-resolved indices | [panels/overrides_tool.py](../../mangaeasy/panels/overrides_tool.py) |
+| `narration-edit` | upsert/delete narration lines + prune stale WAVs | [video_pipeline/narration_edit.py](../../mangaeasy/video_pipeline/narration_edit.py) |
+| `panels-remap` | carry narration + audio across a re-crop | [panels/remap.py](../../mangaeasy/panels/remap.py) |
+| `page-split` | crop paged manga (MAGI v3) + verify sheets | [panels/page.py](../../mangaeasy/panels/page.py) |
+| `panel-transcript` | optional unverified OCR cross-check for every panel | [ocr/panel_transcript.py](../../mangaeasy/ocr/panel_transcript.py) |
+| `narration-review-sheets` | panel + narration + unverified OCR sheets for semantic QA | [video_pipeline/narration_sheets.py](../../mangaeasy/video_pipeline/narration_sheets.py) |
+| `video-check` | validate item inputs before building (incl. unspeakable text) | [video_pipeline/check_items.py](../../mangaeasy/video_pipeline/check_items.py) |

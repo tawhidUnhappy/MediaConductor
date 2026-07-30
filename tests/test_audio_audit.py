@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-from mediaconductor.video_pipeline import audio_audit
+from mangaeasy.video_pipeline import audio_audit
 
 
 def _ready_item(project_root: Path, audio_root: Path, name: str) -> None:
@@ -36,11 +36,11 @@ def test_human_audit_emits_one_progress_tick_per_item(tmp_path, monkeypatch, cap
     assert audio_audit.main() == 0
     progress = [
         line for line in capsys.readouterr().out.splitlines()
-        if line.startswith("MEDIACONDUCTOR_PROGRESS")
+        if line.startswith("MANGAEASY_PROGRESS")
     ]
     assert progress == [
-        "MEDIACONDUCTOR_PROGRESS 1/2 Audited 01",
-        "MEDIACONDUCTOR_PROGRESS 2/2 Audited 02",
+        "MANGAEASY_PROGRESS 1/2 Audited 01",
+        "MANGAEASY_PROGRESS 2/2 Audited 02",
     ]
 
 
@@ -66,6 +66,6 @@ def test_json_audit_stdout_remains_one_json_object(tmp_path, monkeypatch, capsys
     assert payload["not_ready"] == ["02"]
     assert payload["ok"] is True
     assert captured.err.splitlines() == [
-        "MEDIACONDUCTOR_PROGRESS 1/2 Audited 01",
-        "MEDIACONDUCTOR_PROGRESS 2/2 Audited 02",
+        "MANGAEASY_PROGRESS 1/2 Audited 01",
+        "MANGAEASY_PROGRESS 2/2 Audited 02",
     ]

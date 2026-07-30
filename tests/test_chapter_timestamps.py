@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from mediaconductor.video_pipeline import chapter_timestamps
+from mangaeasy.video_pipeline import chapter_timestamps
 
 
 def _project(tmp_path: Path, *items: str, name: str = "Series") -> tuple[Path, Path]:
@@ -254,7 +254,7 @@ def test_json_main_emits_one_clean_document(tmp_path, monkeypatch, capsys):
     ]) == 0
 
     output = capsys.readouterr().out
-    assert "MEDIACONDUCTOR_RESULT" not in output
+    assert "MANGAEASY_RESULT" not in output
     report = json.loads(output)
     assert [entry["item"] for entry in report["entries"]] == ["01", "02", "2.1", "03"]
     assert report["total_duration_seconds"] == 122.0

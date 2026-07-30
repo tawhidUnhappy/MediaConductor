@@ -6,12 +6,12 @@ import sys
 
 import pytest
 
-from mediaconductor.cli import COMMANDS
-from mediaconductor.command_spec import JSON_COMMANDS, LONG_RUNNING, TOOLS
-from mediaconductor.mcp_server import _allowed_tools, _run_tool, _tools_list
-from mediaconductor.modes import DEFAULT_MODE, MODES, resolve_skill_path
-from mediaconductor.tools.install import TOOLS as EXTERNAL_TOOLS
-from mediaconductor.tools.setup import MODE_TOOLS
+from mangaeasy.cli import COMMANDS
+from mangaeasy.command_spec import JSON_COMMANDS, LONG_RUNNING, TOOLS
+from mangaeasy.mcp_server import _allowed_tools, _run_tool, _tools_list
+from mangaeasy.modes import DEFAULT_MODE, MODES, resolve_skill_path
+from mangaeasy.tools.install import TOOLS as EXTERNAL_TOOLS
+from mangaeasy.tools.setup import MODE_TOOLS
 
 
 def test_mode_registries_reference_real_surfaces():
@@ -116,7 +116,7 @@ def test_job_start_rejects_recursion():
 
 def test_mcp_help_does_not_start_server():
     proc = subprocess.run(
-        [sys.executable, "-m", "mediaconductor.cli", "mcp", "--help"],
+        [sys.executable, "-m", "mangaeasy.cli", "mcp", "--help"],
         capture_output=True, text=True, encoding="utf-8", timeout=30,
     )
     assert proc.returncode == 0
@@ -128,10 +128,10 @@ def test_mcp_help_does_not_start_server():
 
 def test_mode_setup_dry_run_is_exact():
     proc = subprocess.run(
-        [sys.executable, "-m", "mediaconductor.cli", "setup", "--mode", "manga-video", "--dry-run"],
+        [sys.executable, "-m", "mangaeasy.cli", "setup", "--mode", "manga-video", "--dry-run"],
         capture_output=True, text=True, encoding="utf-8", timeout=30,
     )
     assert proc.returncode == 0
-    marker = next(line for line in proc.stdout.splitlines() if line.startswith("MEDIACONDUCTOR_RESULT "))
+    marker = next(line for line in proc.stdout.splitlines() if line.startswith("MANGAEASY_RESULT "))
     payload = json.loads(marker.partition(" ")[2])
     assert payload["tools"] == ["kokoro-82m", "index-tts", "magi-v3", "deepseek-ocr2"]

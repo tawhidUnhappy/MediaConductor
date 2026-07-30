@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from mediaconductor import defaults
-from mediaconductor.reviews import record_crop_review, record_narration_review
-from mediaconductor.video_pipeline import run_pipeline
+from mangaeasy import defaults
+from mangaeasy.reviews import record_crop_review, record_narration_review
+from mangaeasy.video_pipeline import run_pipeline
 
 
 def _command_name(command: list[str]) -> str:
@@ -152,23 +152,23 @@ def test_progress_markers_cover_full_dynamic_pipeline(tmp_path, monkeypatch, cap
     ]
     progress = [
         line for line in capsys.readouterr().out.splitlines()
-        if line.startswith("MEDIACONDUCTOR_PROGRESS")
+        if line.startswith("MANGAEASY_PROGRESS")
     ]
     assert progress == [
-        "MEDIACONDUCTOR_PROGRESS 0/7 Starting Generate narration audio",
-        "MEDIACONDUCTOR_PROGRESS 1/7 Completed Generate narration audio",
-        "MEDIACONDUCTOR_PROGRESS 1/7 Starting Apply narration fades",
-        "MEDIACONDUCTOR_PROGRESS 2/7 Completed Apply narration fades",
-        "MEDIACONDUCTOR_PROGRESS 2/7 Starting Render item videos",
-        "MEDIACONDUCTOR_PROGRESS 3/7 Completed Render item videos",
-        "MEDIACONDUCTOR_PROGRESS 3/7 Starting Join long video",
-        "MEDIACONDUCTOR_PROGRESS 4/7 Completed Join long video",
-        "MEDIACONDUCTOR_PROGRESS 4/7 Starting Mix background music",
-        "MEDIACONDUCTOR_PROGRESS 5/7 Completed Mix background music",
-        "MEDIACONDUCTOR_PROGRESS 5/7 Starting Normalize final audio",
-        "MEDIACONDUCTOR_PROGRESS 6/7 Completed Normalize final audio",
-        "MEDIACONDUCTOR_PROGRESS 6/7 Starting Validate generated video",
-        "MEDIACONDUCTOR_PROGRESS 7/7 Completed Validate generated video",
+        "MANGAEASY_PROGRESS 0/7 Starting Generate narration audio",
+        "MANGAEASY_PROGRESS 1/7 Completed Generate narration audio",
+        "MANGAEASY_PROGRESS 1/7 Starting Apply narration fades",
+        "MANGAEASY_PROGRESS 2/7 Completed Apply narration fades",
+        "MANGAEASY_PROGRESS 2/7 Starting Render item videos",
+        "MANGAEASY_PROGRESS 3/7 Completed Render item videos",
+        "MANGAEASY_PROGRESS 3/7 Starting Join long video",
+        "MANGAEASY_PROGRESS 4/7 Completed Join long video",
+        "MANGAEASY_PROGRESS 4/7 Starting Mix background music",
+        "MANGAEASY_PROGRESS 5/7 Completed Mix background music",
+        "MANGAEASY_PROGRESS 5/7 Starting Normalize final audio",
+        "MANGAEASY_PROGRESS 6/7 Completed Normalize final audio",
+        "MANGAEASY_PROGRESS 6/7 Starting Validate generated video",
+        "MANGAEASY_PROGRESS 7/7 Completed Validate generated video",
     ]
 
 
@@ -193,13 +193,13 @@ def test_item_only_validation_uses_raw_audio_and_render_fps(tmp_path, monkeypatc
     assert "--no-require-long" in validate
     progress = [
         line for line in capsys.readouterr().out.splitlines()
-        if line.startswith("MEDIACONDUCTOR_PROGRESS")
+        if line.startswith("MANGAEASY_PROGRESS")
     ]
     assert progress == [
-        "MEDIACONDUCTOR_PROGRESS 0/2 Starting Render item videos",
-        "MEDIACONDUCTOR_PROGRESS 1/2 Completed Render item videos",
-        "MEDIACONDUCTOR_PROGRESS 1/2 Starting Validate generated video",
-        "MEDIACONDUCTOR_PROGRESS 2/2 Completed Validate generated video",
+        "MANGAEASY_PROGRESS 0/2 Starting Render item videos",
+        "MANGAEASY_PROGRESS 1/2 Completed Render item videos",
+        "MANGAEASY_PROGRESS 1/2 Starting Validate generated video",
+        "MANGAEASY_PROGRESS 2/2 Completed Validate generated video",
     ]
 
 

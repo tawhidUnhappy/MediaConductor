@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from mediaconductor.video_pipeline.narration_contract import (
+from mangaeasy.video_pipeline.narration_contract import (
     NarrationContractError,
     narration_problems,
     validate_entries,
@@ -75,7 +75,7 @@ def test_nested_panel_paths_are_rejected(item, image):
 
 def test_panel_must_resolve_to_a_direct_child(item):
     """Resolved containment, not only a string check on the raw value."""
-    from mediaconductor.video_pipeline.narration_contract import resolve_panel_path
+    from mangaeasy.video_pipeline.narration_contract import resolve_panel_path
 
     panels = item / "panels"
     assert resolve_panel_path("a.png", panels, "x") == (panels / "a.png").resolve()

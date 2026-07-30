@@ -2,7 +2,7 @@
 
 Heavy model tools run in their own isolated `uv` environments, each with its
 own `.venv`, Python, and CUDA/Torch stack. The easiest way to provision them is
-`mediaconductor install-tool <name>` — see [install-tools.md](install-tools.md).
+`mangaeasy install-tool <name>` — see [install-tools.md](install-tools.md).
 
 `READY.json` records a completed local installation, and `doctor` rechecks the
 interpreter, adapters, model directories, and required model payloads without
@@ -16,7 +16,7 @@ not bit-reproducible yet.
 Run:
 
 ```bash
-mediaconductor tools
+mangaeasy tools
 ```
 
 The resolver checks, in order:
@@ -28,13 +28,13 @@ The resolver checks, in order:
    - `DEEPSEEK_OCR2_ROOT` (or `DEEPSEEK_OCR2_DIR`)
    - `Z_IMAGE_TURBO_ROOT` (or `Z_IMAGE_TURBO_DIR`)
 2. The managed tools dir: `<install folder>/runtime/tools/<name>`
-   (override with `MEDIACONDUCTOR_TOOLS_DIR`)
+   (override with `MANGAEASY_TOOLS_DIR`)
 If a tool has `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python` (Unix),
-MediaConductor uses it directly. Otherwise it falls back to `uv run --project`.
+mangaEasy uses it directly. Otherwise it falls back to `uv run --project`.
 
 ## TTS engine selection
 
-`mediaconductor video` picks the engine automatically (`--tts auto`, the default):
+`mangaeasy video` picks the engine automatically (`--tts auto`, the default):
 
 - **IndexTTS** when an NVIDIA GPU is present, the `index-tts` env is installed
   with checkpoints, and the speaker reference WAV exists — best quality.
@@ -47,12 +47,12 @@ Force a specific engine with `--tts indextts` or `--tts kokoro`.
 Used by:
 
 ```bash
-mediaconductor video          # default engine on machines without an NVIDIA GPU
-mediaconductor video-audio
+mangaeasy video          # default engine on machines without an NVIDIA GPU
+mangaeasy video-audio
 ```
 
-Install with `mediaconductor install-tool kokoro-82m`. MediaConductor sends a manifest
-to `mediaconductor.video_pipeline.kokoro_batch_worker` and executes it inside the
+Install with `mangaeasy install-tool kokoro-82m`. mangaEasy sends a manifest
+to `mangaeasy.video_pipeline.kokoro_batch_worker` and executes it inside the
 Kokoro environment. Its model is a legacy first-use download from the current
 Hub default revision, not an immutable installer snapshot.
 
@@ -61,19 +61,19 @@ Hub default revision, not an immutable installer snapshot.
 Used by:
 
 ```bash
-mediaconductor video          # default engine on NVIDIA GPU machines
-mediaconductor video-audio-indextts
-mediaconductor index-tts
+mangaeasy video          # default engine on NVIDIA GPU machines
+mangaeasy video-audio-indextts
+mangaeasy index-tts
 ```
 
-Install with `mediaconductor install-tool index-tts`. IndexTTS stays isolated
+Install with `mangaeasy install-tool index-tts`. IndexTTS stays isolated
 because its dependency stack is large and can conflict with other tools. Its
 source checkout and Hugging Face checkpoint are both immutable revisions, and
 readiness verifies every required checkpoint payload.
 
 ## MAGI v3 (panel detection)
 
-Used by panel detection when `MEDIACONDUCTOR_EXTERNAL_MAGI` is not `0`.
+Used by panel detection when `MANGAEASY_EXTERNAL_MAGI` is not `0`.
 
 The external MAGI environment must expose:
 
@@ -81,12 +81,12 @@ The external MAGI environment must expose:
 magi-v3/detect_magi.py
 ```
 
-`mediaconductor install-tool magi-v3` creates this automatically — the adapter ships
-inside the mediaconductor package (`mediaconductor/assets/tools/detect_magi.py`) and is
+`mangaeasy install-tool magi-v3` creates this automatically — the adapter ships
+inside the mangaeasy package (`mangaeasy/assets/tools/detect_magi.py`) and is
 copied into the tool folder. The `ragavsachdeva/magiv3` model code/weights
 download from the current Hugging Face default revision on the first run.
 
-Set `MEDIACONDUCTOR_EXTERNAL_MAGI=0` only when the main package env has the `ml`
+Set `MANGAEASY_EXTERNAL_MAGI=0` only when the main package env has the `ml`
 extra installed and you intentionally want in-process detection.
 
 ## DeepSeek-OCR 2
@@ -94,11 +94,11 @@ extra installed and you intentionally want in-process detection.
 Used by:
 
 ```bash
-mediaconductor deepseek-ocr2 --project-root data/library/<project>
-mediaconductor deepseek-ocr2 --project-root data/library/<project> --item-range 01-24 --device cuda
+mangaeasy deepseek-ocr2 --project-root data/library/<project>
+mangaeasy deepseek-ocr2 --project-root data/library/<project> --item-range 01-24 --device cuda
 ```
 
-Install with `mediaconductor install-tool deepseek-ocr2`. The installer creates an
+Install with `mangaeasy install-tool deepseek-ocr2`. The installer creates an
 isolated uv environment and downloads the `deepseek-ai/DeepSeek-OCR-2` model
 from Hugging Face into `deepseek-ocr2/model`. The command scans narration JSON
 files, finds each panel image, and adds an `ocr` field to every entry that does

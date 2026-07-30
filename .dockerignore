@@ -10,7 +10,7 @@
 /dist/
 /build-tmp/
 
-# The two trees this install writes at runtime (mediaconductor/layout.py):
+# The two trees this install writes at runtime (mangaeasy/layout.py):
 # data/ is everything downloaded or generated, runtime/ is tool envs + caches.
 /data/
 /runtime/

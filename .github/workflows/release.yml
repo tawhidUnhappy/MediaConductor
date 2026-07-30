@@ -48,7 +48,7 @@ jobs:
 
       - name: Set build version
         shell: bash
-        run: echo "MEDIACONDUCTOR_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+        run: echo "MANGAEASY_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Verify tag and source versions
         shell: bash
@@ -56,7 +56,7 @@ jobs:
           set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
           pyproject=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          package=$(python -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('mediaconductor/__init__.py', encoding='utf-8').read()).group(1))")
+          package=$(python -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('mangaeasy/__init__.py', encoding='utf-8').read()).group(1))")
           echo "tag=$tag pyproject=$pyproject package=$package"
           if [ "$tag" != "$pyproject" ] || [ "$tag" != "$package" ]; then
             echo "::error::Version mismatch. Run scripts/release.py before tagging."
@@ -69,7 +69,7 @@ jobs:
       - name: Lint, compile, and test
         run: |
           uv run --no-sync ruff check .
-          uv run --no-sync python -m compileall -q mediaconductor scripts
+          uv run --no-sync python -m compileall -q mangaeasy scripts
           uv run --no-sync pytest
 
       - name: Verify Python distributions
@@ -80,14 +80,14 @@ jobs:
       # Heavy AI stacks stay in isolated install-tool environments and are not
       # frozen. Core executables are provisioned on first use.
       - name: Build frozen CLI and MCP server
-        run: uv run --no-sync pyinstaller packaging/mediaconductor.spec
+        run: uv run --no-sync pyinstaller packaging/mangaeasy.spec
 
       - name: Verify macOS bundle icon
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
-          bundle="dist/MediaConductor.app"
+          bundle="dist/mangaEasy.app"
           icon=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$bundle/Contents/Info.plist")
           test -n "$icon"
           test -s "$bundle/Contents/Resources/$icon"
@@ -97,11 +97,11 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$RUNNER_OS" = "macOS" ]; then
-            backend="dist/MediaConductor.app/Contents/MacOS/mediaconductor"
+            backend="dist/mangaEasy.app/Contents/MacOS/mangaeasy"
           elif [ "$RUNNER_OS" = "Windows" ]; then
-            backend="dist/MediaConductor/mediaconductor.exe"
+            backend="dist/mangaEasy/mangaeasy.exe"
           else
-            backend="dist/MediaConductor/mediaconductor"
+            backend="dist/mangaEasy/mangaeasy"
           fi
           "$backend" --version
           "$backend" doctor --json | python -c "import json,sys; json.loads(sys.stdin.read().strip().splitlines()[-1]); print('doctor JSON ok')"
@@ -114,17 +114,17 @@ jobs:
           set -euo pipefail
           mkdir -p release-assets
           if [ "$RUNNER_OS" = "macOS" ]; then
-            (cd dist && zip -qry "../release-assets/media-conductor-${{ matrix.platform }}.zip" MediaConductor.app)
+            (cd dist && zip -qry "../release-assets/mangaeasy-${{ matrix.platform }}.zip" mangaEasy.app)
           elif [ "$RUNNER_OS" = "Windows" ]; then
-            (cd dist && 7z a -tzip "../release-assets/media-conductor-${{ matrix.platform }}.zip" MediaConductor >/dev/null)
+            (cd dist && 7z a -tzip "../release-assets/mangaeasy-${{ matrix.platform }}.zip" mangaEasy >/dev/null)
           else
-            (cd dist && tar czf "../release-assets/media-conductor-${{ matrix.platform }}.tar.gz" MediaConductor)
+            (cd dist && tar czf "../release-assets/mangaeasy-${{ matrix.platform }}.tar.gz" mangaEasy)
           fi
 
       - name: Upload build assets
         uses: actions/upload-artifact@v4
         with:
-          name: media-conductor-${{ matrix.platform }}
+          name: mangaeasy-${{ matrix.platform }}
           path: release-assets/*
           if-no-files-found: error
 
@@ -143,18 +143,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: MediaConductor ${{ github.ref_name }}
+          name: mangaEasy ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: release-assets/**/*
           body: |
-            ## MediaConductor ${{ github.ref_name }}
+            ## mangaEasy ${{ github.ref_name }}
 
-            MediaConductor is a CLI and MCP server for manga, manhwa, and
+            mangaEasy is a CLI and MCP server for manga, manhwa, and
             webtoon recap-video production. These archives contain the frozen
-            `mediaconductor` executable and do not require a system Python.
+            `mangaeasy` executable and do not require a system Python.
 
             AI models and media tools are intentionally not embedded. After
-            unpacking, run `mediaconductor setup --mode manga-video` to
+            unpacking, run `mangaeasy setup --mode manga-video` to
             provision the isolated manga toolchain. A source install is also
             available:
 
@@ -167,13 +167,13 @@ jobs:
 
             ### Downloads
 
-            - **Windows** — `media-conductor-windows.zip`; run
-              `MediaConductor\mediaconductor.exe --help`. The unsigned build may
+            - **Windows** — `mangaeasy-windows.zip`; run
+              `mangaEasy\mangaeasy.exe --help`. The unsigned build may
               trigger SmartScreen.
-            - **macOS** — `media-conductor-macos-arm64.zip` (and an Intel build
-              when available). Run `xattr -cr MediaConductor.app` once, then use
-              `MediaConductor.app/Contents/MacOS/mediaconductor`.
-            - **Linux** — `media-conductor-linux.tar.gz`; run
-              `MediaConductor/mediaconductor --help`.
+            - **macOS** — `mangaeasy-macos-arm64.zip` (and an Intel build
+              when available). Run `xattr -cr mangaEasy.app` once, then use
+              `mangaEasy.app/Contents/MacOS/mangaeasy`.
+            - **Linux** — `mangaeasy-linux.tar.gz`; run
+              `mangaEasy/mangaeasy --help`.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

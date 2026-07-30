@@ -1,34 +1,34 @@
 # Architecture
 
-MediaConductor is intentionally split into a small `mangaeasy` compatibility
+mangaEasy is intentionally split into a small `mangaeasy` compatibility
 package and optional external AI tools, all driven through one primary CLI.
 
 ## One command
 
-Everything is reachable through the `mediaconductor` entry point
-(`mediaconductor.cli:main`; `mangaeasy` remains a 2.x alias). It is a thin
+Everything is reachable through the `mangaeasy` entry point
+(`mangaeasy.cli:main`; `mangaeasy` remains a 2.x alias). It is a thin
 dispatcher: it maps a subcommand name to a
 module and calls that module's `main()`, importing the module **lazily** so
-`mediaconductor --help` never pulls in heavy optional dependencies.
+`mangaeasy --help` never pulls in heavy optional dependencies.
 
 ```text
-mediaconductor <command> [args...]  ->  mediaconductor.<area>.<module>:main()
+mangaeasy <command> [args...]  ->  mangaeasy.<area>.<module>:main()
 ```
 
 ## Main package
 
 The main package contains:
 
-- General item-based video pipeline in `mediaconductor.video_pipeline`
-- Acquisition and cropping in `mediaconductor.download`, `mediaconductor.panels`,
-  `mediaconductor.ocr`; image utilities in `mediaconductor.images`
+- General item-based video pipeline in `mangaeasy.video_pipeline`
+- Acquisition and cropping in `mangaeasy.download`, `mangaeasy.panels`,
+  `mangaeasy.ocr`; image utilities in `mangaeasy.images`
 - Command schemas shared by MCP and `commands --json --full` in
-  `mediaconductor.command_spec`; detached background jobs in `mediaconductor.jobs`
-- External tool lookup/wrappers in `mediaconductor.tools`
-- Agent-facing prompts and in-tool-env scripts in `mediaconductor/assets/`
+  `mangaeasy.command_spec`; detached background jobs in `mangaeasy.jobs`
+- External tool lookup/wrappers in `mangaeasy.tools`
+- Agent-facing prompts and in-tool-env scripts in `mangaeasy/assets/`
 
 The default workspace root is the current working directory. Set
-`MEDIACONDUCTOR_PROJECT_ROOT` to run commands against another folder.
+`MANGAEASY_PROJECT_ROOT` to run commands against another folder.
 
 ## External tools
 
@@ -49,7 +49,7 @@ This avoids dependency conflicts while still allowing full GPU acceleration.
 
 No GPU is required anywhere — every stage has a CPU path.
 
-Tool installs (`mediaconductor install-tool`):
+Tool installs (`mangaeasy install-tool`):
 
 - Auto-detects hardware: CUDA torch builds only on Windows/Linux with an
   NVIDIA GPU; standard CPU builds everywhere else (macOS, AMD, plain CPU).
@@ -57,15 +57,15 @@ Tool installs (`mediaconductor install-tool`):
 
 OCR:
 
-- `mediaconductor deepseek-ocr2` runs inside the isolated DeepSeek-OCR 2 environment and
+- `mangaeasy deepseek-ocr2` runs inside the isolated DeepSeek-OCR 2 environment and
   writes an `ocr` field into narration JSON entries.
 - `--device auto` uses CUDA when the tool env can see it, otherwise CPU.
 
 Audio:
 
-- `mediaconductor video --tts auto` (the default) picks IndexTTS when an NVIDIA GPU
+- `mangaeasy video --tts auto` (the default) picks IndexTTS when an NVIDIA GPU
   and the installed `index-tts` env are available, otherwise Kokoro.
-- `mediaconductor video-audio` calls `kokoro-82m` with that tool's own Python.
+- `mangaeasy video-audio` calls `kokoro-82m` with that tool's own Python.
 - `--device auto` uses CUDA when available, otherwise CPU.
 - `--device cuda` fails fast if CUDA is not visible.
 - The IndexTTS bridge enables fp16/CUDA kernels only when CUDA is present.
@@ -78,6 +78,6 @@ Video:
 
 ## Package data
 
-`mediaconductor/assets/` ships only agent-facing prompts (`prompts/narration.md`)
+`mangaeasy/assets/` ships only agent-facing prompts (`prompts/narration.md`)
 and standalone scripts executed inside the external tool envs (`tools/`).
 The old Flask templates/static files were removed with the GUI.

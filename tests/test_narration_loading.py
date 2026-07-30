@@ -13,13 +13,13 @@ import sys
 
 import pytest
 
-from mediaconductor.video_pipeline import generate_audio_indextts
-from mediaconductor.video_pipeline.item_assets import (
+from mangaeasy.video_pipeline import generate_audio_indextts
+from mangaeasy.video_pipeline.item_assets import (
     frame_aligned_duration,
     load_narration,
     validate_calm_narration,
 )
-from mediaconductor.video_pipeline.narration_contract import NarrationContractError
+from mangaeasy.video_pipeline.narration_contract import NarrationContractError
 
 
 def write_json(path, data):
@@ -150,7 +150,7 @@ def test_indextts_outer_preflight_blocks_all_workers_before_start(tmp_path, monk
         )
     # The review gate runs before narration validation, so record it first;
     # this test is about the narration preflight, not the review gate.
-    from mediaconductor.reviews import record_crop_review, record_narration_review
+    from mangaeasy.reviews import record_crop_review, record_narration_review
     record_crop_review(project_root, None, reviewer="test", source_subdir="panels")
     record_narration_review(project_root, None, reviewer="test")
 

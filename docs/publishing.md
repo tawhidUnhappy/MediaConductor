@@ -3,7 +3,7 @@
 ## Cutting a release
 
 One script bumps every version in lockstep (`pyproject.toml`,
-`mediaconductor/__init__.py`) and tags:
+`mangaeasy/__init__.py`) and tags:
 
 ```bash
 uv run python scripts/release.py 1.2.3 --tag
@@ -18,19 +18,19 @@ Windows / Linux / macOS (Apple Silicon, plus best-effort Intel):
 1. **Fails fast if the tag and source versions disagree** (so a forgotten
    `release.py` run can't ship mislabeled artifacts).
 2. Runs ruff + pytest + a compile check.
-3. Freezes the CLI with PyInstaller (`packaging/mediaconductor.spec`) into
-   `dist/MediaConductor/` (or `dist/MediaConductor.app/` on macOS), verifies the
+3. Freezes the CLI with PyInstaller (`packaging/mangaeasy.spec`) into
+   `dist/mangaEasy/` (or `dist/mangaEasy.app/` on macOS), verifies the
    macOS bundle contains its declared brand icon, and **smoke-tests it**
    (`--version`, `doctor --json`, and an MCP handshake).
 4. Packages the frozen build into a per-OS archive
-   (`media-conductor-<platform>.zip` / `.tar.gz`).
+   (`mangaeasy-<platform>.zip` / `.tar.gz`).
 5. Publishes a GitHub Release with every platform's archive attached.
 
-Core binaries (ffmpeg/ffprobe/uv/git-lfs) are **not** bundled — `mediaconductor
+Core binaries (ffmpeg/ffprobe/uv/git-lfs) are **not** bundled — `mangaeasy
 bootstrap-tools` downloads them once on first use, keeping archives small.
 
-Monitor the build at `https://github.com/tawhidUnhappy/MediaConductor/actions`.
-The Release appears at `https://github.com/tawhidUnhappy/MediaConductor/releases`
+Monitor the build at `https://github.com/tawhidUnhappy/mangaEasy/actions`.
+The Release appears at `https://github.com/tawhidUnhappy/mangaEasy/releases`
 once the builds succeed (usually ~10-15 minutes).
 
 ### Pre-releases
@@ -44,7 +44,7 @@ Tags with a hyphen (e.g. `v1.1.0-beta1`) are automatically marked as
 uv sync --group dev
 uv run ruff check .
 uv run pytest
-uv run python -m compileall -q mediaconductor
+uv run python -m compileall -q mangaeasy
 uv run python scripts/release.py --check
 ```
 

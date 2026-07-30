@@ -9,8 +9,8 @@ The whole 46-chapter build failed after rendering 45 chapters.
 
 from pathlib import Path
 
-from mediaconductor.video_pipeline import item_video_builder
-from mediaconductor.video_pipeline.item_assets import PanelAsset
+from mangaeasy.video_pipeline import item_video_builder
+from mangaeasy.video_pipeline.item_assets import PanelAsset
 
 # Windows caps a command line at 32,767 characters; stay clear of it.
 WINDOWS_COMMAND_LIMIT = 32767

@@ -6,8 +6,8 @@ import sys
 
 import pytest
 
-import mediaconductor.mcp_server as mcp_server
-from mediaconductor.mcp_server import (
+import mangaeasy.mcp_server as mcp_server
+from mangaeasy.mcp_server import (
     _build_args,
     _enforce_workspace_policy,
     _resolve_allowed_roots,
@@ -15,13 +15,13 @@ from mediaconductor.mcp_server import (
     _server_instructions,
     _validate_arguments,
 )
-from mediaconductor.modes import DEFAULT_MODE, MODES
+from mangaeasy.modes import DEFAULT_MODE, MODES
 
 
 def mcp_session(*messages: dict, args: tuple[str, ...] = ()) -> list[dict]:
     stdin = "".join(json.dumps(m) + "\n" for m in messages)
     proc = subprocess.run(
-        [sys.executable, "-m", "mediaconductor.cli", "mcp", *args],
+        [sys.executable, "-m", "mangaeasy.cli", "mcp", *args],
         input=stdin, capture_output=True, text=True, encoding="utf-8", timeout=120,
     )
     return [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
@@ -35,7 +35,7 @@ def test_initialize_and_tools_list():
         {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
     )
     by_id = {r["id"]: r for r in replies}
-    assert by_id[1]["result"]["serverInfo"]["name"] == "media-conductor"
+    assert by_id[1]["result"]["serverInfo"]["name"] == "mangaeasy"
     tools = by_id[2]["result"]["tools"]
     # No router catalog: the default IS the manga catalog.
     assert {t["name"] for t in tools} == MODES[DEFAULT_MODE].tools & set(mcp_server.TOOLS)
@@ -78,7 +78,7 @@ def test_exit_three_is_review_required_not_an_mcp_error(monkeypatch):
         return subprocess.CompletedProcess(
             argv,
             3,
-            stdout='MEDIACONDUCTOR_RESULT {"artifact":"ready"}\n',
+            stdout='MANGAEASY_RESULT {"artifact":"ready"}\n',
             stderr="",
         )
 
@@ -137,7 +137,7 @@ def test_out_of_mode_tool_reads_as_unknown_not_merely_forbidden():
 
 def test_all_tools_escape_hatch_is_gone():
     proc = subprocess.run(
-        [sys.executable, "-m", "mediaconductor.cli", "mcp", "--all-tools"],
+        [sys.executable, "-m", "mangaeasy.cli", "mcp", "--all-tools"],
         input="", capture_output=True, text=True, encoding="utf-8", timeout=60,
     )
     assert proc.returncode != 0
@@ -419,7 +419,7 @@ def test_public_mcp_server_rejects_outside_path_before_tool_launch(tmp_path):
     }
     proc = subprocess.run(
         [
-            sys.executable, "-m", "mediaconductor.cli", "mcp",
+            sys.executable, "-m", "mangaeasy.cli", "mcp",
             "--mode", "manga-video", "--allow-root", str(allowed),
         ],
         input=json.dumps(request) + "\n",

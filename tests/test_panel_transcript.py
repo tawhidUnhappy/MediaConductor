@@ -2,7 +2,7 @@
 
 import json
 
-from mediaconductor.ocr.panel_transcript import (
+from mangaeasy.ocr.panel_transcript import (
     load_bound_ocr,
     panel_sha256,
     seed_transcript,

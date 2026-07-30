@@ -15,7 +15,7 @@ def _fail(message: str) -> NoReturn:
 def main(argv: list[str] | None = None) -> int:
     command = list(sys.argv[1:] if argv is None else argv)
     if not command:
-        _fail("pass the server command, for example: mediaconductor mcp")
+        _fail("pass the server command, for example: mangaeasy mcp")
 
     requests = [
         {
@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     init_result = initialize["result"]
     if init_result.get("protocolVersion") != "2025-11-25":
         _fail(f"unexpected protocol version: {init_result!r}")
-    if init_result.get("serverInfo", {}).get("name") != "media-conductor":
+    if init_result.get("serverInfo", {}).get("name") != "mangaeasy":
         _fail(f"unexpected server identity: {init_result!r}")
 
     tools_response = responses.get(2, {})

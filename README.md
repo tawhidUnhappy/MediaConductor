@@ -1,12 +1,12 @@
-# MediaConductor
+# mangaEasy
 
 > An agent-native toolkit for manga, manhwa, and webtoon recap videos.
 
-[![CI](https://github.com/tawhidUnhappy/MediaConductor/actions/workflows/ci.yml/badge.svg)](https://github.com/tawhidUnhappy/MediaConductor/actions/workflows/ci.yml)
+[![CI](https://github.com/tawhidUnhappy/mangaEasy/actions/workflows/ci.yml/badge.svg)](https://github.com/tawhidUnhappy/mangaEasy/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.10%E2%80%933.12-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/core-MIT-green)](LICENSE)
 
-MediaConductor (formerly **mangaEasy**) is a production-oriented CLI and MCP
+mangaEasy (formerly **mangaEasy**) is a production-oriented CLI and MCP
 server that lets an LLM acquire manga chapters, crop them into panels, verify
 those crops by eye, narrate them against the artwork, synthesize, render, and
 explicitly publish a recap video. It has no GUI. Heavy AI projects run in
@@ -36,16 +36,16 @@ exact files, and are recorded as approvals bound to the bytes they cover.
 An AI agent can set up the complete application from only this URL:
 
 ```bash
-git clone --depth 1 https://github.com/tawhidUnhappy/MediaConductor.git
-cd MediaConductor
+git clone --depth 1 https://github.com/tawhidUnhappy/mangaEasy.git
+cd mangaEasy
 uv sync
-uv run mediaconductor modes --json
-uv run mediaconductor setup --mode manga-video
-uv run mediaconductor doctor --mode manga-video --json
+uv run mangaeasy modes --json
+uv run mangaeasy setup --mode manga-video
+uv run mangaeasy doctor --mode manga-video --json
 ```
 
 Then point the agent to [AGENTS.md](AGENTS.md), which loads one small skill.
-`mediaconductor modes --json` also returns the absolute `skill_path`, including
+`mangaeasy modes --json` also returns the absolute `skill_path`, including
 wheel and frozen installations where the skill is bundled inside the package.
 
 Requirements for a source clone are Git and
@@ -57,19 +57,20 @@ fallbacks work but panel detection and voice cloning are much slower.
 Install the command globally instead:
 
 ```bash
-uv tool install git+https://github.com/tawhidUnhappy/MediaConductor.git
-mediaconductor modes
+uv tool install git+https://github.com/tawhidUnhappy/mangaEasy.git
+mangaeasy modes
 ```
 
-`mangaeasy` remains an equivalent compatibility command for existing scripts.
-The internal Python import remains `mediaconductor` during the 2.x migration.
+The previous `mediaconductor` command remains installed as an equivalent
+alias for existing scripts, and `MEDIACONDUCTOR_*` environment variables are
+still honoured. The Python import is `mangaeasy`.
 
 ## The pipeline
 
 ```bash
-mediaconductor setup --mode manga-video
-mediaconductor commands --mode manga-video --json --full
-mediaconductor mcp --allow-root D:/MediaProjects
+mangaeasy setup --mode manga-video
+mangaeasy commands --mode manga-video --json --full
+mangaeasy mcp --allow-root D:/MediaProjects
 ```
 
 MangaDex acquisition, webtoon or paged-manga crops, visual verification sheets,
@@ -101,12 +102,12 @@ There is no confirmation flag anywhere in the CLI or the MCP schema. An
 approval is a record bound to SHA-256 snapshots of exactly what was approved:
 
 ```bash
-mediaconductor manga-review crop        --project-root data/library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review narration   --project-root data/library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review final-video --project-root data/library/<P> --items 01 \
+mangaeasy manga-review crop        --project-root data/library/<P> --items 01 --reviewer NAME
+mangaeasy manga-review narration   --project-root data/library/<P> --items 01 --reviewer NAME
+mangaeasy manga-review final-video --project-root data/library/<P> --items 01 \
     --video data/output/<P>/<P>_full.mp4 --reviewer NAME \
     --rights-confirmed --voice-consent-confirmed --source-permission-confirmed
-mediaconductor manga-review check       --project-root data/library/<P> --items 01
+mangaeasy manga-review check       --project-root data/library/<P> --items 01
 ```
 
 Re-cropping a panel, rewriting a line, or re-encoding the MP4 invalidates the
@@ -119,19 +120,19 @@ reviewed one once it exists.
 
 Related gates:
 
-- `mediaconductor panel-decisions` — every cropped panel must be narrated or
+- `mangaeasy panel-decisions` — every cropped panel must be narrated or
   carry a hash-bound omission decision (`credit`, `scanlator_notice`,
   `decorative`, `duplicate`, `sfx_only`, `platform_safety`, `other`).
-- `mediaconductor manga-rights` — the manifest that authorizes publication.
+- `mangaeasy manga-rights` — the manifest that authorizes publication.
   It **fails closed**: a page being reachable on a webtoon site is not
   permission, and neither is attribution or a disclaimer.
-- `mediaconductor video-quality` — measures the *encoded* deliverable, not the
+- `mangaeasy video-quality` — measures the *encoded* deliverable, not the
   pre-encode filter, and extracts frames for the readability pass.
 
 ## MCP server
 
 ```bash
-mediaconductor mcp --allow-root D:/MediaProjects
+mangaeasy mcp --allow-root D:/MediaProjects
 ```
 
 For ready-to-paste source-checkout and globally installed client blocks, see
@@ -140,8 +141,8 @@ For ready-to-paste source-checkout and globally installed client blocks, see
 ```json
 {
   "mcpServers": {
-    "media-conductor": {
-      "command": "mediaconductor",
+    "mangaeasy": {
+      "command": "mangaeasy",
       "args": ["mcp", "--allow-root", "D:/MediaProjects"]
     }
   }
@@ -177,8 +178,8 @@ Long-running calls must use `job_start`, then `job_status`:
 Shell-only agents use the equivalent detached runner:
 
 ```powershell
-mediaconductor job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/Recap","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output"}'
-mediaconductor job-status <job-id> --json
+mangaeasy job-start --tool run_full_pipeline --arguments-json '{"project_root":"D:/MediaProjects/library/Recap","audio_root":"D:/MediaProjects/audio","output_root":"D:/MediaProjects/output"}'
+mangaeasy job-status <job-id> --json
 ```
 
 `job-status` accepts only the generated id returned by `job-start`. Use
@@ -189,18 +190,18 @@ For a containerized stdio server, keep application state and media in the
 mounted `/data` workspace:
 
 ```bash
-docker build -t media-conductor .
-docker run --rm -i -v D:/MediaProjects:/data media-conductor \
+docker build -t mangaeasy .
+docker run --rm -i -v D:/MediaProjects:/data mangaeasy \
   mcp --allow-root /data
 ```
 
 The image exposes no unauthenticated network port. Run setup against the same
-persistent volume first (`... media-conductor setup --mode manga-video`) so its
+persistent volume first (`... mangaeasy setup --mode manga-video`) so its
 isolated tools and model snapshots survive container replacement.
 
 ## Self-contained workspace
 
-Everything MediaConductor downloads or generates goes in **one folder**,
+Everything mangaEasy downloads or generates goes in **one folder**,
 `data/`. Delete that folder and the install is factory-fresh — nothing else
 needs cleaning up, and nothing you own goes with it:
 
@@ -231,13 +232,13 @@ round-trip.
 Start fresh without opening a file manager:
 
 ```bash
-mediaconductor workspace-reset                 # dry run: what would go, and how big
-mediaconductor workspace-reset --confirm       # do it
-mediaconductor workspace-reset --keep-library --confirm   # keep the downloads, clear the rest
+mangaeasy workspace-reset                 # dry run: what would go, and how big
+mangaeasy workspace-reset --confirm       # do it
+mangaeasy workspace-reset --keep-library --confirm   # keep the downloads, clear the rest
 ```
 
 It refuses to run while a background job is still writing, and prints exactly
-what it removed. `mediaconductor workspace-layout --json` reports every
+what it removed. `mangaeasy workspace-layout --json` reports every
 resolved root and whether it landed in the right tree; `doctor` warns when one
 escapes.
 
@@ -249,7 +250,7 @@ dependency graph, caches, adapter, model provenance, and `READY.json`.
 model must still have its model directory and either every declared file or at
 least one real payload file outside the Hugging Face metadata cache.
 
-Every model snapshot downloaded by `mediaconductor install-tool` is locked to
+Every model snapshot downloaded by `mangaeasy install-tool` is locked to
 an immutable Hugging Face commit and checked against a required-file allowlist.
 Source checkouts are also commit-pinned. Kokoro and MAGI still obtain model
 weights on first use, so those paths are explicitly documented as
@@ -265,15 +266,15 @@ non-reproducible follow-ups.
 Install or inspect one tool:
 
 ```bash
-mediaconductor install-tool index-tts
-mediaconductor tools --json
-mediaconductor doctor --mode manga-video --json
+mangaeasy install-tool index-tts
+mangaeasy tools --json
+mangaeasy doctor --mode manga-video --json
 ```
 
 All HF, Torch, uv Python, Triton, TorchInductor, NLTK, and extension caches are
 redirected below `runtime/cache/`, so a model is downloaded once per install
-and never scattered into a global cache. Set `MEDIACONDUCTOR_SHARE_CACHES=1`
-only when deliberately opting into global caches, and `MEDIACONDUCTOR_HOME` to
+and never scattered into a global cache. Set `MANGAEASY_SHARE_CACHES=1`
+only when deliberately opting into global caches, and `MANGAEASY_HOME` to
 point several checkouts at one shared `runtime/` tree.
 
 ## Safety and publishing
@@ -296,10 +297,10 @@ point several checkouts at one shared `runtime/` tree.
 - OAuth JSON is atomically written with owner-only file permissions where the
   platform supports them. Tokens are never printed.
 - Multiple named YouTube profiles can isolate channels. Discover them with
-  `mediaconductor youtube-profiles --json`. A live status/upload opens browser
+  `mangaeasy youtube-profiles --json`. A live status/upload opens browser
   consent automatically when needed; `--no-auto-auth` disables that for
   headless use.
-- MediaConductor ships no manga, music, or voice samples. Supply only media you
+- mangaEasy ships no manga, music, or voice samples. Supply only media you
   are licensed and authorized to use.
 
 YouTube OAuth requires a one-time browser action by the channel owner. Follow
@@ -321,11 +322,11 @@ disclosure](https://support.google.com/youtube/answer/14328491).
 - `2`: invalid CLI usage.
 - `3`: artifact created, but human/agent QA approval is required.
 - `--json` commands print one JSON report.
-- Generation commands finish with `MEDIACONDUCTOR_RESULT {...}` for 2.x
+- Generation commands finish with `MANGAEASY_RESULT {...}` for 2.x
   compatibility.
-- Progress lines use `MEDIACONDUCTOR_PROGRESS current/total label`.
+- Progress lines use `MANGAEASY_PROGRESS current/total label`.
 
-Use `mediaconductor commands --mode manga-video --json --full` instead of
+Use `mangaeasy commands --mode manga-video --json --full` instead of
 scraping help text.
 
 ## Development and production checks
@@ -333,6 +334,6 @@ scraping help text.
 ```bash
 uv sync
 uv run ruff check .
-uv run python -m compileall -q mediaconductor
+uv run python -m compileall -q mangaeasy
 uv run pytest
 ```

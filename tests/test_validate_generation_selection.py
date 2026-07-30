@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import sys
 
-from mediaconductor.video_pipeline import validate_generation
+from mangaeasy.video_pipeline import validate_generation
 
 
 def test_explicit_batch_allows_item_videos_from_other_batches(tmp_path, monkeypatch, capsys):

@@ -489,7 +489,7 @@ wheels = [
 ]
 
 [[package]]
-name = "media-conductor"
+name = "mangaeasy"
 version = "3.0.0"
 source = { editable = "." }
 dependencies = [

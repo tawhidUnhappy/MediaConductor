@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_macos_bundle_uses_tracked_brand_icon_source():
-    spec = (ROOT / "packaging" / "mediaconductor.spec").read_text(encoding="utf-8")
+    spec = (ROOT / "packaging" / "mangaeasy.spec").read_text(encoding="utf-8")
     assert (ROOT / "packaging" / "icon.png").is_file()
     assert 'ICON  = str(ROOT / "packaging" / "icon.png")' in spec
     assert 'ROOT / "packaging" / "icon.icns"' not in spec
@@ -22,7 +22,7 @@ def test_release_checks_declared_macos_icon_resource():
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(
         encoding="utf-8"
     )
-    build = "uv run --no-sync pyinstaller packaging/mediaconductor.spec"
+    build = "uv run --no-sync pyinstaller packaging/mangaeasy.spec"
     verify = "test -s \"$bundle/Contents/Resources/$icon\""
     assert build in workflow and verify in workflow
     assert workflow.index(build) < workflow.index(verify)

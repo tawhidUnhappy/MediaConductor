@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from mediaconductor.video_pipeline import make_long_video, make_videos, run_pipeline
-from mediaconductor.video_pipeline.ffmpeg_tools import h264_encoder_args
-from mediaconductor.video_pipeline.item_video_builder import VideoBuildConfig
-from mediaconductor.video_pipeline.long_video_builder import LongVideoConfig
+from mangaeasy.video_pipeline import make_long_video, make_videos, run_pipeline
+from mangaeasy.video_pipeline.ffmpeg_tools import h264_encoder_args
+from mangaeasy.video_pipeline.item_video_builder import VideoBuildConfig
+from mangaeasy.video_pipeline.long_video_builder import LongVideoConfig
 
 
 @pytest.mark.parametrize(
@@ -75,7 +75,7 @@ def test_long_video_config_uses_production_quality_defaults(tmp_path: Path):
 def test_video_cli_parsers_use_production_quality_defaults(
     monkeypatch, parser, preset_attribute: str,
 ):
-    monkeypatch.setattr(sys, "argv", ["mediaconductor-video-test"])
+    monkeypatch.setattr(sys, "argv", ["mangaeasy-video-test"])
     args = parser()
     assert getattr(args, preset_attribute) == "p5"
     assert args.audio_bitrate == "192k"

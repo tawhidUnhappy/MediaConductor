@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from mediaconductor.audio.provenance import (
+from mangaeasy.audio.provenance import (
     TtsContract,
     is_current,
     narration_digest,
@@ -23,12 +23,12 @@ from mediaconductor.audio.provenance import (
     stale_reason,
     write_provenance,
 )
-from mediaconductor.panel_decisions import (
+from mangaeasy.panel_decisions import (
     PanelDecisionError,
     audit_item,
     record_decisions,
 )
-from mediaconductor.rights import (
+from mangaeasy.rights import (
     SAFETY_SCANS,
     RightsError,
     check_rights,
@@ -130,7 +130,7 @@ def test_sidecar_records_the_full_contract(take):
 
 
 def test_archiving_a_stale_take_moves_its_sidecar_too(take, tmp_path):
-    from mediaconductor.audio.provenance import archive_stale_take
+    from mangaeasy.audio.provenance import archive_stale_take
 
     archive = tmp_path / "old" / "run_0001"
     archive_stale_take(take, archive, subdir="01")
@@ -310,7 +310,7 @@ def test_a_corrupt_manifest_does_not_read_as_permission(tmp_path):
 # ── Workspace layout ─────────────────────────────────────────────────────────
 
 def test_workspace_layout_reports_every_persistent_root(monkeypatch, tmp_path):
-    import mediaconductor.workspace as workspace
+    import mangaeasy.workspace as workspace
 
     report = workspace.layout_report()
     names = {entry["name"] for entry in report["roots"]}
@@ -330,7 +330,7 @@ def test_every_production_root_lands_inside_the_deletable_data_folder(monkeypatc
     data/, that promise silently becomes false — the case this asserts
     against, on the real resolution path rather than a stubbed one.
     """
-    import mediaconductor.workspace as workspace
+    import mangaeasy.workspace as workspace
 
     report = workspace.layout_report()
     data_root = Path(report["data_root"])
@@ -348,7 +348,7 @@ def test_every_production_root_lands_inside_the_deletable_data_folder(monkeypatc
 
 def test_a_root_escaping_its_tree_is_reported(monkeypatch, tmp_path):
     """A stray env var used to scatter gigabytes with no symptom for weeks."""
-    import mediaconductor.workspace as workspace
+    import mangaeasy.workspace as workspace
 
     workspace_root = tmp_path / "workspace"
     data_root = workspace_root / "data"
@@ -369,7 +369,7 @@ def test_a_root_escaping_its_tree_is_reported(monkeypatch, tmp_path):
 
 def test_data_and_runtime_overlap_is_reported(monkeypatch, tmp_path):
     """runtime/ inside data/ would make workspace-reset delete the tool envs."""
-    import mediaconductor.workspace as workspace
+    import mangaeasy.workspace as workspace
 
     workspace_root = tmp_path / "workspace"
     data_root = workspace_root / "data"

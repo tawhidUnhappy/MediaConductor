@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from mediaconductor import defaults
+from mangaeasy import defaults
 
 
 def _write_system_config(path, bgm):

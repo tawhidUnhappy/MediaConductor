@@ -1,6 +1,6 @@
-# MediaConductor agent entry point
+# mangaEasy agent entry point
 
-MediaConductor produces **manga, manhwa, and webtoon recap videos** from source
+mangaEasy produces **manga, manhwa, and webtoon recap videos** from source
 chapters: acquire, crop into panels, verify the crops, narrate against
 the panels, synthesize, render, and publish.
 
@@ -10,16 +10,16 @@ From a fresh clone:
 
 ```bash
 uv sync
-uv run mediaconductor modes --json
-uv run mediaconductor setup --mode manga-video
-uv run mediaconductor doctor --mode manga-video --json
+uv run mangaeasy modes --json
+uv run mangaeasy setup --mode manga-video
+uv run mangaeasy doctor --mode manga-video --json
 ```
 
-For MCP, register `mediaconductor mcp --allow-root <workspace>`. Repeat
+For MCP, register `mangaeasy mcp --allow-root <workspace>`. Repeat
 `--allow-root` only for additional intentional workspaces; when omitted it
 defaults to the server's startup directory. The catalog is the manga catalog —
 there is no router mode and no all-tools escape hatch. Long operations must use
-the typed `job_start` MCP tool or `mediaconductor job-start --tool <name>
+the typed `job_start` MCP tool or `mangaeasy job-start --tool <name>
 --arguments-json <object>`.
 
 **Review is recorded, never asserted.** There is no confirmation boolean
@@ -27,9 +27,9 @@ anywhere in the CLI or the MCP schema. Approvals are bound to the exact bytes
 they cover and can be recorded by a human or an LLM agent:
 
 ```bash
-mediaconductor manga-review crop      --project-root data/library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review narration --project-root data/library/<P> --items 01 --reviewer NAME
-mediaconductor manga-review check     --project-root data/library/<P> --items 01
+mangaeasy manga-review crop      --project-root data/library/<P> --items 01 --reviewer NAME
+mangaeasy manga-review narration --project-root data/library/<P> --items 01 --reviewer NAME
+mangaeasy manga-review check     --project-root data/library/<P> --items 01
 ```
 
 Re-cropping a panel or rewriting a line invalidates the approval automatically,

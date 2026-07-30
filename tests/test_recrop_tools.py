@@ -6,18 +6,18 @@ import time
 
 from PIL import Image, ImageChops
 
-from mediaconductor.images.thumbnail_compose import block_arrow_polygon
-from mediaconductor.panels.cutcheck import (
+from mangaeasy.images.thumbnail_compose import block_arrow_polygon
+from mangaeasy.panels.cutcheck import (
     _cutcheck_exit_code,
     parse_forced_cuts,
     prune_item_artifacts,
     stitch_pages,
     window_bounds,
 )
-from mediaconductor.panels.gutter import collect_image_paths, stitch_images
-from mediaconductor.panels.remap import is_regular_panel, map_spans
-from mediaconductor.video_pipeline.check_items import is_speakable
-from mediaconductor.video_pipeline.item_video_builder import stale_reason
+from mangaeasy.panels.gutter import collect_image_paths, stitch_images
+from mangaeasy.panels.remap import is_regular_panel, map_spans
+from mangaeasy.video_pipeline.check_items import is_speakable
+from mangaeasy.video_pipeline.item_video_builder import stale_reason
 
 
 def _span(file, top, bottom):

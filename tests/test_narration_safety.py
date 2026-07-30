@@ -1,6 +1,6 @@
 """Unit tests for narration delivery and fluency lints."""
 
-from mediaconductor.audio.narration_safety import (
+from mangaeasy.audio.narration_safety import (
     narration_delivery_lint,
     narration_fluency_lint,
 )

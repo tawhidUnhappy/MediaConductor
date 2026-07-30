@@ -4,9 +4,9 @@ and the work-qa fix-until-clean loop small models drive."""
 import json
 from datetime import timedelta
 
-from mediaconductor.qa_loop import qa_item
-from mediaconductor.ocr.panel_transcript import panel_sha256
-from mediaconductor.workboard import (
+from mangaeasy.qa_loop import qa_item
+from mangaeasy.ocr.panel_transcript import panel_sha256
+from mangaeasy.workboard import (
     _iso,
     _utcnow,
     acquire_claim,
@@ -303,7 +303,7 @@ def test_todo_ids_are_never_reused_after_removal(tmp_path):
 
 
 def test_respect_claims_gate_blocks_only_live_foreign_claims(tmp_path):
-    from mediaconductor.workboard import respect_claims_gate
+    from mangaeasy.workboard import respect_claims_gate
 
     root = tmp_path / "proj"
     make_item(root, "05")

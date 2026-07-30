@@ -1,11 +1,11 @@
 # Third-party software notices
 
-MediaConductor is MIT-licensed; see [LICENSE](LICENSE). The project distributes
+mangaEasy is MIT-licensed; see [LICENSE](LICENSE). The project distributes
 or can install the components below. Each component remains subject to its own
 license and terms. This notice is a practical inventory, not legal advice and
 not a replacement for the upstream license files.
 
-## Distributed with MediaConductor
+## Distributed with mangaEasy
 
 - **Python runtime dependencies** are declared in `pyproject.toml`: Requests,
   Pillow, img2pdf, NumPy, pywinpty (Windows), google-auth, and
@@ -15,15 +15,15 @@ not a replacement for the upstream license files.
   licensing exception that permits bundling applications under other licenses.
   Python itself is covered by the PSF License.
 
-MediaConductor does not distribute model weights, voice samples, or the user's
+mangaEasy does not distribute model weights, voice samples, or the user's
 source media in its Git repository or Python package.
 
 ## Installed on demand in isolated environments
 
 The following projects are fetched from their official repositories or Hugging
-Face model pages only when the user runs `mediaconductor setup`,
-`mediaconductor bootstrap-tools`, or `mediaconductor install-tool`. They are
-not part of the MediaConductor wheel or frozen release archive.
+Face model pages only when the user runs `mangaeasy setup`,
+`mangaeasy bootstrap-tools`, or `mangaeasy install-tool`. They are
+not part of the mangaEasy wheel or frozen release archive.
 
 - **FFmpeg / ffprobe** — builds from
   [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) on Windows and
