@@ -19,6 +19,17 @@ TOOL_ENVS = {
 
 TOOL_ENV = {tool_name: env_vars[0] for tool_name, env_vars in TOOL_ENVS.items()}
 
+# Variables that name WHICH environment uv/Python should operate on. Every one
+# of these must be stripped before launching an isolated tool subprocess —
+# inheriting any of them points that tool's install or import at mangaEasy's
+# own venv. See tool_env() for the specific failure each one caused.
+ENV_TARGET_VARS = (
+    "VIRTUAL_ENV",
+    "UV_PROJECT_ENVIRONMENT",
+    "PYTHONHOME",
+    "PYTHONPATH",
+)
+
 
 def package_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -158,15 +169,27 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     locations instead (a shared cross-project cache); then they are only
     filled in when absent.
 
-    Always drops VIRTUAL_ENV/PYTHONHOME inherited from mangaeasy's own
-    process. Every caller launches a subprocess by an explicit absolute
-    python.exe path into some *other* tool's isolated venv (kokoro, IndexTTS,
-    MAGI, ...) -- but a few of those tools (e.g. misaki/spacy's
-    `en_core_web_sm` auto-download) fall back to bare `uv pip install` when
-    no `pip` module is present, and uv resolves that against VIRTUAL_ENV if
-    it's set. Left inherited, that silently installs into mangaeasy's own
-    venv instead of the tool's, which then can't find what it just
-    "successfully" installed.
+    Always drops every variable that names *which* environment uv or Python
+    should act on (:data:`ENV_TARGET_VARS`). Each caller launches a subprocess
+    by an explicit absolute python path into some *other* tool's isolated venv
+    (kokoro, IndexTTS, MAGI, ...), so an inherited target is never right and is
+    actively destructive:
+
+    * ``VIRTUAL_ENV`` — a few tools (misaki/spacy's ``en_core_web_sm``
+      auto-download) fall back to bare ``uv pip install`` when no ``pip``
+      module is present, and uv resolves that against VIRTUAL_ENV. Left
+      inherited, it installs into mangaeasy's own venv instead of the tool's,
+      which then cannot find what it just "successfully" installed.
+    * ``UV_PROJECT_ENVIRONMENT`` — worse, because it redirects ``uv sync``
+      itself. ``scripts/isolate.sh`` sets it so the *main* venv cannot be
+      relocated by an ambient value, but every ``install-tool`` runs
+      ``uv sync`` inside the tool's own project dir. Inherited, that sync
+      targets the main venv: it installed kokoro + torch into mangaEasy's
+      environment and, resolving to kokoro's lockfile, uninstalled the
+      ``mangaeasy`` package itself, leaving the tool dir with no venv at all
+      and the CLI unrunnable (2026-07-30).
+    * ``PYTHONHOME`` / ``PYTHONPATH`` — point the interpreter's stdlib and
+      import path at this env rather than the tool's.
     """
     from mangaeasy.isolation import isolation_env
 
@@ -174,8 +197,8 @@ def tool_env(base: dict[str, str] | None = None) -> dict[str, str]:
     # definition the launchers export before `uv sync`, so the shell side and
     # the Python side cannot drift apart.
     env = isolation_env(base or os.environ)
-    env.pop("VIRTUAL_ENV", None)
-    env.pop("PYTHONHOME", None)
+    for variable in ENV_TARGET_VARS:
+        env.pop(variable, None)
 
     espeak_root = Path("C:/Program Files/eSpeak NG")
     if espeak_root.exists():

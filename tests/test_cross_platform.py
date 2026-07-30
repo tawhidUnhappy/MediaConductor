@@ -204,3 +204,47 @@ def test_launchers_agree_on_the_cli_name():
     for name in ("run.sh", "run.bat"):
         text = (ROOT / name).read_text(encoding="utf-8")
         assert f"uv run {CLI_NAME} --help" in text, f"{name} does not invoke {CLI_NAME}"
+
+
+# ── Tool installs must not resolve to platform-exclusive wheels ───────────────
+
+def test_index_tts_excludes_the_windows_only_extras():
+    """`uv sync --all-extras` must not pull a win_amd64-only package.
+
+    IndexTTS declares `triton-windows` in two extras. `accel` was already
+    excluded, but `torch_compile` was not, so --all-extras resolved to a
+    package published solely as a win_amd64 wheel and `uv sync` refused to
+    install on Linux/macOS — taking voice cloning down on every non-Windows
+    machine while appearing to be a generic install failure.
+    """
+    from mangaeasy.tools.install import TOOLS
+
+    excluded = set(TOOLS["index-tts"].exclude_extras or ())
+    for extra in ("accel", "torch_compile"):
+        assert extra in excluded, (
+            f"index-tts must exclude the '{extra}' extra — it requires "
+            f"triton-windows, which has no wheel outside Windows"
+        )
+
+
+def test_upstream_projects_never_take_all_extras_blindly():
+    """--all-extras is only safe when the platform-specific extras are named.
+
+    Scoped to `uv_project` tools, where *upstream* owns pyproject.toml and can
+    add an OS-specific extra at any ref. `managed_env` tools use a pyproject
+    mangaEasy writes itself (_write_managed_pyproject), so their extras cannot
+    surprise us.
+    """
+    from mangaeasy.tools.install import TOOLS
+
+    offenders = [
+        key for key, spec in TOOLS.items()
+        if spec.kind == "uv_project"
+        and "--all-extras" in (spec.sync_args or ())
+        and not spec.exclude_extras
+    ]
+    assert not offenders, (
+        f"{offenders} sync an upstream project with --all-extras but exclude "
+        f"nothing; an OS-specific extra there breaks the install on other "
+        f"platforms (see index-tts / triton-windows)"
+    )

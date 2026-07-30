@@ -12,8 +12,17 @@ def test_index_tts_skips_build_hostile_extras():
     # deepspeed needs a matching system CUDA toolkit; accel (flash-attn) has
     # no wheel and needs torch at build time, killing `uv sync` before the
     # env exists; webui (gradio) is unused by the CLI pipeline.
+    #
+    # torch_compile is the cross-platform one: it exists only to pull
+    # `triton-windows`, published solely as a win_amd64 wheel, so
+    # `uv sync --all-extras` refused to install on Linux/macOS and voice
+    # cloning was unavailable on every non-Windows machine. Nothing is lost
+    # off Windows — torch already provides ordinary `triton` there.
+    # test is pytest-only.
     spec = install.TOOLS["index-tts"]
-    assert set(spec.exclude_extras) == {"deepspeed", "accel", "webui"}
+    assert set(spec.exclude_extras) == {
+        "deepspeed", "accel", "webui", "torch_compile", "test",
+    }
 
 
 @pytest.mark.parametrize(

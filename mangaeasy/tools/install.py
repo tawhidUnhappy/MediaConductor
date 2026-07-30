@@ -99,7 +99,13 @@ TOOLS: dict[str, ToolSpec] = {
         # build time, so `uv sync` dies before the env exists; infer_v2 only
         # imports flash_attn when use_accel=True, which the adapter never
         # sets. webui is gradio-only and unused by the CLI pipeline.
-        exclude_extras=["deepspeed", "accel", "webui"],
+        # torch_compile exists *only* to pull `triton-windows`, a package
+        # published solely as a win_amd64 wheel — so `uv sync --all-extras`
+        # resolved to it and refused to install on Linux/macOS ("only has
+        # wheels for win_amd64"), taking voice cloning down on every non-
+        # Windows machine. Nothing is lost off Windows: torch already brings
+        # the ordinary `triton` there. test is pytest-only.
+        exclude_extras=["deepspeed", "accel", "webui", "torch_compile", "test"],
         # Upstream pins requires-python ">=3.10,<3.12" at this ref; the
         # ToolSpec default of 3.12 makes `uv sync` refuse the interpreter.
         python="3.11",
@@ -124,8 +130,26 @@ TOOLS: dict[str, ToolSpec] = {
             "einops>=0.8.2",
             "pillow>=10.0.0",
             "numpy>=1.24.0",
+            # magiv3 ships its model code as a HF *dynamic module* (Florence-2
+            # derived), so its imports resolve when `from_pretrained` runs, not
+            # when the env is built. transformers' check_imports() aborts on
+            # the first missing one — after the env installed cleanly and
+            # `verify_import` passed — so every panel detection failed at first
+            # real use while `doctor` reported the tool ready. The list below
+            # is the complete set of third-party imports across the model's
+            # .py files, not a guess: re-derive it by AST-parsing the snapshot
+            # under runtime/cache/hf/hub/models--ragavsachdeva--magiv3/ rather
+            # than adding them one traceback at a time.
+            # (flash_attn is deliberately absent: its import there is guarded,
+            # check_imports skips it, and it has no prebuilt wheel.)
+            "pytorch_metric_learning>=2.0.0",
+            "matplotlib>=3.7.0",
+            "shapely>=2.0.0",
+            "networkx>=3.0",
         ],
-        verify_import="transformers",
+        # Import the model's own dynamic-module dependencies, not just
+        # transformers — those are invisible to any lighter check.
+        verify_import="pytorch_metric_learning, matplotlib, shapely, networkx",
         needs_gpu=True,
         notes="Detects manga panels. The magiv3 model + code download from Hugging Face on first run.",
     ),

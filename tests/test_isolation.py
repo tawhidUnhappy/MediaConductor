@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 from mangaeasy import isolation
-from mangaeasy.tools.external import app_root, tool_env
+from mangaeasy.tools.external import ENV_TARGET_VARS, app_root, tool_env
 from mangaeasy.tools.vendored import UV_ASSETS, UV_VERSION, download_manifest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -272,3 +272,51 @@ def test_core_tools_are_portable_first():
 
     signature = inspect.signature(ensure_core_tools)
     assert signature.parameters["prefer_portable"].default is True
+
+
+# ── Tool subprocesses must never inherit an environment TARGET ────────────────
+
+def test_tool_env_drops_every_environment_target(monkeypatch):
+    """An inherited env target redirects a tool's install into the main venv.
+
+    UV_PROJECT_ENVIRONMENT is the dangerous one: scripts/isolate.sh sets it so
+    the main venv cannot be relocated, but `install-tool` runs `uv sync` inside
+    the tool's own project dir. Inherited, that sync targeted mangaEasy's venv —
+    it installed kokoro + torch there and, resolving to kokoro's lockfile,
+    uninstalled the `mangaeasy` package itself, leaving the CLI unrunnable and
+    the tool dir with no venv (2026-07-30).
+    """
+    for variable in ENV_TARGET_VARS:
+        monkeypatch.setenv(variable, "/some/other/env")
+    env = tool_env()
+    leaked = [v for v in ENV_TARGET_VARS if v in env]
+    assert not leaked, (
+        f"tool_env() leaked environment target(s) {leaked} into an isolated "
+        f"tool subprocess; each one redirects that tool's uv/python at the "
+        f"wrong environment"
+    )
+
+
+def test_env_target_vars_covers_uv_project_environment():
+    """isolate.sh exports it, so tool_env() must know to strip it."""
+    assert "UV_PROJECT_ENVIRONMENT" in ENV_TARGET_VARS
+    assert "UV_PROJECT_ENVIRONMENT" in ISOLATE_SH.read_text(encoding="utf-8")
+
+
+def test_every_env_target_the_shell_exports_is_stripped():
+    """Anything isolate.sh exports that names an environment must be dropped.
+
+    Catches the general shape of the bug: adding a new redirecting variable to
+    the shell half without teaching tool_env() to strip it.
+    """
+    text = ISOLATE_SH.read_text(encoding="utf-8")
+    exported = set(re.findall(r"export ([A-Z_]+)", text))
+    exported |= set(re.findall(r"^([A-Z_]+)=", text, re.M))
+    targets = {v for v in exported
+               if v.endswith("_ENVIRONMENT") or v in {"VIRTUAL_ENV", "PYTHONHOME", "PYTHONPATH"}}
+    missing = targets - set(ENV_TARGET_VARS)
+    assert not missing, (
+        f"scripts/isolate.sh exports {sorted(missing)}, which name an "
+        f"environment but are not in ENV_TARGET_VARS — a tool's `uv sync` "
+        f"would target mangaEasy's own venv"
+    )
