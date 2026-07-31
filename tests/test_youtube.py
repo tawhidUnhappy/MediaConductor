@@ -24,18 +24,16 @@ def run_cli(env_home, *args: str) -> subprocess.CompletedProcess:
 
 
 def approved_project(tmp_path, video):
-    """A project whose reviews and rights authorize uploading *video*.
+    """A project whose reviews authorize uploading *video*.
 
-    Upload is gated on a hash-bound final-video review plus a fail-closed
-    rights manifest, so every upload test has to produce a genuinely approved
-    state rather than a flag.
+    Upload is gated on a hash-bound final-video review, so every upload test
+    has to produce a genuinely approved state rather than a flag.
     """
     from mangaeasy.reviews import (
         record_crop_review,
         record_final_video_review,
         record_narration_review,
     )
-    from mangaeasy.rights import SAFETY_SCANS, write_rights
 
     project = tmp_path / "library" / "Recap"
     panels = project / "01" / "panels"
@@ -50,31 +48,7 @@ def approved_project(tmp_path, video):
     record_final_video_review(
         project, video, ["01"],
         reviewer="tester",
-        rights_confirmed=True,
-        voice_consent_confirmed=True,
-        source_permission_confirmed=True,
     )
-    write_rights(project, {
-        "schema_version": 1,
-        "source": {"url": "https://example.test/title", "title": "Recap",
-                   "edition": "digital", "language": "en",
-                   "creator": "A. Author", "publisher": "Example Press"},
-        "permission": {"basis": "explicit_permission", "detail": "written grant 2026-07",
-                       "granted_by": "Example Press", "evidence": "grant.pdf",
-                       "allowed_chapters": ["1-12"]},
-        "attribution": "Art by A. Author, published by Example Press.",
-        "translation": {"provenance": "official English edition", "scanlator": ""},
-        "voice_consent": {"basis": "synthetic_licensed", "detail": "Kokoro licence",
-                          "speaker": ""},
-        "music": [{"path": "bgm/track.wav", "license": "CC-BY 4.0",
-                   "source": "https://example.test/track"}],
-        "thumbnail_sources": ["01/panels/01_001.png"],
-        "commentary": {"adds": "Chapter-by-chapter analysis of the reveal structure.",
-                       "source_to_script_originality": "Narration is original prose; no bubble text copied.",
-                       "edit_decision_list": "output/Recap/edl.json"},
-        "safety_scans": {name: {"scanned_by": "tester", "scanned_at": "2026-07-26",
-                                "clear": True} for name in SAFETY_SCANS},
-    })
     return project
 
 
@@ -136,19 +110,6 @@ def test_upload_refuses_when_the_approved_bytes_changed(tmp_path):
                    "--video", str(video), "--title", "t")
     assert proc.returncode == 1
     assert "not covered by a current review" in proc.stderr
-
-
-def test_upload_refuses_when_rights_are_unknown(tmp_path):
-    from mangaeasy.rights import rights_path
-
-    video = tmp_path / "v.mp4"
-    video.write_bytes(b"x")
-    project = approved_project(tmp_path, video)
-    rights_path(project).unlink()
-    proc = run_cli(tmp_path, "youtube-upload", "--project-root", str(project),
-                   "--video", str(video), "--title", "t")
-    assert proc.returncode == 1
-    assert "no rights manifest" in proc.stderr
 
 
 def test_auth_without_client_secrets_fails_actionably(tmp_path):
@@ -461,7 +422,6 @@ def test_upload_json_identifies_selected_profile_and_channel(tmp_path, monkeypat
     assert report["channel_id"] == "UCMANGA"
     # Enough provenance to reconstruct which approved bytes went where.
     assert report["approved_video_sha256"]
-    assert report["rights_basis"] == "explicit_permission"
 
 
 def test_upload_thumbnail_reauthorizes_and_retries_once_on_401(

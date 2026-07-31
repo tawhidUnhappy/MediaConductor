@@ -131,7 +131,7 @@ snapshots of exactly what was reviewed. Reviews can be performed and recorded by
 |---|---|---|
 | `manga-review crop` | source pages + panel crops for the selected items | any source or panel byte changing |
 | `manga-review narration` | panels + `narration.json` + `intro.json` | any panel or script byte changing |
-| `manga-review final-video` | one exact MP4 + the approved item inputs + rights/voice/source acknowledgements | any output, panel, or script byte changing |
+| `manga-review final-video` | one exact MP4 + the approved item inputs | any output, panel, or script byte changing |
 
 What the reviewer is actually asserting:
 
@@ -163,26 +163,13 @@ Review approvals are recorded against exact file bytes by running the `manga-rev
 
 `youtube-upload` requires, before authorization and before a single byte is sent:
 
-1. a current `manga-review final-video` record for **that exact file**, which
-   itself requires current crop and narration records;
-2. a complete `manga-rights` manifest.
+a current `manga-review final-video` record for **that exact file**, which
+itself requires current crop and narration records.
 
-The rights manifest **fails closed**. Two specific beliefs are rejected because
-both are common and both are wrong: that a page being reachable on a webtoon
-site implies a licence, and that attribution or a "no copyright intended"
-disclaimer substitutes for permission. `permission.basis` must be one of
-`license`, `explicit_permission`, `public_domain`, or `commentary`, with
-supporting detail, evidence, and the chapters it actually covers.
-
-A commentary basis additionally requires recording what the video *adds*
-(criticism, explanation, analysis, interpretation), how the script differs from
-the source dialogue, and an edit decision list showing only the panels the
-commentary needs were used — not a complete readable substitute for the chapter.
-
-Platform-safety scans (nudity, sexualized minors, graphic gore, misleading
-thumbnail) must each be recorded clear by a named reviewer. Recap source
-material commonly has teenage leads, so the second of those is a live
-constraint, not a formality.
+That gate answers "is this the file that was checked?", not "may this be
+published at all". Clearing the source material, the music, and the narrator
+voice for use is the operator's responsibility and is deliberately not modelled
+by the tool.
 
 ---
 

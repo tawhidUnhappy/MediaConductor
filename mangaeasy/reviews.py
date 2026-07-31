@@ -35,11 +35,9 @@ REVIEW_RECORD_RELATIVE_PATH = Path(".mangaeasy") / "manga-reviews.json"
 # project reviewed under the old name must keep its records rather than land
 # back behind the gate: reads fall back here, writes always go to the new path.
 LEGACY_REVIEW_RECORD_RELATIVE_PATH = Path(".mediaconductor") / "manga-reviews.json"
-ACKNOWLEDGEMENT_FIELDS = (
-    "rights_confirmed",
-    "voice_consent_confirmed",
-    "source_permission_confirmed",
-)
+# Records written before the rights system was removed carry an
+# `acknowledgements` block. It is ignored on read rather than rejected, so an
+# in-flight project does not land back behind the gate on upgrade.
 
 
 class ReviewRecordError(ValueError):
@@ -426,24 +424,11 @@ def record_final_video_review(
     items: Sequence[str] | None,
     *,
     reviewer: str,
-    rights_confirmed: bool,
-    voice_consent_confirmed: bool,
-    source_permission_confirmed: bool,
     reviewed_at: str | None = None,
 ) -> dict:
     """Approve one exact final MP4 after current crop and narration approvals."""
     root = Path(project_root).expanduser().resolve()
     selected = _selected_item_dirs(root, items)
-    acknowledgements = {
-        "rights_confirmed": rights_confirmed,
-        "voice_consent_confirmed": voice_consent_confirmed,
-        "source_permission_confirmed": source_permission_confirmed,
-    }
-    missing = [name for name in ACKNOWLEDGEMENT_FIELDS if acknowledgements[name] is not True]
-    if missing:
-        raise ReviewRecordError(
-            "final video review requires true acknowledgement(s): " + ", ".join(missing)
-        )
     prior = check_review_records(
         root,
         [item.name for item in selected],
@@ -476,7 +461,6 @@ def record_final_video_review(
             "sha256": video_digest,
             "size": video_size,
         },
-        "acknowledgements": acknowledgements,
     }
     store["final_video"] = {
         "reviewed_at": reviewed_at,
@@ -494,7 +478,6 @@ def record_final_video_review(
         "items": basis["items"],
         "video": basis["video"],
         "input_digest": store["final_video"]["input_digest"],
-        "acknowledgements": acknowledgements,
     }
 
 
@@ -520,15 +503,6 @@ def _check_final_video(
                 "final video review item selection differs from the requested items: "
                 f"recorded={record.get('items')} requested={requested_items}"
             ),
-        }
-    acknowledgements = record.get("acknowledgements")
-    if not isinstance(acknowledgements, dict) or any(
-        acknowledgements.get(name) is not True for name in ACKNOWLEDGEMENT_FIELDS
-    ):
-        return {
-            "ok": False,
-            "status": "stale",
-            "detail": "final video review lacks current rights/voice/source acknowledgements",
         }
     prior = check_review_records(
         project_root,
@@ -729,9 +703,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     final.add_argument("--video", type=Path, required=True)
     final.add_argument("--reviewer", required=True)
     final.add_argument("--reviewed-at", default=None)
-    final.add_argument("--rights-confirmed", action="store_true")
-    final.add_argument("--voice-consent-confirmed", action="store_true")
-    final.add_argument("--source-permission-confirmed", action="store_true")
 
     check = subparsers.add_parser("check", help="Check whether review records are current.")
     _add_selection_arguments(check)
@@ -772,9 +743,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 items,
                 reviewer=args.reviewer,
                 reviewed_at=args.reviewed_at,
-                rights_confirmed=args.rights_confirmed,
-                voice_consent_confirmed=args.voice_consent_confirmed,
-                source_permission_confirmed=args.source_permission_confirmed,
             )
         else:
             report = check_review_records(

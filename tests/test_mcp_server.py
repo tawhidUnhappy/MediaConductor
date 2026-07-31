@@ -212,12 +212,8 @@ def test_manga_review_is_exposed_as_a_first_class_tool():
         "items": ["01"],
         "video": "/output/Recap/Recap_full.mp4",
         "reviewer": "sam",
-        "rights_confirmed": True,
-        "voice_consent_confirmed": True,
-        "source_permission_confirmed": True,
     })
     assert args[0] == "final-video"
-    assert "--rights-confirmed" in args
     assert args[args.index("--video") + 1] == "/output/Recap/Recap_full.mp4"
 
 
@@ -316,8 +312,8 @@ def test_workspace_policy_accepts_inside_output_and_rejects_outside(tmp_path):
         )
 
 
-@pytest.mark.parametrize("tool", ["manga_review", "panel_decisions", "manga_rights"])
-def test_workspace_policy_covers_review_and_rights_records(tool, tmp_path):
+@pytest.mark.parametrize("tool", ["manga_review", "panel_decisions"])
+def test_workspace_policy_covers_review_records(tool, tmp_path):
     """Review evidence is a filesystem write like any render root."""
     allowed = tmp_path / "allowed"
     outside = tmp_path / "outside"

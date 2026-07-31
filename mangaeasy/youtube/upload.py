@@ -57,8 +57,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-auto-auth", action="store_false", dest="auto_auth", default=True,
                         help="Do not open browser consent automatically if authorization is needed.")
     parser.add_argument("--project-root", type=Path, required=True,
-                        help="Manga project whose current final-video review and rights manifest "
-                             "authorize this exact file.")
+                        help="Manga project whose current final-video review covers this exact file.")
     parser.add_argument("--items", nargs="*",
                         help="Items covered by the upload (default: every item in the project).")
     parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-12.")
@@ -240,22 +239,21 @@ def _set_thumbnail(session, video_id: str, thumbnail: Path) -> None:
 
 
 def enforce_publication_gate(project_root: Path, video: Path, items: list[str] | None) -> dict:
-    """Refuse to upload unless *this exact file* is approved and rights are clear.
+    """Refuse to upload unless *this exact file* is approved.
 
-    Two independent gates, both bound to bytes rather than to assertions:
+    The hash-bound ``manga-review final-video`` record is bound to bytes rather
+    than to an assertion, and itself requires current crop and narration
+    reviews — so re-cropping a panel or rewriting a line after the review
+    invalidates the approval automatically.
 
-    * the hash-bound ``manga-review final-video`` record — which itself requires
-      current crop and narration reviews, so re-cropping a panel or rewriting a
-      line after the review invalidates the approval automatically;
-    * the rights manifest, which fails closed when source ownership, permission,
-      attribution, translation provenance, voice consent, music licensing,
-      thumbnail sources, or the platform-safety scans are unresolved.
+    This is a quality gate: it answers "is this the file that was checked?",
+    not "may this be published at all". Clearing the source material for use is
+    the operator's responsibility and is deliberately not modelled here.
 
     Reviews can be recorded by a human or an LLM agent.
-    Raises ``ReviewRecordError`` or ``RightsError`` with the exact remedy.
+    Raises ``ReviewRecordError`` with the exact remedy.
     """
     from mangaeasy.reviews import ReviewRecordError, check_review_records
-    from mangaeasy.rights import require_publishable_rights
 
     report = check_review_records(
         project_root,
@@ -268,11 +266,9 @@ def enforce_publication_gate(project_root: Path, video: Path, items: list[str] |
         raise ReviewRecordError(
             f"upload refused — {video} is not covered by a current review:\n{detail}\n"
             f"Record the review with `{CLI_NAME} manga-review "
-            f"final-video --project-root {project_root} --video {video} --reviewer <name> "
-            "--rights-confirmed --voice-consent-confirmed --source-permission-confirmed`."
+            f"final-video --project-root {project_root} --video {video} --reviewer <name>`."
         )
-    rights = require_publishable_rights(project_root)
-    return {"review": report, "rights": rights}
+    return {"review": report}
 
 
 def main() -> int:
@@ -289,7 +285,6 @@ def main() -> int:
     # Before authorization, before a single byte is sent: an upload that should
     # not happen must fail in seconds, not after 400 MB and a live video id.
     from mangaeasy.reviews import ReviewRecordError
-    from mangaeasy.rights import RightsError
     from mangaeasy.video_pipeline.common import merge_item_selection
 
     try:
@@ -298,11 +293,10 @@ def main() -> int:
             video,
             merge_item_selection(args.items, args.item_range),
         )
-    except (ReviewRecordError, RightsError) as exc:
+    except ReviewRecordError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    print(f"Publication gate passed: final-video review current, rights basis "
-          f"'{gate['rights']['permission_basis']}'.", flush=True)
+    print("Publication gate passed: final-video review current.", flush=True)
 
     description = args.description
     if args.description_file is not None:
@@ -463,7 +457,6 @@ def main() -> int:
         # it was: enough to reconstruct the decision later without guessing.
         "project_root": str(args.project_root),
         "approved_video_sha256": gate["review"]["stages"]["final_video"].get("recorded_digest"),
-        "rights_basis": gate["rights"]["permission_basis"],
     }
     emit_result(**result)
     if args.as_json:

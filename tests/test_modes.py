@@ -76,7 +76,7 @@ def test_mcp_catalog_is_the_manga_catalog():
     assert {
         "webtoon_cutcheck", "webtoon_override", "panels_remap",
         "narration_review_sheets", "narration_edit", "audio_audit",
-        "manga_review", "panel_decisions", "manga_rights", "video_quality",
+        "manga_review", "panel_decisions", "video_quality",
     } <= manga
     assert not {"story_init", "song_init", "generate_image", "generate_song"} & manga
 

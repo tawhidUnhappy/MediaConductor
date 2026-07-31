@@ -125,24 +125,12 @@ def test_new_intro_or_changed_narration_invalidates_narration_review(tmp_path):
     assert report["stages"]["narration"]["items"]["01"]["status"] == "stale"
 
 
-def test_final_video_review_binds_mp4_inputs_and_acknowledgements(tmp_path):
+def test_final_video_review_binds_mp4_inputs(tmp_path):
     root, item = _project(tmp_path)
     _approve_inputs(root)
     video = tmp_path / "output" / "Story_full.mp4"
     video.parent.mkdir()
     video.write_bytes(b"final-video-v1")
-
-    with pytest.raises(ReviewRecordError, match="source_permission_confirmed"):
-        record_final_video_review(
-            root,
-            video,
-            ["01"],
-            reviewer="final-reviewer",
-            reviewed_at=REVIEWED_AT,
-            rights_confirmed=True,
-            voice_consent_confirmed=True,
-            source_permission_confirmed=False,
-        )
 
     record_final_video_review(
         root,
@@ -150,9 +138,6 @@ def test_final_video_review_binds_mp4_inputs_and_acknowledgements(tmp_path):
         ["01"],
         reviewer="final-reviewer",
         reviewed_at=REVIEWED_AT,
-        rights_confirmed=True,
-        voice_consent_confirmed=True,
-        source_permission_confirmed=True,
     )
     current = check_review_records(
         root,

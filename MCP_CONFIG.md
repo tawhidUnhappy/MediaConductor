@@ -170,7 +170,7 @@ Everything the server downloads or generates goes under one folder in the
 workspace — `<workspace>/data/`:
 
 ```text
-data/library/<Project>/   downloaded chapters, panels, narration, rights, reviews
+data/library/<Project>/   downloaded chapters, panels, narration, reviews
 data/audio/  data/audio_faded/   TTS takes and render-safe derivatives
 data/output/<Project>/    item videos, <Project>_full.mp4, quality reports
 data/review/  data/work/  review sheets; scratch and job logs
@@ -300,12 +300,11 @@ The catalog exposes **49 tools** from `mangaeasy/command_spec.py`. Every tool ca
 | `narration_check` | `project_root` | Validate files parse, images exist, stems unique. |
 | `narration_review_sheets` | `project_root` | Generate visual review sheets pairing panels and lines. |
 
-### Review, Decisions & Rights (3)
+### Review & Decisions (2)
 | Tool | Required | Purpose |
 | --- | --- | --- |
 | `manga_review` | `action`, `project_root` | Record or check hash-bound reviews: `crop`, `narration`, `final-video`, `check`. |
 | `panel_decisions` | `project_root` | Record panel omissions or audit unaccounted panels. |
-| `manga_rights` | `action`, `project_root` | `init` / `check` / `show` the publication rights manifest. Fails closed. |
 
 ### Audio, Render & Join (7)
 | Tool | Required | Purpose |

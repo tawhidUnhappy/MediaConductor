@@ -1,9 +1,9 @@
-"""The gates that make an unreviewed or unlicensed publish impossible.
+"""The gates that make an unreviewed publish impossible.
 
 Each test here corresponds to a way the previous design could be satisfied
 without doing the work: a reused WAV that no longer matched its narration, an
-omission nobody decided, a rights question nobody answered, a persistent root
-quietly landing outside the workspace.
+omission nobody decided, a persistent root quietly landing outside the
+workspace.
 """
 
 from __future__ import annotations
@@ -27,14 +27,6 @@ from mangaeasy.panel_decisions import (
     PanelDecisionError,
     audit_item,
     record_decisions,
-)
-from mangaeasy.rights import (
-    SAFETY_SCANS,
-    RightsError,
-    check_rights,
-    require_publishable_rights,
-    rights_path,
-    write_rights,
 )
 
 
@@ -199,183 +191,6 @@ def test_decisions_cannot_name_a_panel_outside_the_folder(item):
 def test_reviewer_is_required(item):
     with pytest.raises(PanelDecisionError, match="reviewer must be"):
         record_decisions(item, ["credits.png"], reason="credit", reviewer="  ")
-
-
-# ── Rights manifest ──────────────────────────────────────────────────────────
-
-def complete_rights() -> dict:
-    return {
-        "schema_version": 1,
-        "source": {"url": "https://example.test/title", "title": "Recap",
-                   "edition": "digital", "language": "en",
-                   "creator": "A. Author", "publisher": "Example Press"},
-        "permission": {"basis": "explicit_permission", "detail": "written grant 2026-07",
-                       "granted_by": "Example Press", "evidence": "grant.pdf",
-                       "allowed_chapters": ["1-12"]},
-        "attribution": "Art by A. Author, published by Example Press.",
-        "translation": {"provenance": "official English edition", "scanlator": ""},
-        "voice_consent": {"basis": "synthetic_licensed", "detail": "Kokoro licence",
-                          "speaker": ""},
-        "music": [{"path": "bgm/track.wav", "license": "CC-BY 4.0",
-                   "source": "https://example.test/track"}],
-        "thumbnail_sources": ["01/panels/a.png"],
-        "commentary": {"adds": "Chapter-by-chapter analysis of the reveal structure.",
-                       "source_to_script_originality": "Original prose; no bubble text copied.",
-                       "edit_decision_list": "output/Recap/edl.json"},
-        "safety_scans": {name: {"scanned_by": "sam", "scanned_at": "2026-07-26",
-                                "clear": True} for name in SAFETY_SCANS},
-    }
-
-
-def test_missing_manifest_fails_closed(tmp_path):
-    report = check_rights(tmp_path)
-    assert not report["ok"]
-    assert "no rights manifest" in report["problems"][0]
-    with pytest.raises(RightsError, match="publication refused"):
-        require_publishable_rights(tmp_path)
-
-
-def test_a_complete_manifest_authorizes_publication(tmp_path):
-    write_rights(tmp_path, complete_rights())
-    report = require_publishable_rights(tmp_path)
-    assert report["ok"]
-    assert report["permission_basis"] == "explicit_permission"
-
-
-def test_being_reachable_online_is_not_a_permission_basis(tmp_path):
-    data = complete_rights()
-    data["permission"]["basis"] = "accessible_online"
-    write_rights(tmp_path, data)
-    report = check_rights(tmp_path)
-    assert not report["ok"]
-    assert any("not a recognized basis" in p for p in report["problems"])
-
-
-def test_attribution_alone_is_not_permission(tmp_path):
-    data = complete_rights()
-    data["permission"]["basis"] = ""
-    write_rights(tmp_path, data)
-    report = check_rights(tmp_path)
-    assert not report["ok"]
-    assert any("attribution or a disclaimer" in p for p in report["problems"])
-
-
-@pytest.mark.parametrize("mutate,needle", [
-    (lambda d: d["source"].update(url=""), "source.url"),
-    (lambda d: d["source"].update(creator=""), "source.creator"),
-    (lambda d: d["permission"].update(allowed_chapters=[]), "allowed_chapters"),
-    (lambda d: d.update(attribution=""), "attribution is empty"),
-    (lambda d: d["translation"].update(provenance=""), "translation.provenance"),
-    (lambda d: d["voice_consent"].update(basis=""), "voice_consent.basis"),
-    (lambda d: d.update(thumbnail_sources=[]), "thumbnail_sources"),
-    (lambda d: d["commentary"].update(adds=""), "commentary.adds"),
-    (lambda d: d["commentary"].update(source_to_script_originality=""), "originality"),
-])
-def test_every_required_field_blocks_publication(tmp_path, mutate, needle):
-    data = complete_rights()
-    mutate(data)
-    write_rights(tmp_path, data)
-    report = check_rights(tmp_path)
-    assert not report["ok"]
-    assert any(needle in problem for problem in report["problems"]), report["problems"]
-
-
-@pytest.mark.parametrize("scan", SAFETY_SCANS)
-def test_every_platform_safety_scan_must_be_recorded_clear(tmp_path, scan):
-    data = complete_rights()
-    data["safety_scans"][scan]["clear"] = None
-    write_rights(tmp_path, data)
-    report = check_rights(tmp_path)
-    assert not report["ok"]
-    assert any(scan in problem for problem in report["problems"])
-
-
-def test_commentary_basis_requires_an_edit_decision_list(tmp_path):
-    """Using no more of the work than the commentary needs has to be shown."""
-    data = complete_rights()
-    data["permission"]["basis"] = "commentary"
-    data["permission"]["detail"] = "criticism and analysis"
-    data["commentary"]["edit_decision_list"] = ""
-    write_rights(tmp_path, data)
-    report = check_rights(tmp_path)
-    assert not report["ok"]
-    assert any("edit_decision_list" in p for p in report["problems"])
-
-
-def test_a_corrupt_manifest_does_not_read_as_permission(tmp_path):
-    rights_path(tmp_path).write_text("{not json", encoding="utf-8")
-    assert not check_rights(tmp_path)["ok"]
-
-
-# ── Operator-level seeding ───────────────────────────────────────────────────
-#
-# Standing facts (whose voice, what the channel adds) are stated once in
-# config.system.json; facts about *this* work are never inherited.
-
-def test_operator_level_fields_seed_from_system_config():
-    from mangaeasy.rights import _template, seed_template
-
-    template = _template()
-    seeded = seed_template(template, {
-        "attribution": "Art by the credited creator",
-        "permission": {"basis": "license", "detail": "Publisher agreement 2026-01"},
-        "voice_consent": {"basis": "own_voice", "speaker": "the operator"},
-        "safety_scans": {"scanned_by": "operator"},
-    })
-
-    assert template["voice_consent"]["basis"] == "own_voice"
-    assert template["permission"]["basis"] == "license"
-    assert template["attribution"] == "Art by the credited creator"
-    assert all(template["safety_scans"][n]["scanned_by"] == "operator" for n in SAFETY_SCANS)
-    assert "voice_consent.basis" in seeded
-
-
-def test_per_work_facts_are_never_inherited_from_system_config():
-    """The whole point of the split: a standing basis must not decide which
-    series it covers, nor pre-answer a safety scan for pages it never saw."""
-    from mangaeasy.rights import _template, seed_template
-
-    template = _template()
-    seed_template(template, {
-        "source": {"title": "Some Other Series", "creator": "Someone Else"},
-        "permission": {"basis": "license", "allowed_chapters": ["1-99"]},
-        "commentary": {"edit_decision_list": "cut nothing"},
-        "safety_scans": {"scanned_by": "operator", "clear": True},
-    })
-
-    assert template["source"]["title"] == ""
-    assert template["source"]["creator"] == ""
-    assert template["permission"]["allowed_chapters"] == []
-    assert template["commentary"]["edit_decision_list"] == ""
-    assert all(template["safety_scans"][n]["clear"] is None for n in SAFETY_SCANS)
-
-
-def test_seeding_a_blank_default_leaves_the_field_for_the_validator():
-    from mangaeasy.rights import _template, seed_template
-
-    template = _template()
-    seeded = seed_template(template, {"voice_consent": {"basis": "   "}})
-    assert template["voice_consent"]["basis"] == ""
-    assert seeded == []
-
-
-def test_a_seeded_manifest_still_fails_closed_until_the_work_is_identified(tmp_path):
-    """Seeding removes repetition, not the gate."""
-    from mangaeasy.rights import _template, seed_template
-
-    template = _template()
-    seed_template(template, {
-        "permission": {"basis": "license", "detail": "Publisher agreement",
-                       "granted_by": "Publisher", "evidence": "contract.pdf"},
-        "voice_consent": {"basis": "own_voice"},
-        "safety_scans": {"scanned_by": "operator"},
-    })
-    write_rights(tmp_path, template)
-
-    report = check_rights(tmp_path)
-    assert not report["ok"]
-    with pytest.raises(RightsError):
-        require_publishable_rights(tmp_path)
 
 
 # ── Workspace layout ─────────────────────────────────────────────────────────

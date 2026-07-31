@@ -208,7 +208,7 @@ and `youtube_thumbnail` tools. The safe sequence is:
 3. Call `youtube_status` with that profile and `verify=true`. If it has no
    token but the shared client exists, the user's browser opens once and the
    tool continues after consent. Set `auto_auth=false` only for headless use.
-4. Publish once with the same explicit profile after all rights/review gates.
+4. Publish once with the same explicit profile after the review gate.
 5. Record the returned profile, channel id, and video id in publish metadata.
 
 OAuth consent still needs the channel owner in a browser, but the agent does

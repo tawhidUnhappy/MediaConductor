@@ -22,8 +22,8 @@ Before any publish operation:
 4. Carry the exact profile name through the mode manifest when it has a
    `youtube.profile` field and through every direct `youtube-* --profile`
    command. Do not silently fall back to `default` during publishing.
-5. Publish only after the mode's rights, QA, disclosure, and explicit-user-
-   approval gates. Record profile, channel id, and returned video id.
+5. Publish only after the mode's QA, disclosure, and explicit-user-approval
+   gates. Record profile, channel id, and returned video id.
 
 ## Replacing an existing upload
 

@@ -35,9 +35,8 @@ mangaeasy manga-review check     --project-root data/library/<P> --items 01
 Re-cropping a panel or rewriting a line invalidates the approval automatically,
 and TTS, rendering, joining, and upload all refuse to run without current
 records. Publishing additionally requires a hash-bound `manga-review
-final-video` record and a complete `manga-rights` manifest, which fails closed
-when source ownership, permission, voice consent, or the platform-safety scans
-are unresolved. The LLM agent performs all reviews itself — inspecting crops,
+final-video` record. Clearing the source material for use is the operator's
+responsibility and is deliberately not modelled by the tool. The LLM agent performs all reviews itself — inspecting crops,
 validating narration, and confirming the final video — then records the
 approval using its agent identity as the reviewer name.
 

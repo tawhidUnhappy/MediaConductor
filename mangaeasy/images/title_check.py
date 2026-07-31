@@ -13,9 +13,7 @@ the reversal has to be the actual turn of the story, the emphasis words have
 to be the ones a browsing viewer recognises (``VILLAIN``, ``YANDERE``,
 ``ISEKAI'D``), and every claim has to be supported by a beat that appears in
 the video. **A title that passes this check can still be a lie.** The check
-covers the shape; whether the promise is true is the agent's judgement, and
-`manga-rights check` is what refuses the upload when the thumbnail and title
-imply something the recap does not contain.
+covers the shape; whether the promise is true is the agent's judgement.
 """
 
 from __future__ import annotations

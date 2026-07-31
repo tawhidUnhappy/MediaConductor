@@ -23,8 +23,7 @@ core behind `panels-context-pack`.
 
 - Thumbnail base art is an **approved source panel**, never generated art: the
   channel's value is the actual comic, and a generated cover promises art the
-  video does not contain. The panel must also appear in `rights.json` under
-  `thumbnail_sources`, or `manga-rights check` fails closed.
+  video does not contain.
 - The bundled `assets/fonts/edosz.ttf` brush face is available via `--font` for
   a manga-styled text block; the built-in candidates are Impact / Arial Bold /
   DejaVu Sans Bold.

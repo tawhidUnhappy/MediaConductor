@@ -38,7 +38,7 @@ RUNTIME_DIRNAME = "runtime"
 
 # Subfolders of data/, in the order a production actually flows through them.
 DATA_SUBDIRS: tuple[tuple[str, str], ...] = (
-    ("library", "downloaded chapters, cropped panels, narration, rights and review records"),
+    ("library", "downloaded chapters, cropped panels, narration, and review records"),
     ("audio", "raw TTS takes with their provenance sidecars"),
     ("audio_faded", "render-safe narration derivatives (8 ms edge fades)"),
     ("output", "item videos, the joined full video, and quality reports"),
@@ -216,7 +216,6 @@ a job is still writing and it tells you what it removed.
 
     library/<project>/01/panels/      cropped panels for chapter 01
     library/<project>/01/narration.json
-    library/<project>/rights.json     source, permission basis, safety scans
     audio/<project>/01/*.wav          one narration take per panel
     audio_faded/<project>/01/*.wav    what actually gets rendered
     output/<project>/                 01.mp4 ... plus <project>_full.mp4

@@ -120,12 +120,11 @@ _PATH_ARGUMENTS: dict[str, frozenset[str]] = {
     "work_todo": frozenset({"project_root"}),
     "work_qa": frozenset({"project_root"}),
     "work_artifacts": frozenset({"project_root"}),
-    # Review records, panel decisions, rights manifests, and quality reports are
+    # Review records, panel decisions, and quality reports are
     # all filesystem writes bound to specific bytes; the workspace policy must
     # cover them exactly like a render root.
     "manga_review": frozenset({"project_root", "video"}),
     "panel_decisions": frozenset({"project_root"}),
-    "manga_rights": frozenset({"project_root"}),
     "video_quality": frozenset({"project_root", "output_root", "video"}),
 }
 

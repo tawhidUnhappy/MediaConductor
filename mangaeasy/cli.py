@@ -128,10 +128,9 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "youtube-delete":       ("mangaeasy.youtube.delete",                       "main",        "YouTube",          "Delete a video through a selected profile (two-step: requires --confirm)."),
     "youtube-thumbnail":    ("mangaeasy.youtube.thumbnail",                    "main",        "YouTube",          "Set/replace a thumbnail through a selected profile (no re-upload needed)."),
 
-    # ── Review, rights, and panel accounting (the production gates) ───────────
-    "manga-review":         ("mangaeasy.reviews",                              "main",        "Review & rights",  "Record/check hash-bound crop, narration, and final-video reviews (crop|narration|final-video|check)."),
-    "panel-decisions":      ("mangaeasy.panel_decisions",                      "main",        "Review & rights",  "Account for every panel: narrated, or deliberately omitted for a stated reason."),
-    "manga-rights":         ("mangaeasy.rights",                               "main",        "Review & rights",  "Create/verify the rights manifest that authorizes publication (init|check|show)."),
+    # ── Review and panel accounting (the production gates) ────────────────────
+    "manga-review":         ("mangaeasy.reviews",                              "main",        "Review",  "Record/check hash-bound crop, narration, and final-video reviews (crop|narration|final-video|check)."),
+    "panel-decisions":      ("mangaeasy.panel_decisions",                      "main",        "Review",  "Account for every panel: narrated, or deliberately omitted for a stated reason."),
 
     # ── External AI tool environments ─────────────────────────────────────────
     "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where manga tool envs (Kokoro/IndexTTS/MAGI/DeepSeek OCR) resolve."),

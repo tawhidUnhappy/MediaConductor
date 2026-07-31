@@ -288,7 +288,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "thumbnail-compose",
         "Compose a 1280x720 YouTube thumbnail from APPROVED SOURCE PANELS. There is no image "
         "generation in this path: the base pixels are always manga panels the crop review "
-        "approved and rights.json lists under thumbnail_sources, because art the video does "
+        "approved, because art the video does "
         "not contain is both a thumbnail-policy problem and a disappointment for whoever "
         "clicked. Four elements: 'blocks' (short ALL-CAPS hook words, yellow #FFE600, thick "
         "black stroke, -2..-5 degree rotate reads hand-placed), 'arrows' (fat block arrows "
@@ -586,7 +586,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         {"profile": _YOUTUBE_PROFILE,
          "auto_auth": _YOUTUBE_AUTO_AUTH,
          "project_root": {**_PROJECT_ROOT, "description": "Manga project whose current final-video "
-                          "review and rights record is bound to this exact file."},
+                          "review is bound to this exact file."},
          "video": {**_STR, "description": "Absolute path to the video file."},
          "title": {**_STR, "description": "Video title (max 100 chars)."},
          "description": _STR,
@@ -748,8 +748,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "manga-review",
         "Record and check the hash-bound reviews that production depends on. 'crop' approves "
         "the exact source pages and panel crops, 'narration' approves the exact panels plus "
-        "narration.json/intro.json, 'final-video' approves one exact MP4 together with the "
-        "rights, voice-consent, and source-permission acknowledgements, and 'check' reports "
+        "narration.json/intro.json, 'final-video' approves one exact MP4, and 'check' reports "
         "whether those records still match the current bytes. Any change to the inputs "
         "invalidates the approval — a boolean is never accepted as evidence that a review "
         "happened. Reviews can be recorded by a human or an LLM agent.",
@@ -762,17 +761,12 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "stages": {"type": "array", "items": {"type": "string",
                                                "enum": ["crop", "narration", "final_video"]},
                     "description": "Stages to check (default: crop + narration)."},
-         "rights_confirmed": {**_BOOL, "description": "Final-video: rights to the source art are confirmed."},
-         "voice_consent_confirmed": {**_BOOL, "description": "Final-video: narrator voice consent/provenance is confirmed."},
-         "source_permission_confirmed": {**_BOOL, "description": "Final-video: permission to use the source is confirmed."}},
+         },
         ["action", "project_root"],
         {"action": (None, "positional"), "project_root": ("--project-root", "value"),
          "items": ("--items", "list"), "reviewer": ("--reviewer", "value"),
          "video": ("--video", "value"), "source_subdir": ("--source-subdir", "value"),
-         "stages": ("--stage", "repeat"),
-         "rights_confirmed": ("--rights-confirmed", "flag"),
-         "voice_consent_confirmed": ("--voice-consent-confirmed", "flag"),
-         "source_permission_confirmed": ("--source-permission-confirmed", "flag")},
+         "stages": ("--stage", "repeat")},
     ),
     "panel_decisions": (
         "panel-decisions",
@@ -795,20 +789,6 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "item": ("--item", "value"), "panels": ("--panels", "list"),
          "reason": ("--reason", "value"), "note": ("--note", "value"),
          "reviewer": ("--reviewer", "value")},
-    ),
-    "manga_rights": (
-        "manga-rights",
-        "Create and verify the rights manifest that authorizes publication: source URL, "
-        "edition, language, creator, publisher, permission basis, allowed chapters, "
-        "attribution, translation provenance, voice consent, music licences, thumbnail "
-        "source panels, and platform-safety scans. Fails closed — a reachable webtoon page "
-        "is not permission, and neither is attribution or a disclaimer.",
-        {"action": {"type": "string", "enum": ["init", "check", "show"]},
-         "project_root": _PROJECT_ROOT,
-         "force": {**_BOOL, "description": "init: overwrite an existing manifest."}},
-        ["action", "project_root"],
-        {"action": (None, "positional"), "project_root": ("--project-root", "value"),
-         "force": ("--force", "flag")},
     ),
     "workspace_layout": (
         "workspace-layout",
@@ -849,7 +829,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 }
 
 # Commands whose --json flag should be appended automatically by the MCP server.
-# manga-review, panel-decisions and manga-rights always print one JSON object,
+# manga-review and panel-decisions always print one JSON object,
 # so they are deliberately absent — appending --json would be an unknown flag.
 JSON_COMMANDS = {"modes", "doctor", "where", "library-list", "video-check", "video-validate", "video-chapters",
                  "video-audio-audit", "youtube-profiles", "youtube-status", "youtube-upload",

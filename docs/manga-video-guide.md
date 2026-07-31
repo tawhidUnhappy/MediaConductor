@@ -306,9 +306,9 @@ upload batches: what's next, what's published — see the recipe below), `mcp`.
 resolves). OCR is reachable only through `panel-transcript`, which writes
 SHA-256-bound values into `<item>/transcript.json`.
 
-**Review and rights gates** — `manga-review` (crop | narration | final-video |
+**Review gates** — `manga-review` (crop | narration | final-video |
 check), `panel-decisions` (account for every un-narrated panel),
-`manga-rights` (init | check | show), `video-quality` (measure the encoded
+`video-quality` (measure the encoded
 deliverable). TTS, rendering, joining, and upload refuse to run without current
 hash-bound records, and there is no bypass flag.
 
@@ -385,8 +385,6 @@ uv --project D:/mangaEasy run mangaeasy thumbnail-compose --base "$PROJ/01/panel
 # Validate the video, then bind the approval to its exact bytes:
 uv --project D:/mangaEasy run mangaeasy manga-review final-video --project-root "$PROJ" --item-range 01-12 \
     --video "$OUT/<P>/<P>_full.mp4" --reviewer <name> \
-    --rights-confirmed --voice-consent-confirmed --source-permission-confirmed
-uv --project D:/mangaEasy run mangaeasy manga-rights check --project-root "$PROJ"
 uv --project D:/mangaEasy run mangaeasy youtube-upload --profile <profile> --project-root "$PROJ" \
     --video "$OUT/<P>/<P>_full.mp4" --title "..." --thumbnail final_thumb.png --json
 uv --project D:/mangaEasy run mangaeasy series-mark-published --project-root "$PROJ" --items 01-12 \

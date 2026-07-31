@@ -39,7 +39,7 @@ Each package has its own README.md with entry points and gotchas.
 | Stage | Package / module | What it does |
 |---|---|---|
 | core | `cli.py`, `command_spec.py`, `runtime.py`, `config.py`, `layout.py`, `paths.py`, `isolation.py`, `fonts.py`, `library_scan.py`, `series_plan.py`, `mcp_server.py`, `jobs.py`, `workboard.py`, `qa_loop.py`, `workspace.py` | dispatch, shared command schemas, self-spawning, config, **the one on-disk folder map**, **the one cache-pinning definition**, **the one font resolver**, batch planning, MCP server, background jobs, multi-agent board, resolved-root reporting + `workspace-reset` |
-| gates | `reviews.py`, `panel_decisions.py`, `rights.py` | hash-bound crop/narration/final-video approvals, per-panel omission decisions, the fail-closed rights manifest |
+| gates | `reviews.py`, `panel_decisions.py` | hash-bound crop/narration/final-video approvals, per-panel omission decisions |
 | acquire | `download/` | MangaDex fetch (polite, resumable, writes `manga.json`) |
 | acquire | `panels/` | crop: `webtoon-split`, `page-split` (MAGI), cutcheck, overrides, remap |
 | read | `ocr/` | DeepSeek-OCR 2 panel transcripts |
@@ -69,7 +69,7 @@ Each package has its own README.md with entry points and gotchas.
   work must go through the `job_start`/`job_status` tools, never a blocking
   call. Public startup always applies `--allow-root` (the current directory by
   default) to direct, nested-job, and configured-default filesystem paths,
-  including review records, rights manifests, and final-video paths.
+  including review records and final-video paths.
 - **Background jobs** (`mangaeasy/jobs.py`): `job-start --tool NAME
   --arguments-json OBJECT` only. Raw positional argv is rejected — it was a
   strictly *wider* interface than the MCP call it mirrored, so anything the
@@ -141,7 +141,6 @@ data/                         ← THE deletable folder. Nothing else is producti
   library/<project>/          source items; manga.json (machine-managed source record)
     01/panels/ 01/narration.json [01/intro.json] [01/transcript.json]
     01/panel_decisions.json   why each un-narrated panel is omitted (hash-bound)
-    rights.json               source, permission basis, consent, safety scans
     .mangaeasy/manga-reviews.json   hash-bound crop/narration/final-video approvals
   audio/<project>/<item>/*.wav        per-panel narration + *.wav.json provenance sidecar
   audio_faded/<project>/<item>/*.wav  production render derivatives; raw TTS untouched

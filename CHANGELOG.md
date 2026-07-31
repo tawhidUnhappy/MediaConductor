@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+### Removed
+
+- **The rights system is gone** — `manga-rights`, `rights.py`, `rights.json`,
+  and the `--rights-confirmed` / `--voice-consent-confirmed` /
+  `--source-permission-confirmed` flags on `manga-review final-video`.
+  Publication no longer asks the tool whether the source material is cleared
+  for use; that is the operator's responsibility and is deliberately not
+  modelled here. Removed at the owner's direction.
+
+  What this removes with it, stated plainly so it is not discovered later: the
+  recorded permission basis and its evidence, the voice-consent record, the
+  music-licence and thumbnail-source lists, and the four platform-safety
+  attestations (nudity, sexualized minors, graphic gore, misleading
+  thumbnail). Nothing in the pipeline now records or checks any of them.
+
+  **The final-video review gate is unchanged.** `youtube-upload` still refuses
+  any file that is not covered by a current hash-bound `manga-review
+  final-video` record, which still requires current crop and narration
+  reviews. That gate answers "is this the file that was checked?" — it never
+  answered "may this be published at all".
+
+  Existing `rights.json` files are left on disk and simply ignored. Review
+  records written earlier carry an `acknowledgements` block; it is ignored on
+  read rather than rejected, so an in-flight project does not land back behind
+  the gate on upgrade.
+
 **The product is `mangaEasy` again, and every text-drawing command now renders
 the same on Linux, Windows and macOS.** The rename is breaking; the portability
 fixes are not.

@@ -5,8 +5,7 @@ already approved** into a finished 1280×720 YouTube thumbnail. There is no
 image generation anywhere in this path and there is not meant to be: the
 channel's value is the actual comic, and art the video does not contain is
 both a thumbnail-policy problem and a straight disappointment for whoever
-clicked. Every base pixel comes from a panel listed in ``rights.json`` under
-``thumbnail_sources``.
+clicked. Every base pixel comes from a panel the crop review approved.
 
 Four layout elements, which between them reproduce the reference thumbnails
 this channel imitates:
@@ -481,8 +480,8 @@ def main(argv: list[str] | None = None) -> int:
                     "+ chapter badge (1280x720). No image generation.",
     )
     parser.add_argument("--base", type=Path, action="append", default=[], metavar="PANEL",
-                        help="Base panel — an approved crop listed in rights.json "
-                             "thumbnail_sources. Repeat it for a split layout.")
+                        help="Base panel — an approved crop from the project. "
+                             "Repeat it for a split layout.")
     parser.add_argument("--output", type=Path, required=True, help="Output PNG/JPG path.")
     parser.add_argument("--text", action="append", default=[], metavar="WORDS",
                         help="Quick mode: one text block (repeatable, stacked top-left, "

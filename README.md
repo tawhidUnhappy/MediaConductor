@@ -23,7 +23,7 @@ download / import            MangaDex or your own chapter files
 → render → join → BGM        one final whole-mix normalize
 → measure the encoded file   loudness, drift, black/frozen frames, silence
 → FINAL VIDEO REVIEW         recorded against the exact MP4 hash
-→ rights check → upload      fails closed if permission is unresolved
+→ upload                     bound to the approved MP4 hash
 ```
 
 The parts a machine can check are checked automatically. The parts it cannot —
@@ -117,8 +117,7 @@ approval is a record bound to SHA-256 snapshots of exactly what was approved:
 mangaeasy manga-review crop        --project-root data/library/<P> --items 01 --reviewer NAME
 mangaeasy manga-review narration   --project-root data/library/<P> --items 01 --reviewer NAME
 mangaeasy manga-review final-video --project-root data/library/<P> --items 01 \
-    --video data/output/<P>/<P>_full.mp4 --reviewer NAME \
-    --rights-confirmed --voice-consent-confirmed --source-permission-confirmed
+    --video data/output/<P>/<P>_full.mp4 --reviewer NAME
 mangaeasy manga-review check       --project-root data/library/<P> --items 01
 ```
 
@@ -135,7 +134,6 @@ Related gates:
 - `mangaeasy panel-decisions` — every cropped panel must be narrated or
   carry a hash-bound omission decision (`credit`, `scanlator_notice`,
   `decorative`, `duplicate`, `sfx_only`, `platform_safety`, `other`).
-- `mangaeasy manga-rights` — the manifest that authorizes publication.
   It **fails closed**: a page being reachable on a webtoon site is not
   permission, and neither is attribution or a disclaimer.
 - `mangaeasy video-quality` — measures the *encoded* deliverable, not the
@@ -166,7 +164,7 @@ escape hatch; a tool outside the catalog answers *unknown* rather than
 "forbidden", so a removed feature cannot be probed by name. Background jobs
 accept a typed MCP tool and a validated argument object — never raw command
 lines. Each repeatable `--allow-root` confines direct arguments, nested job
-arguments, configured defaults, and review/rights/final-video paths. If it is
+arguments, configured defaults, and review/final-video paths. If it is
 omitted, the server allows only its startup working directory. This same-user
 stdio boundary reduces accidental filesystem reach; it is not an
 operating-system sandbox.
@@ -221,7 +219,7 @@ needs cleaning up, and nothing you own goes with it:
 <workspace>/
   data/                    ← everything produced. Delete it to start fresh.
     README.md              what each folder holds, in plain English
-    library/<project>/     downloaded chapters, cropped panels, narration, rights
+    library/<project>/     downloaded chapters, cropped panels, narration
     audio/<project>/       raw TTS takes + provenance sidecars
     audio_faded/<project>/ render-safe narration derivatives
     output/<project>/      per-item videos, <project>_full.mp4, quality/ reports
@@ -293,11 +291,8 @@ point several checkouts at one shared `runtime/` tree.
 
 - Upload requires a current, hash-bound `manga-review final-video` record for
   the exact file, which in turn requires current crop and narration reviews.
-- Upload requires a complete `manga-rights` manifest: source URL, edition,
-  language, creator, publisher, permission basis, allowed chapters,
-  attribution, translation provenance, voice consent, music licences,
-  thumbnail source panels, and clear nudity / sexualized-minors / graphic-gore /
-  misleading-thumbnail scans. Unknown ownership blocks publication.
+- Clearing the source material, the music, and the narrator voice for use is
+  the operator's responsibility. mangaEasy does not verify it.
 - Default upload privacy stays `private`. Replacement is upload-new → verify →
   delete-old.
 - `publish.json` prevents accidental repeat uploads.

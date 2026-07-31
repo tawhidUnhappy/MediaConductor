@@ -647,9 +647,7 @@ first at `0:00`, each ≥10 s. **Recompute after every audio regeneration**
 **Base art comes from the approved source panels.** Generated key art is
 deliberately not an option: the channel's value is the actual comic, and a
 generated cover promises art the video does not contain — a thumbnail-policy
-problem and a straightforward disappointment for whoever clicks. The panel you
-use must be listed in `rights.json` under `thumbnail_sources`, or
-`manga-rights check` fails closed.
+problem and a straightforward disappointment for whoever clicks.
 
 Shortlist candidates first, then choose by opening them:
 
@@ -674,8 +672,7 @@ not optional flavor):
   emotional contrast between two characters *is* the hook.
 - **Never a sexualized minor**, no nudity, no graphic gore, regardless of what
   the source material shows. Recap source material commonly has teenage leads,
-  so this is a live constraint. `manga-rights check` requires each of those
-  scans to be recorded clear by a named reviewer.
+  so this is a live constraint.
 - **Title and thumbnail must agree.** A thumbnail implying a beat the video
   does not contain is a misleading thumbnail regardless of intent.
 - Foreground face ≈ 30% of frame height; keep the payload out of the

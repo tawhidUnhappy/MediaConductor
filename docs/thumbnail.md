@@ -44,8 +44,6 @@ What you are looking for, in order:
 - **Room for the markup.** A panel with a busy top-left has nowhere for the
   label to go.
 
-The panel you pick must be listed in `rights.json` under `thumbnail_sources`;
-`manga-rights check` fails closed without it.
 
 ## 2. Composing
 

@@ -53,7 +53,6 @@ def test_full_catalog_describes_typed_job_wrapper_and_source_layout(capsys):
     # The review gates are part of the published contract, not side doors.
     assert commands["manga-review"]["args"]["action"]["kind"] == "positional"
     assert commands["youtube-upload"]["args"]["project_root"]["required"] is True
-    assert commands["manga-rights"]["args"]["action"]["kind"] == "positional"
     assert "review_policy" not in commands["video"]["args"]
 
 
