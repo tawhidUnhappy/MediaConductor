@@ -224,6 +224,24 @@ dispatcher renders it; never `sys.exit` from library code). Note
   omission decision from a fixed reason vocabulary (`panel_decisions.py`). The
   previous "confirm none is a story panel" warning recorded nothing, so a
   dropped story panel and a skipped credits page looked identical.
+- **`page-split` drops a page it cannot segment, and says so only as a
+  `suspect`**: an `automatic-full-page-box` yields *no* panel files, so the beat
+  disappears from the video with a zero exit code. Titles drawn as montage or
+  splash pages (panels bleeding over black fills, no gutters) defeat MAGI
+  routinely — one production lost 13 of 81 pages, including the chapter's climax.
+  The fix is an explicit-box overrides file (`--overrides`), and **every
+  subsequent re-crop of that project must pass it too** or the recovered panels
+  vanish again. Compare `pages` against the number that actually produced files
+  rather than trusting the exit code.
+- **A project's durable context lives in `data/library/<P>/MEMORY.json`**
+  (story bible: premise, characters with per-fact confidence, beats tied to
+  panel ids, decisions and their reasons). It is a *summary*: the workboard
+  (`.workboard/*.jsonl`, via `work-status`) stays authoritative for progress,
+  `manga.json` for the source record, `manga-reviews.json` for approvals. Its
+  `brief` block is meant to be the entire working set for a fresh agent, with
+  everything else loaded on demand — keep it short and push detail down. A
+  fact tagged `conf: low` must never be stated as established, in narration or
+  anywhere else.
 - **Production manga renders use faded derivatives, not raw clip edges**:
   `data/audio_faded/` contains symmetric 8 ms fade-in/fade-out copies and `data/audio/`
   remains the recoverable TTS source. Keep `--audio-source raw` opt-in.

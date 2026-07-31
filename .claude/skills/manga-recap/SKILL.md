@@ -45,7 +45,22 @@ the log. Only foreground the quick `--json`/validation commands.
 mangaeasy where --json      # install paths + version
 mangaeasy doctor --json     # ffmpeg/GPU/tool readiness
 mangaeasy work-status --project-root data/library/<Project> --json   # resuming? exact per-item stage
+cat data/library/<Project>/MEMORY.json                               # story bible, if one exists
 ```
+
+**Read `MEMORY.json` first when it exists.** It is the project's durable story
+memory: premise, character bible with per-name confidence, per-chapter beats
+tied to panel ids, and *why* earlier decisions were made. Its `brief` block is
+designed to be the whole working set — read that and you can act; everything
+below it is detail to load only when needed. It exists because a context loss
+between sessions otherwise costs the next narrator every established character
+name and every crop decision.
+
+Two rules for it: the **workboard is authoritative for progress** (MEMORY.json
+is a summary and can be stale — if they disagree, believe `work-status`), and
+**never state a `conf: low` fact as established**, in narration or anywhere
+else. Append atomic facts as you learn them and keep `brief` short; when it
+grows past ~40 lines, push detail down and leave a pointer.
 
 Resuming a project — including picking it back up on a **different LLM**
 after another one ran out of budget or context mid-batch — or working
@@ -144,6 +159,26 @@ suspects.
 
 For paged manga, a no-detection fallback or a near-full-source-page box is not
 usable when the page contains several panels: create manual boxes and re-crop.
+**A page reported as `automatic-full-page-box` produces NO panels at all — it is
+dropped, not mis-cropped**, and nothing fails, so the beat simply disappears from
+the video. Check the count: `pages` in the result vs. how many pages actually
+yielded files. Titles that draw montage/splash pages — panels bleeding over black
+fills with no gutters — hit this hard (one real series lost 13 of 81 pages,
+including both of chapter 1's biggest beats). Fix with an overrides file of
+explicit boxes and re-run:
+
+```bash
+# data/work/overrides.json  ->  {"<item>": {"<page file>": [[x1,y1,x2,y2], ...]}}
+mangaeasy page-split --project-root data/library/<Project> \
+    --items 01 --overrides data/work/overrides.json
+```
+
+One box spanning the whole page is the right answer for a genuine borderless
+splash; several boxes for a page whose panels merely bleed. Leave title pages and
+colour promo/end-cards out of the file so they stay omitted — they will keep
+showing up as `suspects`, which is correct, not a regression. **Once an overrides
+file exists, every later re-crop must pass `--overrides` too**, or the recovered
+panels vanish again. Record the file and its reasoning in `MEMORY.json`.
 For webtoons, an automatic near-full-source-strip crop is equally invalid.
 The only page-sized exception is a genuinely borderless single-panel splash.
 Inspect that page and crop yourself and record the exact manual accept with
