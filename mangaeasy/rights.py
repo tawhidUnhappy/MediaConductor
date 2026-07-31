@@ -106,6 +106,91 @@ def _template() -> dict:
     }
 
 
+# ── Operator-level seeding ────────────────────────────────────────────────
+#
+# Some facts in this manifest are about the *operator*, not about the manga:
+# whose voice narrates, what the channel adds editorially, who runs the safety
+# scans. Those are identical for every project, so re-eliciting them per series
+# is pure repetition — an interrogation that carries no new information and
+# trains everyone to answer without reading.
+#
+# These fields may therefore be seeded from ``config.system.json`` →
+# ``rights_defaults``. Everything absent from this list stays blank on purpose,
+# because it genuinely differs per work and a wrong inherited value would be
+# worse than an empty one.
+OPERATOR_SEEDABLE: tuple[tuple[str, ...], ...] = (
+    ("attribution",),
+    ("permission", "basis"),
+    ("permission", "detail"),
+    ("permission", "granted_by"),
+    ("permission", "evidence"),
+    ("voice_consent", "basis"),
+    ("voice_consent", "detail"),
+    ("voice_consent", "speaker"),
+    ("commentary", "adds"),
+    ("commentary", "source_to_script_originality"),
+)
+
+# Never seeded, and why. Kept as data so `init` can tell an agent exactly what
+# is still outstanding instead of the agent asking the operator to recite it.
+PER_WORK_FIELDS: tuple[tuple[str, str], ...] = (
+    ("source.url", "which series this is"),
+    ("source.title", "which series this is"),
+    ("source.creator", "who made this one"),
+    ("source.publisher", "who published this one"),
+    ("source.language", "which edition/translation"),
+    ("permission.allowed_chapters", "which chapters this basis actually covers"),
+    ("translation.provenance", "whose translation these pages are"),
+    ("commentary.edit_decision_list", "what this particular recap cut"),
+    ("safety_scans.*.clear", "the scan result for these pages"),
+)
+
+
+def _operator_defaults() -> dict:
+    """``rights_defaults`` from config.system.json, or {} when unset."""
+    from mangaeasy.config import load_system_config
+
+    block = load_system_config().get("rights_defaults")
+    return block if isinstance(block, dict) else {}
+
+
+def _dig(data: dict, path: Sequence[str]):
+    node = data
+    for key in path:
+        if not isinstance(node, dict) or key not in node:
+            return None
+        node = node[key]
+    return node
+
+
+def seed_template(template: dict, defaults: dict) -> list[str]:
+    """Fill operator-level fields from ``defaults``. Returns what was seeded.
+
+    Only paths in :data:`OPERATOR_SEEDABLE` are copied, and only when the
+    default is a non-empty string — so a half-written config can never quietly
+    blank a field that the validator would otherwise have caught.
+    """
+    seeded: list[str] = []
+    for path in OPERATOR_SEEDABLE:
+        value = _dig(defaults, path)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        node = template
+        for key in path[:-1]:
+            node = node[key]
+        node[path[-1]] = value.strip()
+        seeded.append(".".join(path))
+
+    scanned_by = _dig(defaults, ("safety_scans", "scanned_by"))
+    if isinstance(scanned_by, str) and scanned_by.strip():
+        for name in SAFETY_SCANS:
+            # Only the scanner's identity carries over. `clear` stays None: the
+            # result is a fact about *these* pages and must be established here.
+            template["safety_scans"][name]["scanned_by"] = scanned_by.strip()
+        seeded.append("safety_scans.*.scanned_by")
+    return seeded
+
+
 def load_rights(project_root: Path) -> dict:
     path = rights_path(project_root)
     if not path.is_file():
@@ -325,12 +410,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 1
             template = _template()
             template["created_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            seeded = seed_template(template, _operator_defaults())
             path = write_rights(root, template)
             print(json.dumps({
                 "ok": True,
                 "rights_file": str(path),
-                "next": f"Fill in every field, then run `{CLI_NAME} manga-rights check "
-                        f"--project-root {root}`.",
+                "seeded_from_system_config": seeded,
+                "still_required": [field for field, _ in PER_WORK_FIELDS],
+                "next": f"Fill in the per-work fields listed in 'still_required', then run "
+                        f"`{CLI_NAME} manga-rights check --project-root {root}`."
+                        + ("" if seeded else
+                           "  Tip: set `rights_defaults` in config.system.json to carry your "
+                           "standing voice consent, permission basis, and commentary policy "
+                           "into every new project instead of re-entering them."),
             }, ensure_ascii=False))
             return 0
         if args.action == "show":

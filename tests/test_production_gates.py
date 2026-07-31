@@ -307,6 +307,77 @@ def test_a_corrupt_manifest_does_not_read_as_permission(tmp_path):
     assert not check_rights(tmp_path)["ok"]
 
 
+# ── Operator-level seeding ───────────────────────────────────────────────────
+#
+# Standing facts (whose voice, what the channel adds) are stated once in
+# config.system.json; facts about *this* work are never inherited.
+
+def test_operator_level_fields_seed_from_system_config():
+    from mangaeasy.rights import _template, seed_template
+
+    template = _template()
+    seeded = seed_template(template, {
+        "attribution": "Art by the credited creator",
+        "permission": {"basis": "license", "detail": "Publisher agreement 2026-01"},
+        "voice_consent": {"basis": "own_voice", "speaker": "the operator"},
+        "safety_scans": {"scanned_by": "operator"},
+    })
+
+    assert template["voice_consent"]["basis"] == "own_voice"
+    assert template["permission"]["basis"] == "license"
+    assert template["attribution"] == "Art by the credited creator"
+    assert all(template["safety_scans"][n]["scanned_by"] == "operator" for n in SAFETY_SCANS)
+    assert "voice_consent.basis" in seeded
+
+
+def test_per_work_facts_are_never_inherited_from_system_config():
+    """The whole point of the split: a standing basis must not decide which
+    series it covers, nor pre-answer a safety scan for pages it never saw."""
+    from mangaeasy.rights import _template, seed_template
+
+    template = _template()
+    seed_template(template, {
+        "source": {"title": "Some Other Series", "creator": "Someone Else"},
+        "permission": {"basis": "license", "allowed_chapters": ["1-99"]},
+        "commentary": {"edit_decision_list": "cut nothing"},
+        "safety_scans": {"scanned_by": "operator", "clear": True},
+    })
+
+    assert template["source"]["title"] == ""
+    assert template["source"]["creator"] == ""
+    assert template["permission"]["allowed_chapters"] == []
+    assert template["commentary"]["edit_decision_list"] == ""
+    assert all(template["safety_scans"][n]["clear"] is None for n in SAFETY_SCANS)
+
+
+def test_seeding_a_blank_default_leaves_the_field_for_the_validator():
+    from mangaeasy.rights import _template, seed_template
+
+    template = _template()
+    seeded = seed_template(template, {"voice_consent": {"basis": "   "}})
+    assert template["voice_consent"]["basis"] == ""
+    assert seeded == []
+
+
+def test_a_seeded_manifest_still_fails_closed_until_the_work_is_identified(tmp_path):
+    """Seeding removes repetition, not the gate."""
+    from mangaeasy.rights import _template, seed_template
+
+    template = _template()
+    seed_template(template, {
+        "permission": {"basis": "license", "detail": "Publisher agreement",
+                       "granted_by": "Publisher", "evidence": "contract.pdf"},
+        "voice_consent": {"basis": "own_voice"},
+        "safety_scans": {"scanned_by": "operator"},
+    })
+    write_rights(tmp_path, template)
+
+    report = check_rights(tmp_path)
+    assert not report["ok"]
+    with pytest.raises(RightsError):
+        require_publishable_rights(tmp_path)
+
+
 # ── Workspace layout ─────────────────────────────────────────────────────────
 
 def test_workspace_layout_reports_every_persistent_root(monkeypatch, tmp_path):

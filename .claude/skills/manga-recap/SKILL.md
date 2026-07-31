@@ -98,6 +98,30 @@ folder name; `--from/--to` bound the range. Re-running resumes; complete
 chapters are skipped. The result line gives the project path
 (`data/library/<Project>/`), and `manga.json` records the source.
 
+## 1b. Establish rights once, up front
+
+Do this immediately after the download, not at upload time. Publication is
+gated on `rights.json`, and discovering that at the end of a long run is what
+turns a finished batch into a stall.
+
+```bash
+mangaeasy manga-rights init  --project-root data/library/<Project>
+mangaeasy manga-rights check --project-root data/library/<Project>
+```
+
+`init` seeds the operator's standing fields (voice consent, permission basis,
+commentary policy, scanner identity) from `config.system.json` →
+`rights_defaults`, and prints `still_required` — the facts that genuinely
+differ for this series: which work it is, which chapters the basis covers, and
+the safety-scan results.
+
+Fill those in from `manga.json` and the source page, then ask the user **once**
+for anything still unresolved — collected into a single question, not one per
+field and never once per series for the standing facts. If `check` passes, the
+question is settled: proceed through the rest of the run without raising it
+again. If it fails, keep going through crop/narrate/render — only the upload in
+step 7 is blocked.
+
 ## 2. Plan the batch
 
 Videos ship 12 chapters at a time (01–12, then 13–24, …):

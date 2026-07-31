@@ -11,6 +11,29 @@
     "volume_db": -30
   },
 
+  "//rights_defaults": "Standing, operator-level facts seeded into every new project's rights.json by `manga-rights init`, so they are stated once instead of re-entered per series. Per-work facts (which series, which chapters the basis covers, the safety-scan results) are never seeded and must still be filled in each time.",
+  "rights_defaults": {
+    "attribution": "",
+    "permission": {
+      "basis": "",
+      "detail": "",
+      "granted_by": "",
+      "evidence": ""
+    },
+    "voice_consent": {
+      "basis": "",
+      "detail": "",
+      "speaker": ""
+    },
+    "commentary": {
+      "adds": "",
+      "source_to_script_originality": ""
+    },
+    "safety_scans": {
+      "scanned_by": ""
+    }
+  },
+
   "download_defaults": {
     "translated_language": "en",
     "use_data_saver": false,
