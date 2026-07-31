@@ -5,7 +5,12 @@ import time
 from pathlib import Path
 
 from mangaeasy.utils import remove_tree
-from mangaeasy.video_pipeline.common import DEFAULT_OUTPUT_ROOT, DEFAULT_PROJECT_ROOT, DEFAULT_WORK_DIR
+from mangaeasy.video_pipeline.common import (
+    DEFAULT_OUTPUT_ROOT,
+    DEFAULT_PROJECT_ROOT,
+    DEFAULT_WORK_DIR,
+    count_files,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,12 +31,6 @@ def parse_args() -> argparse.Namespace:
                              "archives otherwise grow without bound (a real project hit ~3 GB of "
                              "music-bed cache alone).")
     return parser.parse_args()
-
-
-def count_files(path: Path) -> int:
-    if path.is_file():
-        return 1
-    return sum(1 for child in path.rglob("*") if child.is_file())
 
 
 def add_if_exists(targets: list[Path], path: Path) -> None:

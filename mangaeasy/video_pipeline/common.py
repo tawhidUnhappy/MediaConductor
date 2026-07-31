@@ -4,6 +4,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
+from typing import Protocol
 
 from mangaeasy.layout import (
     audio_root,
@@ -77,6 +78,32 @@ def clamp_gpu_workers(requested: int) -> int:
 def project_name(project_root: Path, override: str | None = None) -> str:
     value = override if override is not None else project_root.resolve().name
     return validate_portable_segment(value, label="project name")
+
+
+class ProjectScoped(Protocol):
+    """The three fields every project-scoped work path is derived from.
+
+    A Protocol rather than a base class: ``VideoBuildConfig`` and
+    ``LongVideoConfig`` are independent dataclasses that happen to share this
+    much, and neither should have to inherit from the other to reuse
+    ``project_work_dir``.
+    """
+
+    project_root: Path
+    work_dir: Path
+    project_name_override: str | None
+
+
+def project_work_dir(config: ProjectScoped) -> Path:
+    """Scratch directory for one project's renders, under ``work_dir``."""
+    return config.work_dir.resolve() / project_name(config.project_root, config.project_name_override)
+
+
+def count_files(path: Path) -> int:
+    """File count under ``path`` — used by the cleanup commands to report scope."""
+    if path.is_file():
+        return 1
+    return sum(1 for child in path.rglob("*") if child.is_file())
 
 
 def item_number(value: str) -> int:

@@ -62,7 +62,7 @@ from mangaeasy import fonts
 from mangaeasy.brand import CLI_NAME
 from mangaeasy.panels.ai import _clamp_box, _manga_reading_order
 from mangaeasy.panels.gutter import collect_image_paths
-from mangaeasy.panels.webtoon import _archive_existing_panels, write_contact_sheets
+from mangaeasy.panels.webtoon import _archive_existing_panels, _split_exit_code, write_contact_sheets
 from mangaeasy.tools.external import python_command, resolve_tool_dir, tool_env
 from mangaeasy.utils import emit_result
 
@@ -352,11 +352,6 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         "review_crops": review_crops,
         "verify_images": sorted(str(p) for p in item_verify.glob(f"{item}_*.png")),
     }
-
-
-def _split_exit_code(reports: Sequence[dict]) -> int:
-    """Exit 3 after artifact generation; reserve exit 1 for true failures."""
-    return 1 if any(report.get("status") != "ok" for report in reports) else 3
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:

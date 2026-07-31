@@ -141,7 +141,7 @@ and `webtoon-cutcheck`. The default is `download`.
 
    ```bash
    <mc> narration-check --project-root D:/MediaProjects/library/example --items 01 --json
-   <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work --output-root D:/MediaProjects/review/narration
+   <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
    ```
 
 
@@ -151,7 +151,7 @@ and `webtoon-cutcheck`. The default is `download`.
 
    ```bash
    <mc> narration-check --project-root D:/MediaProjects/library/example --items 01 --json
-   <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work --output-root D:/MediaProjects/review/narration
+   <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
    ```
 
    Open every original crop at readable/full resolution while reviewing every

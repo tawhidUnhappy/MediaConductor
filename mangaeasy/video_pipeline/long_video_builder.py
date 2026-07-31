@@ -9,7 +9,13 @@ from pathlib import Path
 from mangaeasy.defaults import default_music_volume_db
 from mangaeasy.utils import archive_before_overwrite
 from mangaeasy.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem, load_narration
-from mangaeasy.video_pipeline.common import item_dirs, item_value, merge_item_selection, project_name
+from mangaeasy.video_pipeline.common import (
+    item_dirs,
+    item_value,
+    merge_item_selection,
+    project_name,
+    project_work_dir,
+)
 from mangaeasy.video_pipeline.ffmpeg_tools import (
     choose_h264_encoder,
     h264_encoder_args,
@@ -65,10 +71,6 @@ def default_output_name(name: str) -> str:
 def output_path(config: LongVideoConfig) -> Path:
     name = project_name(config.project_root, config.project_name_override)
     return (config.output or (config.output_root / name / default_output_name(name))).resolve()
-
-
-def project_work_dir(config: LongVideoConfig) -> Path:
-    return config.work_dir.resolve() / project_name(config.project_root, config.project_name_override)
 
 
 def input_dir(config: LongVideoConfig) -> Path:

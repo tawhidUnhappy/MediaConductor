@@ -9,8 +9,8 @@ from mangaeasy.video_pipeline.common import (
     DEFAULT_PROJECT_ROOT,
     item_dirs,
     merge_item_selection,
-    project_name,
 )
+from mangaeasy.video_pipeline.item_assets import item_audio_dir as canonical_item_audio_dir
 from mangaeasy.video_pipeline.item_assets import load_narration
 
 
@@ -51,7 +51,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def item_audio_dir(args: argparse.Namespace, item_dir: Path) -> Path:
-    return args.audio_root.resolve() / project_name(args.project_root, args.project_name) / item_dir.name
+    """Argparse-shaped adapter over the one definition in ``item_assets``."""
+    return canonical_item_audio_dir(args.audio_root, args.project_root, args.project_name, item_dir)
 
 
 def files_by_stem(folder: Path, extensions: set[str]) -> dict[str, Path]:

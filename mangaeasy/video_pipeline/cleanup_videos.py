@@ -7,6 +7,7 @@ from mangaeasy.utils import remove_tree
 from mangaeasy.video_pipeline.common import (
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PROJECT_ROOT,
+    count_files,
     merge_item_selection,
     project_name,
 )
@@ -28,12 +29,6 @@ def parse_args() -> argparse.Namespace:
         help="Also remove old output files directly under output-root.",
     )
     return parser.parse_args()
-
-
-def count_files(path: Path) -> int:
-    if path.is_file():
-        return 1
-    return sum(1 for child in path.rglob("*") if child.is_file())
 
 
 def safe_targets(

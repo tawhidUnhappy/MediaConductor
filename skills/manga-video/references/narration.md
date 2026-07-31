@@ -97,7 +97,7 @@ Run both gates:
 
 ```bash
 <mc> narration-check --project-root D:/MediaProjects/library/example --items 01 --json
-<mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work --output-root D:/MediaProjects/review/narration
+<mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
 ```
 
 `narration-check` verifies structure and file references. It cannot establish

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mangaeasy.utils import archive_before_overwrite
-from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, project_name
+from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, project_name, project_work_dir
 from mangaeasy.video_pipeline.item_assets import (
     IMAGE_EXTENSIONS,
     PanelAsset,
@@ -66,10 +66,6 @@ def item_output_dir(config: VideoBuildConfig) -> Path:
     if config.output_dir is not None:
         return config.output_dir.resolve()
     return (config.output_root.resolve() / project_name(config.project_root, config.project_name_override) / "items").resolve()
-
-
-def project_work_dir(config: VideoBuildConfig) -> Path:
-    return config.work_dir.resolve() / project_name(config.project_root, config.project_name_override)
 
 
 def selected_item_dirs(config: VideoBuildConfig) -> list[Path]:
