@@ -192,6 +192,16 @@ review its `shift`/`merge` list with `narration-review-sheets
 
 ## 4. Write narration grounded in the panels, then verify it
 
+**Read the numbered verify overlays, not the loose crops.** `page-split` writes
+`data/work/page_verify/<Project>/<item>/<item>_page_NNN.png` — the source page
+with each panel boxed and numbered *in reading order* (RTL is applied, so panel
+1 is top-right on a Japanese title). One overlay shows a whole page's panels in
+story context at readable resolution, and the number maps directly to the file:
+panel N of page P is `<item>_00P_0N.jpg`. That is roughly three to five panels
+per image instead of one, it keeps the beats in sequence, and it removes the
+guesswork about which crop a line belongs to. Character name plates, which many
+series draw once on an introduction page, are legible there too.
+
 Narration is written by YOU, from the panel images — read the whole chapter in
 sequence once, then write each line with that exact original crop open at
 readable/full resolution. OCR is **optional**: if you want an unverified second
