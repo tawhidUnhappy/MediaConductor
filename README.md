@@ -81,7 +81,7 @@ still honoured. The Python import is `mangaeasy`.
 
 ```bash
 mangaeasy setup --mode manga-video
-mangaeasy commands --mode manga-video --json --full
+mangaeasy commands --mode manga-video --json
 mangaeasy mcp --allow-root D:/MediaProjects
 ```
 
@@ -99,10 +99,11 @@ pattern. See [docs/thumbnail.md](docs/thumbnail.md).
 
 The splitters refuse a confident wrong-format run (webtoon pages into the paged
 splitter and vice versa), but crop approval and narration remain visual tasks.
-Use verification sheets as indexes, then open every source page/strip overlay
-and every actual crop at readable/full resolution. Write narration directly
-from each original panel with OCR only as a cross-check. A text-only driver
-must hand those steps to a vision-capable agent or human; use `work-note` to
+Use verification sheets as indexes: inspect flagged/suspect overlays first,
+sample clean crops, and broaden only when the sample finds errors. Write
+narration directly from each original panel with OCR only as a selective
+cross-check for dense/tiny text or uncertain names. A text-only driver must
+hand those steps to a vision-capable agent or human; use `work-note` to
 preserve cast, speaker, crop, and handoff decisions between agents.
 
 See [the Manga Video skill](skills/manga-video/SKILL.md) and
@@ -335,8 +336,9 @@ disclosure](https://support.google.com/youtube/answer/14328491).
   compatibility.
 - Progress lines use `MANGAEASY_PROGRESS current/total label`.
 
-Use `mangaeasy commands --mode manga-video --json --full` instead of
-scraping help text.
+Use `mangaeasy commands --mode manga-video --json` for a compact catalog. Add
+`--full --tools <names...>` only for the command schemas you are about to call;
+do not scrape help text.
 
 ## Development and production checks
 

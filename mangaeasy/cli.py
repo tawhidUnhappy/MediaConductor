@@ -182,7 +182,7 @@ def _print_help(stream=None, mode: str | None = None, all_commands: bool = False
     write("Usage:\n")
     write(f"  {CLI_NAME} <command> [args...]\n")
     write(f"  {CLI_NAME} <command> --help     Show a command's own options\n")
-    write(f"  {CLI_NAME} commands --mode <mode> --json --full\n")
+    write(f"  {CLI_NAME} commands --mode <mode> --json\n")
     write(f"  {CLI_NAME} --version\n")
     write(f"  ({LEGACY_CLI_NAME} remains available as a compatibility alias.)\n\n")
 
@@ -190,8 +190,8 @@ def _print_help(stream=None, mode: str | None = None, all_commands: bool = False
         write("Production catalog:\n")
         for spec in MODES.values():
             write(f"  {spec.key:<14}{spec.description}\n")
-        write(f"\nUse `{CLI_NAME} commands --mode manga-video --json --full` "
-              "for the machine-readable contract.\n\n")
+        write(f"\nUse `{CLI_NAME} commands --mode manga-video --json` for a compact catalog, "
+              "then add `--full --tools <names...>` only for commands you will call.\n\n")
 
     width = max(len(name) for name in visible) + 2
     for group in _group_order():
@@ -212,6 +212,7 @@ def commands_main() -> int:
     lazy-import design survives). `--full` merges in each command's argument
     schema from mangaeasy/command_spec.py — flags, types, required — so an
     agent can build a command line without running one `--help` per command.
+    `--tools` keeps that full output to the commands an agent is about to call.
     Commands without a spec entry fall back to `usage` (`<cmd> --help`).
     """
     import argparse
@@ -225,6 +226,9 @@ def commands_main() -> int:
     parser.add_argument("--full", action="store_true",
                         help="With --json: include each command's argument schema "
                              "(flags, types, required) and long-running marker.")
+    parser.add_argument("--tools", "--commands", nargs="+", dest="tools",
+                        help="Limit output to these CLI command names. Useful with --full "
+                             "to avoid loading the whole schema catalog into an agent prompt.")
     parser.add_argument("--mode", choices=tuple(MODES),
                         help="Return only one mode's commands, keeping agent context small.")
     args = parser.parse_args()
@@ -233,6 +237,17 @@ def commands_main() -> int:
         from mangaeasy.command_spec import LONG_RUNNING, cli_args_schema
 
     visible = MODES[args.mode].commands if args.mode else frozenset(COMMANDS)
+    if args.tools:
+        requested = set(args.tools)
+        unknown = requested - set(COMMANDS)
+        if unknown:
+            parser.error("unknown command(s): " + ", ".join(sorted(unknown)))
+        outside_mode = requested - set(visible)
+        if outside_mode:
+            parser.error(
+                "command(s) outside selected mode: " + ", ".join(sorted(outside_mode))
+            )
+        visible = frozenset(name for name in args.tools if name in requested)
     catalog = []
     for name, (_, _, group, help_text) in COMMANDS.items():
         if name not in visible:

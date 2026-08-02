@@ -191,9 +191,10 @@ Collect all fixes into one overrides file, re-run `webtoon-split`, then re-run
 already exists for the old crops, do **not** re-narrate — see
 "Re-cropping after narration exists" below.
 
-Then open every source page/strip overlay and every resulting crop itself at
-readable/full resolution. Contact sheets are navigation aids only; their
-thumbnails cannot prove that small bubble text, faces, or borders survived.
+Then run a staged visual pass: inspect flagged/suspect overlays and crops first,
+sample clean output, and broaden only if the sample finds errors. Contact
+sheets are navigation aids only; their thumbnails cannot prove that small
+bubble text, faces, or borders survived.
 Check, per page/strip:
 
 1. **Coverage** — every panel has a box; nothing important is in a dropped
@@ -260,10 +261,10 @@ beats; you can't hook a viewer on a story you skimmed. While reading, note:
 
 ```bash
 mangaeasy install-tool deepseek-ocr2   # one-time
-mangaeasy panel-transcript --project-root data/library/<Project> --item-range 01-07
+mangaeasy job-start --tool panel_transcript --arguments-json '{"project_root":"data/library/<Project>","items":["01-07"]}'
 ```
 
-This OCRs every panel into `<item>/transcript.json`, which the review sheets
+This selectively OCRs panels into `<item>/transcript.json`, which the review sheets
 then show beside each narration line as an **unverified candidate reading**.
 It is optional. Panel pixels, bubble tails, and established sequence remain
 authoritative; DeepSeek can hallucinate, omit, or misread stylized text. A
@@ -373,9 +374,9 @@ mangaeasy narration-review-sheets --project-root data/library/<Project> --item-r
 ```
 
 Each sheet pairs a panel preview with the narration line that will be spoken
-over it and an optional, explicitly unverified OCR candidate. Read **every**
-sheet and open every corresponding original crop at readable/full resolution.
-Check the rules above against panel pixels, bubble tails, and sequence:
+over it and an optional, explicitly unverified OCR candidate. Use the sheets as
+an index: review risky entries first, sample clean entries, and broaden if
+errors appear. Check the rules above against panel pixels, bubble tails, and sequence:
 this-panel-only, dialogue meaning faithful to the visible bubble, speaker
 right, no unsupported/future claim, clear varied recap prose, and natural
 speech. Fix each bad line with one command — no JSON editing, and the stale WAV

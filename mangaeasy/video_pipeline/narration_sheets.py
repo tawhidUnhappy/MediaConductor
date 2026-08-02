@@ -6,7 +6,8 @@ over it and (b) an unverified OCR candidate when ``panel-transcript`` has been
 run. OCR is a fallible second reading, never ground truth: the original panel
 pixels, bubble tails, and established sequence remain authoritative. This is
 the *semantic* half of narration verification that ``narration-check``
-deliberately does not do — an agent Reads each sheet and checks, per panel:
+deliberately does not do. An agent starts with risky sheets and samples clean
+ones, broadening only if errors appear, and checks:
 
 1. the narration describes THIS panel (not a summary smeared across several);
 2. quoted/paraphrased dialogue is attributed to the right character by
@@ -15,8 +16,8 @@ deliberately does not do — an agent Reads each sheet and checks, per panel:
    another look at the source, not automatic acceptance of the OCR;
 4. the line reads naturally when spoken aloud.
 
-The embedded panel is a convenience preview. Reviewers still open every
-original crop at readable/full resolution before approving a line.
+The embedded panel is a convenience preview. Reviewers open original crops for
+risky entries and sampled clean entries before approving the pass.
 
 Fix problems by editing narration.json, delete the affected WAVs
 (``video-audio-audit --fix`` after emptying them, or remove by stem), and
@@ -204,7 +205,8 @@ def main() -> int:
 
     print(f"{len(all_sheets)} sheet(s) under {out_root}")
     print(
-        "Read every sheet AND open every original crop at readable/full resolution. "
+        "Review risky sheets first (OCR disagreement, uncertain speaker, dense text, "
+        "chronology/prose issues), then sample clean entries and broaden if errors appear. "
         "Verify narration against panel pixels, bubble tails, and sequence; OCR is an "
         "unverified candidate and never authoritative."
     )

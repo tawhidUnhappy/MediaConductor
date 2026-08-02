@@ -38,15 +38,28 @@ and `webtoon-cutcheck`. The default is `download`.
    ```bash
    <mc> where --json
    <mc> doctor --mode manga-video --json
-   <mc> commands --mode manga-video --json --full
+   <mc> commands --mode manga-video --json
    <mc> library-list --project-root D:/MediaProjects --json
+   ```
+
+   Keep schema lookups narrow. When you know the next tools, ask only for
+   those full schemas:
+
+   ```bash
+   <mc> commands --mode manga-video --json --full --tools job-start download style-detect webtoon-split
    ```
 
 2. Acquire a title, or prepare the existing-image layout above:
 
    ```bash
-   <mc> download --url "<MangaDex title URL>" --name example --all
+   <mc> job-start --tool download --arguments-json '{"url":"<MangaDex title URL>","name":"example","all":true}'
+   <mc> job-status <job-id> --json
    ```
+
+   Download is resumable, verifies expected numbered pages, and uses original
+   quality. Start it as a background job, then go idle or work elsewhere; poll
+   `job-status` after a real wait instead of keeping the model in a loop. If
+   status is still `running`, sleep/stand down and check later.
 
 3. Detect the format, inspect the returned sample images, then run exactly one
    crop path:
@@ -62,12 +75,15 @@ and `webtoon-cutcheck`. The default is `download`.
    correct command; `--force-style` overrides only for deliberate
    mixed-format items.
 
-4. Treat the splitter output as a proposal, not an approval. Open every source
-   page overlay and every returned crop itself at readable/full resolution;
-   contact sheets are an index and cannot prove that small text, faces, or
-   borders survived. Apply `webtoon-override` or paged-manga box fixes and
-   repeat the split until every crop is approved. Never infer approval from a
-   command's exit code, MAGI confidence, a contact sheet, or file existence.
+4. Treat the splitter output as a proposal, not an approval. Use a staged visual
+   pass to save tokens without hiding errors: first inspect all reported
+   suspects, forced cuts, withheld full-source/full-page fallbacks, tall boxes,
+   and contact-sheet oddities; then sample clean pages/crops. If the sample
+   finds a systematic problem, broaden to the whole item. Contact sheets are an
+   index and cannot prove that small text, faces, or borders survived. Apply
+   `webtoon-override` or paged-manga box fixes and repeat the split until every
+   crop is approved. Never infer approval from a command's exit code, MAGI
+   confidence, a contact sheet, or file existence.
 
    If a split is repeated after `transcript.json` exists, immediately sync the
    affected transcript skeleton before reviewing or writing narration:
@@ -106,17 +122,17 @@ and `webtoon-cutcheck`. The default is `download`.
    <mc> work-note --project-root D:/MediaProjects/library/example --topic crop-review --add "01 page 003: tall box is intentional full-body art; accepted"
    ```
 
-5. Optionally OCR the panels before writing narration. The narrating agent
+5. Usually skip OCR before writing narration. The narrating agent
    reads bubble text from the panel images themselves; `panel-transcript` adds
    an independent, unverified DeepSeek reading that shows up as a cross-check
    column on the review sheets. Panel pixels, bubble tails, and established
-   reading sequence remain authoritative. Run OCR when text is small/dense or
-   a name spelling needs a second opinion; skip it freely otherwise (every
-   later gate works without `transcript.json`; only a half-finished transcript
-   is flagged as an interrupted run). OCR never substitutes for image access:
-   if the narrator cannot see the images, stop and use the handoff in step 7.
-   Because it is long-running, use the typed detached wrapper and poll the
-   returned id:
+   reading sequence remain authoritative. Run OCR only when text is small/dense,
+   stylized enough to need a second opinion, or a name spelling remains
+   uncertain after visual reading; skip it otherwise. Every later gate works
+   without `transcript.json`; only a half-finished transcript is flagged as an
+   interrupted run. OCR never substitutes for image access: if the narrator
+   cannot see the images, stop and use the handoff in step 7. Because OCR is
+   long-running, start it detached and check later:
 
    ```bash
    <mc> job-start --tool panel_transcript --arguments-json '{"project_root":"D:/MediaProjects/library/example","items":["01"],"device":"auto"}'
@@ -144,18 +160,10 @@ and `webtoon-cutcheck`. The default is `download`.
    <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
    ```
 
-
-7. Read [narration.md](narration.md). Write one grounded
-   `<chapter>/narration.json`, structurally check it, render semantic review
-   sheets, and inspect every sheet:
-
-   ```bash
-   <mc> narration-check --project-root D:/MediaProjects/library/example --items 01 --json
-   <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
-   ```
-
-   Open every original crop at readable/full resolution while reviewing every
-   line. Fix incorrect panel descriptions, dialogue meaning, speaker
+   Open the original crop while reviewing every line. Focus first on entries
+   with OCR disagreement, uncertain speakers, dense text, unusual chronology,
+   or awkward prose; then sample straightforward entries. If the sample finds
+   errors, broaden the pass. Fix incorrect panel descriptions, dialogue meaning, speaker
    attribution, chronology, and spoken phrasing; treat OCR disagreements as a
    reason to re-read the pixels, not to overwrite them. Recap prose should
    connect already-established cause, choice, and consequence, keep pronouns

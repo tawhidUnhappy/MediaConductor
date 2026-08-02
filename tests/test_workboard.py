@@ -19,6 +19,7 @@ from mangaeasy.workboard import (
     release_claim,
     remove_todo,
     set_todo_status,
+    task_commands,
 )
 
 PNG = b"\x89PNG\r\n\x1a\n"  # suffix check only — content is never decoded
@@ -185,6 +186,25 @@ def test_notes_roundtrip_and_next_tasks(tmp_path):
     # claimed tasks disappear from the suggestion list
     acquire_claim(root, agent="x", ttl_minutes=60, item="01", stage="audio")
     assert next_tasks(statuses, active_claims(root)) == []
+
+
+def test_next_tasks_can_include_deterministic_commands(tmp_path):
+    root = tmp_path / "proj"
+    make_item(root, panels=1, ocr=False, narration=False)
+    statuses = [item_status(root / "01", "proj", tmp_path / "audio", tmp_path / "out")]
+
+    tasks = task_commands(
+        next_tasks(statuses, []),
+        project_root=root,
+        audio_root=tmp_path / "audio",
+        output_root=tmp_path / "out",
+    )
+
+    assert tasks[0]["stage"] == "narrate"
+    assert tasks[0]["command"] == (
+        f"write {root}/01/narration.json, then run "
+        f"mangaeasy narration-check --project-root {root} --items 01 --json"
+    )
 
 
 def test_qa_reports_problems_with_fix_commands(tmp_path):

@@ -103,7 +103,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
     for warning in report.get("warnings", []):
         add("review", "narration:style", warning,
             f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item}, "
-            "then OPEN every sheet and corresponding original crop before rewriting")
+            "then review risky entries first and sample clean entries before rewriting")
 
     # 3. Speakability and narration-quality lints, per entry.
     #    The tolerant reader is deliberate: a file with one dangling image
@@ -180,19 +180,20 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             "crop:visual-review",
             f"{len(crop_evidence)} overlay/sheet/window image(s) and "
             f"{len(review_crops)} production crop(s) require a vision pass; "
-            "open every overlay and every crop at readable resolution. MAGI/gutter output "
-            "is not approval, and an automatic whole-page/strip stand-in is never acceptable.",
-            f"Read {all_visual_evidence[0]} … compare against the original pages, fix every bad "
-            "boundary/order/full-page result, re-split, and repeat the complete visual pass",
+            "inspect flagged/suspect overlays first, sample clean crops, and broaden if errors "
+            "appear. MAGI/gutter output is not approval, and an automatic whole-page/strip "
+            "stand-in is never acceptable.",
+            f"Read {all_visual_evidence[0]} … compare against the original pages, fix bad "
+            "boundary/order/full-page results, re-split, and rerun the staged visual pass",
         )
     else:
         add(
             "review",
             "crop:review-artifacts-missing",
-            "panels exist but no crop verification artifacts were found; manually inspect every "
-            "original page and panel crop before narration or rendering",
+            "panels exist but no crop verification artifacts were found; generate review "
+            "artifacts before narration or rendering",
             f"Run the correct splitter for {root_arg}/{item} to generate overlays/contact sheets, "
-            "then open every result (or hand off to a vision-capable reviewer)",
+            "then inspect flagged/suspect outputs and sample clean crops",
         )
 
     narration_review = work_dir / "narration_review" / name / item
@@ -206,8 +207,9 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             "narration:visual-review",
             f"{len(narration_sheets)} narration sheet(s) require comparison with the original "
             "full-resolution panels; OCR is an unverified hint, not source truth",
-            f"Read {narration_sheets[0]} … open the original panel for EVERY line, fix each "
-            "mismatch, regenerate the sheets, and review again",
+            f"Read {narration_sheets[0]} … review OCR disagreements, uncertain speakers, dense "
+            "text, chronology shifts, and awkward prose first; sample clean entries, broaden if "
+            "errors appear, regenerate sheets, and review again",
         )
     else:
         add(
@@ -215,7 +217,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             "narration:review-sheets-missing",
             "narration exists but semantic review sheets have not been generated",
             f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item} "
-            f"--work-dir {work_dir}, then READ every sheet against the original panels",
+            f"--work-dir {work_dir}, then review risky entries first and sample clean entries",
         )
     return problems
 

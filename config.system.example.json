@@ -13,7 +13,6 @@
 
   "download_defaults": {
     "translated_language": "en",
-    "use_data_saver": false,
     "download_delay": 0.5
   },
 

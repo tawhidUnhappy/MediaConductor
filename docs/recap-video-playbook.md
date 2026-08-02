@@ -116,7 +116,8 @@ mangaeasy webtoon-cutcheck --project-root data/library/<Project> --item-range 01
 It reads the `<item>_ranges.json` manifests webtoon-split wrote and renders a
 ±650 px source-resolution window around every forced auto-split cut and every
 short panel, plus preview sheets under `work/cutcheck/<Project>/`. Use the
-sheets as an index, then open every individual window at full resolution.
+sheets as an index, then inspect flagged windows first and broaden if errors
+appear.
 Verdicts: **FIX** when a cut passes through a figure or speech bubble
 or a short panel is a bubble/SFX fragment (merge it toward its bubble-mate);
 **ACCEPT** for background/effect-art cuts, bordered thin scenery panels and
@@ -290,10 +291,11 @@ for page_name in sorted(detections):
     print(f"{page_name}: {len(boxes)} panels", flush=True)
 ```
 
-Then the non-negotiable step: **open every source page/strip overlay and every
-resulting crop at readable/full resolution**, page by page. Contact sheets are
+Then the non-negotiable step: **clear a staged visual pass over source
+page/strip overlays and resulting crops**: inspect flagged/suspect outputs
+first, sample clean outputs, and broaden if errors appear. Contact sheets are
 navigation aids, not proof that small text, faces, and borders survived. For
-each page check (a) every panel has a box, (b) no two panels share a box, (c)
+risky pages check (a) every panel has a box, (b) no two panels share a box, (c)
 the numbers follow manga reading order
 (right→left inside a row, top→bottom across rows — including landscape
 spreads), (d) no speech bubble is clipped at a box edge. Fix bad pages by
@@ -329,7 +331,7 @@ you skimmed. While reading, note:
 
 ```bash
 mangaeasy install-tool deepseek-ocr2   # one-time
-mangaeasy panel-transcript --project-root data/library/<Project> --item-range 01-07
+mangaeasy job-start --tool panel_transcript --arguments-json '{"project_root":"data/library/<Project>","items":["01-07"]}'
 ```
 
 Writes `<item>/transcript.json` — every panel's bubble/caption text, shown as
@@ -453,9 +455,10 @@ audio-related — missing audio for a *referenced* entry; see Phase 7.)
 mangaeasy narration-review-sheets --project-root data/library/<Project> --item-range 01-07
 ```
 
-Read every sheet and open every corresponding original crop at readable/full
-resolution. Verify every line against panel pixels, bubble tails, and sequence.
-The OCR column is explicitly unverified and may be wrong. Check action,
+Use every sheet as an index, but spend vision tokens on risky entries first:
+OCR disagreements, uncertain speakers, dense text, chronology changes, and
+awkward prose. Sample clean entries and broaden if errors appear. The OCR
+column is explicitly unverified and may be wrong. Check action,
 dialogue meaning, speaker, chronology, reveal timing, clear pronouns, causal
 flow, varied/non-robotic phrasing, and natural speech. Fix each bad line in one
 command (no JSON editing; the stale WAV is pruned so the next audio run

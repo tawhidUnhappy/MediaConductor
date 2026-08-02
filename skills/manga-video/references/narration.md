@@ -5,13 +5,15 @@ is optional — see the workflow reference.)
 
 ## Source-of-truth gate
 
-Narrate only after a vision-capable reviewer has opened every source page/strip
-overlay and every crop at readable/full resolution. MAGI boxes and DeepSeek
-OCR are machine proposals, never approvals or ground truth. A complete source
-page or strip must not stand in for multiple panels; only a genuinely
-borderless single-panel splash may remain page-sized, after an explicit manual
-review decision. If you cannot inspect the images, stop and hand the item to a
-vision-capable agent or human. Never create narration from OCR alone.
+Narrate only after a vision-capable reviewer has cleared the crop pass. MAGI
+boxes and DeepSeek OCR are machine proposals, never approvals or ground truth.
+Use a staged crop review: inspect flagged/suspect overlays and crops first,
+sample clean output, and broaden only when the sample shows systematic errors.
+A complete source page or strip must not stand in for multiple panels; only a
+genuinely borderless single-panel splash may remain page-sized, after an
+explicit manual review decision. If you cannot inspect the images, stop and
+hand the item to a vision-capable agent or human. Never create narration from
+OCR alone.
 
 ## File contract
 
@@ -101,12 +103,13 @@ Run both gates:
 ```
 
 `narration-check` verifies structure and file references. It cannot establish
-semantic accuracy. Open every review sheet and every corresponding original
-crop at readable/full resolution. Compare narration with the panel pixels,
-bubble tails, and sequence; the OCR column is explicitly unverified and can be
-wrong. Correct mismatched panels, speaker errors, unsupported claims,
-chronology drift, repetitive/robotic prose, unclear pronouns, and awkward
-spoken phrasing, then rerun both gates. Every line needs this source comparison,
-not just entries where OCR looks suspicious. If TTS audio already exists, use
-`narration-edit --prune-audio` or the documented audio-audit repair flow so
-changed lines are regenerated.
+semantic accuracy. Use review sheets as an index: inspect OCR disagreements,
+uncertain speakers, dense text, chronology changes, repetitive/robotic prose,
+unclear pronouns, and awkward spoken phrasing first, then sample
+straightforward entries. If the sample finds errors, broaden the pass. Compare
+narration with the panel pixels, bubble tails, and sequence; the OCR column is
+explicitly unverified and can be wrong. Correct mismatched panels, speaker
+errors, unsupported claims, chronology drift, repetitive/robotic prose, unclear
+pronouns, and awkward spoken phrasing, then rerun both gates. If TTS audio
+already exists, use `narration-edit --prune-audio` or the documented
+audio-audit repair flow so changed lines are regenerated.

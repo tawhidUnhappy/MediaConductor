@@ -53,6 +53,7 @@ import getpass
 import json
 import os
 import re
+import shlex
 import socket
 import sys
 from datetime import datetime, timedelta, timezone
@@ -298,6 +299,67 @@ def next_tasks(statuses: list[dict], claims: list[dict]) -> list[dict]:
     return tasks
 
 
+def task_commands(
+    tasks: list[dict],
+    *,
+    project_root: Path,
+    audio_root: Path,
+    output_root: Path,
+) -> list[dict]:
+    """Attach deterministic next CLI commands so agents do less prompt work.
+
+    Narration writing remains a model/human task, but the surrounding checks
+    and generation steps are stable command lines that the tool can supply.
+    """
+    root = str(project_root)
+    audio = str(audio_root)
+    output = str(output_root)
+
+    def q(value: str) -> str:
+        return shlex.quote(value)
+
+    def args_json(data: dict) -> str:
+        return q(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+
+    enriched: list[dict] = []
+    for task in tasks:
+        item = task.get("item")
+        stage = task.get("stage")
+        cmd: str | None = None
+        if item and stage == "crop":
+            cmd = (
+                f"{CLI_NAME} style-detect --project-root {q(root)} --items {q(str(item))} --json"
+            )
+        elif item and stage == "transcribe":
+            cmd = (
+                f"{CLI_NAME} job-start --tool panel_transcript "
+                f"--arguments-json {args_json({'project_root': root, 'items': [item]})}"
+            )
+        elif item and stage == "narrate":
+            cmd = (
+                f"write {q(str(project_root / str(item) / 'narration.json'))}, then run "
+                f"{CLI_NAME} narration-check --project-root {q(root)} --items {q(str(item))} --json"
+            )
+        elif item and stage == "audio":
+            cmd = (
+                f"{CLI_NAME} job-start --tool generate_audio "
+                f"--arguments-json "
+                f"{args_json({'project_root': root, 'audio_root': audio, 'items': [item]})}"
+            )
+        elif item and stage == "render":
+            cmd = (
+                f"{CLI_NAME} video-render --project-root {q(root)} "
+                f"--audio-root {q(audio)} --output-root {q(output)} --items {q(str(item))}"
+            )
+        elif stage == "join":
+            cmd = (
+                f"{CLI_NAME} video --project-root {q(root)} --audio-root {q(audio)} "
+                f"--output-root {q(output)} --build-long-video --normalize-audio"
+            )
+        enriched.append({**task, "command": cmd})
+    return enriched
+
+
 def status_main() -> int:
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} work-status",
@@ -325,7 +387,12 @@ def status_main() -> int:
     statuses = [item_status(d, name, args.audio_root, args.output_root)
                 for d in item_dirs(root, selection)]
     claims = active_claims(root)
-    tasks = next_tasks(statuses, claims)
+    tasks = task_commands(
+        next_tasks(statuses, claims),
+        project_root=root,
+        audio_root=args.audio_root,
+        output_root=args.output_root,
+    )
     open_todos = list_todos(root, pending_only=True)
     report = {
         "project": name,
@@ -348,7 +415,8 @@ def status_main() -> int:
             where = t["item"] or "(project)"
             gpu = "  [GPU]" if t["gpu"] else ""
             reason = f"  ({t['reason']})" if t.get("reason") else ""
-            print(f"{where}: {t['stage']}{gpu}{reason}")
+            command = f"\n  {t['command']}" if t.get("command") else ""
+            print(f"{where}: {t['stage']}{gpu}{reason}{command}")
         return 0
 
     print(f"Project {name} — {len(statuses)} item(s)")

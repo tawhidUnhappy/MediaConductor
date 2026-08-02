@@ -17,8 +17,12 @@ Read [references/workflow.md](references/workflow.md), then operate only the
 ```bash
 <mc> setup --mode manga-video
 <mc> doctor --mode manga-video --json
-<mc> commands --mode manga-video --json --full
+<mc> commands --mode manga-video --json
 ```
+
+Use the compact command catalog for orientation. Load full argument schemas only
+for commands you are about to run, for example
+`<mc> commands --mode manga-video --json --full --tools style-detect webtoon-split`.
 
 At the narration stage, also read
 [references/narration.md](references/narration.md) for the file schema, grounded
@@ -26,10 +30,18 @@ authoring rules, and review loop.
 
 Treat the visual source as the authority throughout this mode. MAGI detections
 and DeepSeek OCR are proposals to inspect, never approvals or ground truth. As the
-LLM agent, inspect page overlays and resulting crops before narration. Never use
-a complete source page or strip as a stand-in for its component panels. A genuinely
-borderless single-panel splash is the only exception, and it must be inspected and
-explicitly recorded as an accept.
+LLM agent, inspect page overlays and resulting crops before narration, starting
+with flagged/suspect outputs and then sampling clean runs before broadening only
+when the sample finds errors. Never use a complete source page or strip as a
+stand-in for its component panels. A genuinely borderless single-panel splash is
+the only exception, and it must be inspected and explicitly recorded as an accept.
+
+Token and GPU budget are product quality inputs. Prefer native vision over
+DeepSeek OCR for ordinary, readable dialogue: OCR is useful only for tiny/dense
+text, difficult names, or a second opinion after the panel remains ambiguous.
+Keep MAGI for paged manga because it cheaply proposes panel boxes at scale; use
+LLM vision to verify and fix those boxes, not to rediscover every box manually
+from full pages.
 
 Use background jobs for every command marked `long_running`. Prefer the typed
 wrapper exposed by the machine catalog:

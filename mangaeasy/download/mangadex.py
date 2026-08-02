@@ -14,6 +14,9 @@ Follows MangaDex API etiquette:
     resume interrupted downloads).
   - Caches chapter metadata locally so repeated runs skip the API feed
     lookup.  Pass --fresh to bypass the cache.
+  - Also skips complete chapters from the MangaDex feed page count when a
+    migrated project has images but no local cache yet, avoiding an at-home
+    API lookup without increasing request rate.
 """
 
 from __future__ import annotations
@@ -163,6 +166,47 @@ def _save_cache(ch_dir: Path, data: dict) -> None:
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+
+
+def _count_downloaded_images(output_dir: Path) -> int:
+    if not output_dir.is_dir():
+        return 0
+    return sum(
+        1
+        for p in output_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in _IMAGE_EXTS and p.stat().st_size > 0
+    )
+
+
+def _present_page_numbers(output_dir: Path, chapter_str: str) -> set[int]:
+    if not output_dir.is_dir():
+        return set()
+    prefix = f"{chapter_str}_"
+    present: set[int] = set()
+    for path in output_dir.iterdir():
+        if (
+            not path.is_file()
+            or path.suffix.lower() not in _IMAGE_EXTS
+            or path.stat().st_size <= 0
+            or not path.name.startswith(prefix)
+        ):
+            continue
+        stem = path.stem
+        try:
+            present.add(int(stem[len(prefix):]))
+        except ValueError:
+            continue
+    return present
+
+
+def _missing_page_numbers(output_dir: Path, chapter_str: str, total: int) -> list[int]:
+    present = _present_page_numbers(output_dir, chapter_str)
+    return [idx for idx in range(1, total + 1) if idx not in present]
+
+
+def _complete_download(output_dir: Path, chapter_str: str, total: int) -> tuple[bool, list[int]]:
+    missing = _missing_page_numbers(output_dir, chapter_str, total)
+    return not missing, missing
 
 
 # ── Manga metadata (data/library/<name>/manga.json) ───────────────────────────────
@@ -511,7 +555,13 @@ def _download_one_chapter(
     manga_root     = manga_dir(str(dl_cfg.get("name")))
     output_dir     = manga_root / chapter_str / "download"
     ch_dir         = output_dir.parent   # <library>/<name>/<chapter_str>/
-    use_data_saver = bool(dl_cfg.get("use_data_saver", False))
+    if bool(dl_cfg.get("use_data_saver", False)):
+        print(
+            "[WARN] download_defaults.use_data_saver is ignored; mangaEasy "
+            "downloads original-quality MangaDex images for production.",
+            flush=True,
+        )
+    use_data_saver = False
     delay          = float(dl_cfg.get("download_delay", 1.5))
 
     print("=== MangaDex downloader ===")
@@ -544,13 +594,39 @@ def _download_one_chapter(
     # Politeness matters most on `--all` re-runs over a long series: without
     # this, every already-downloaded chapter still costs an at-home API call
     # just to discover there is nothing to do.
-    if cache and cache.get("total") and output_dir.is_dir():
-        present = sum(1 for p in output_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
-        if present >= int(cache["total"]):
+    expected_total = int(cache["total"]) if cache and cache.get("total") else 0
+    expected_from = "cache"
+    if not expected_total and chapter_entry is not None:
+        expected_total = int(chapter_entry.get("pages") or 0)
+        expected_from = "chapter feed"
+    if not fresh and expected_total:
+        complete, missing_pages = _complete_download(output_dir, chapter_str, expected_total)
+        present = _count_downloaded_images(output_dir)
+        if complete:
             print(f"[INFO] Chapter {chapter_str} already complete "
-                  f"({present}/{cache['total']} pages) — skipped. Use --fresh to re-fetch.",
+                  f"({present}/{expected_total} pages from {expected_from}) — skipped. "
+                  "Use --fresh to re-fetch.",
                   flush=True)
+            if chapter_entry is not None and not cache:
+                _save_cache(ch_dir, {
+                    "manga_id": manga_id,
+                    "chapter": chapter_str,
+                    "lang": lang,
+                    "chapter_id": chapter_entry["id"],
+                    "total": expected_total,
+                    "complete_without_at_home": True,
+                    "fetched_at": datetime.now(timezone.utc).isoformat(),
+                })
             return True
+        if present >= expected_total:
+            preview = ", ".join(str(n) for n in missing_pages[:12])
+            more = "…" if len(missing_pages) > 12 else ""
+            print(
+                f"[WARN] Chapter {chapter_str} has {present} image file(s), but numbered "
+                f"page(s) are missing: {preview}{more}. Rechecking MangaDex instead of "
+                "fast-skipping.",
+                flush=True,
+            )
 
     # ── Chapter ID ─────────────────────────────────────────────────────────
     # Cache the UUID forever — it never changes for a given manga/chapter/lang.
@@ -609,14 +685,14 @@ def _download_one_chapter(
     download_images(sess, urls, fnames, output_dir, delay, chapter_str)
 
     # ── Missing-page report ────────────────────────────────────────────────
-    actual = (
-        sum(1 for p in output_dir.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
-        if output_dir.is_dir() else 0
-    )
-    if actual < total:
+    actual = _count_downloaded_images(output_dir)
+    complete, missing_pages = _complete_download(output_dir, chapter_str, total)
+    if not complete:
+        preview = ", ".join(str(n) for n in missing_pages[:20])
+        more = "…" if len(missing_pages) > 20 else ""
         print(
-            f"\n[WARN] {actual}/{total} pages present — "
-            f"{total - actual} missing. Run again to resume.",
+            f"\n[WARN] {actual}/{total} image file(s) present, but expected numbered "
+            f"page(s) are missing: {preview}{more}. Run again to resume.",
             flush=True,
         )
         return False
@@ -817,7 +893,7 @@ def main() -> None:
             sys.exit(1)
         chapters = [str(chapter)]
 
-    if chapter_map is None and len(chapters) > 1:
+    if chapter_map is None and (len(chapters) > 1 or args.chapter is not None):
         chapter_map = fetch_chapter_map(sess, manga_id, lang)
 
     ok, missing, failed = [], [], []

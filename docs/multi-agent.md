@@ -33,7 +33,9 @@ one report — that combination is the full resume briefing a fresh agent
 needs, regardless of what wrote the code that produced it. `--next` lists
 only the unclaimed, actionable tasks.
 
-Then loop:
+Then loop. `work-status --next --json` includes deterministic command
+suggestions for the small mechanical stages; use them instead of reconstructing
+basic invocations in the prompt.
 
 1. **Claim** the task before touching it:
    `mangaeasy work-claim --project-root data/library/<P> --item 07 --stage narrate --agent me`
@@ -47,6 +49,9 @@ Then loop:
    `mangaeasy work-claim --project-root data/library/<P> --resource gpu --agent me`
    (release it the moment the GPU step exits; NVENC rendering does not need
    it). Give it a `--ttl-minutes` that covers the whole job.
+   Start long commands with `job-start`, then stop actively polling until the
+   expected work window has passed. `job-status` is the wake-up point; if it is
+   still running, renew/recheck later rather than keeping an LLM loop alive.
 3. **Write down what the next agent needs.** Character names, speaker
    conventions, tone decisions, warnings — the facts that otherwise die with
    your context window:
@@ -157,10 +162,11 @@ done
   window; fix, re-run, the next slice appears.
 - `severity: "review"` items are the checks that need **eyes** (source-page
   overlays, full-resolution crops, and narration review sheets). They do not
-  change the machine-loop exit code. A vision-capable reviewer must open every
-  listed artifact and original panel; detector confidence, OCR agreement,
-  contact sheets, or another retry cannot approve them. Semantic narration QA
-  (right speaker, one beat per panel) stays a vision-pass job:
+  change the machine-loop exit code. A vision-capable reviewer inspects
+  flagged/suspect artifacts first, samples clean outputs, and broadens if
+  errors appear; detector confidence, OCR agreement, contact sheets, or another
+  retry cannot approve them. Semantic narration QA (right speaker, one beat per
+  panel) stays a vision-pass job:
   `mangaeasy narration-review-sheets`, then read every sheet and original.
 - `severity: "info"` = normal-but-worth-confirming (e.g. uncovered
   credits/banner panels).

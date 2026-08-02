@@ -8,9 +8,10 @@ Your task is to create narration completely from scratch for the provided manga 
 
 ## Rules
 
-- Carefully analyze every manga panel before writing. Read the complete chapter
-  in sequence once, then write each entry with that exact original crop open at
-  readable/full resolution.
+- Read the complete chapter in sequence once for context, then write each entry
+  with the relevant original crop open. Spend extra attention on dense text,
+  unclear speakers, reveal timing, action ambiguity, and panels whose crop or
+  OCR looks suspicious.
 - Panel pixels, bubble tails, and the established reading sequence are the
   source of truth. MAGI boxes and DeepSeek OCR are machine proposals only; they
   never approve a crop or establish dialogue.
@@ -180,6 +181,8 @@ in `"narration"`. Keep delivery restrained through the wording itself.
   intensity.
 - Use natural narration flow suitable for YouTube voice-over.
 - Keep narration polished, immersive, and binge-watch friendly.
-- Before returning JSON, compare every line again with its original panel for
-  action, dialogue meaning, speaker, chronology, and reveal timing. Do not
-  approve a line merely because it agrees with OCR.
+- Before returning JSON, re-check high-risk lines against their original panel:
+  dialogue meaning, speaker, chronology, reveal timing, and any OCR
+  disagreement. Sample straightforward lines for drift; if the sample finds
+  errors, broaden the re-check. Do not approve a line merely because it agrees
+  with OCR.

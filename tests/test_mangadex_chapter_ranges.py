@@ -3,6 +3,7 @@
 import pytest
 import argparse
 from mangaeasy.download.mangadex import (
+    _complete_download,
     _parse_chapter_tokens,
     _chapter_token_arg,
 )
@@ -36,3 +37,25 @@ def test_chapter_token_arg_validates_decimals_and_ranges():
 
     with pytest.raises(argparse.ArgumentTypeError):
         _chapter_token_arg("invalid_token")
+
+
+def test_complete_download_detects_numbered_holes(tmp_path):
+    out = tmp_path / "download"
+    out.mkdir()
+    (out / "01_01.jpg").write_bytes(b"page")
+    (out / "01_03.jpg").write_bytes(b"page")
+    (out / "01_99.jpg").write_bytes(b"extra")
+
+    complete, missing = _complete_download(out, "01", 3)
+
+    assert complete is False
+    assert missing == [2]
+
+
+def test_complete_download_accepts_all_expected_pages(tmp_path):
+    out = tmp_path / "download"
+    out.mkdir()
+    for idx in range(1, 4):
+        (out / f"01_{idx:02d}.webp").write_bytes(b"page")
+
+    assert _complete_download(out, "01", 3) == (True, [])

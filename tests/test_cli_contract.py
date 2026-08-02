@@ -56,6 +56,18 @@ def test_full_catalog_describes_typed_job_wrapper_and_source_layout(capsys):
     assert "review_policy" not in commands["video"]["args"]
 
 
+def test_full_catalog_can_be_limited_to_needed_commands(capsys):
+    assert main([
+        "commands", "--mode", "manga-video", "--json", "--full",
+        "--tools", "style-detect", "webtoon-split",
+    ]) == 0
+    data = json.loads(capsys.readouterr().out)
+    commands = {entry["name"]: entry for entry in data["commands"]}
+    assert set(commands) == {"style-detect", "webtoon-split"}
+    assert commands["style-detect"]["args"]["project_root"]["required"] is True
+    assert commands["webtoon-split"]["long_running"] is True
+
+
 def test_where_json_keys(capsys):
     assert main(["where", "--json"]) == 0
     data = json.loads(capsys.readouterr().out)

@@ -19,8 +19,13 @@ After setup, verify:
 
 ```bash
 uv run mangaeasy doctor --mode manga-video --json
-uv run mangaeasy commands --mode manga-video --json --full
+uv run mangaeasy commands --mode manga-video --json
 ```
+
+Use `commands --json --full --tools <names...>` only when you need exact
+arguments for the next command or two. Loading the full mode schema on every
+turn wastes context; `work-status --next --json` and the compact catalog are
+the normal resume path.
 
 The detailed operating manual is
 [`manga-video-guide.md`](manga-video-guide.md); the design rationale for which
@@ -36,8 +41,10 @@ vision-capable agent or human. OCR is only a cross-check; it cannot establish
 panel composition, speaker identity, action, or crop quality by itself.
 
 Record cast, speaker, crop, and handoff decisions with `work-note` so another
-agent can resume without guessing. Before building, inspect every crop and
-narration review sheet and rerun the corresponding checks after each fix.
+agent can resume without guessing. Before building, use the review artifacts as
+indexes: inspect high-risk/flagged crops and narration entries first, sample
+clean runs, and broaden only when the sample finds errors. Rerun the
+corresponding checks after each fix.
 
 Always run `mangaeasy where --json` first and confirm `workspace_root` and
 `data_root` are the workspace you intend to fill. Everything you download or
@@ -68,7 +75,9 @@ cannot be reached by naming it.
 
 Long-running operations use the typed `job_start` tool and are followed with
 `job_status`; raw command lines are not accepted, in the MCP server or in
-`job-start`. Publishing is always an explicit, review-gated stage.
+`job-start`. Start download/crop/OCR/render jobs, then go idle or work on a
+different item; poll after a real wait instead of spending model turns in a
+tight loop. Publishing is always an explicit, review-gated stage.
 
 The repeatable `--allow-root` boundary applies to direct tool paths, nested
 `job_start` arguments, configured defaults, and the review/final-video

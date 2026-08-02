@@ -18,12 +18,13 @@ with absolute local paths. A global uv-tool install may omit the uv prefix;
 
 ```bash
 uv --project D:/mangaEasy run mangaeasy where --json
-uv --project D:/mangaEasy run mangaeasy commands --mode manga-video --json --full
+uv --project D:/mangaEasy run mangaeasy commands --mode manga-video --json
 ```
 
-`--full` includes each command's arguments (flag, type, required) and a
-`long_running` marker, so you never need to run per-command `--help` to build
-a command line.
+Use `--full --tools <names...>` only when you need exact arguments for the next
+command or two. It includes each selected command's arguments (flag, type,
+required) and a `long_running` marker, so you never need to run per-command
+`--help` to build a command line.
 
 Prefer MCP? `uv --project D:/mangaEasy run mangaeasy mcp --mode manga-video --allow-root D:/MediaProjects`
 runs a scoped MCP stdio server with typed tools —
@@ -188,10 +189,10 @@ both failures are silent.
   `narration-edit` over hand-editing). The project-level `manga.json` and
   `publish.json` are machine-managed — read them freely, don't hand-edit them.
 - MAGI boxes and DeepSeek OCR are unverified proposals, never approvals or
-  ground truth. A vision-capable reviewer must open every source page/strip overlay,
-  every crop, and every original panel used by narration. Multi-panel source
-  pages cannot be used as production stand-ins; only a manually confirmed,
-  genuinely borderless splash may remain page-sized.
+  ground truth. A vision-capable reviewer should inspect flagged/suspect crop
+  outputs first, sample clean outputs, and broaden if errors appear. Multi-panel
+  source pages cannot be used as production stand-ins; only a manually
+  confirmed, genuinely borderless splash may remain page-sized.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.
@@ -228,8 +229,9 @@ both failures are silent.
 
 ## 4. Background jobs (how to run anything long)
 
-Real steps run minutes to hours (TTS, panel detection, OCR, renders,
-uploads) — `commands --json --full` marks them `long_running`. Never block a
+Real steps run minutes to hours (downloads, TTS, panel detection, OCR, renders,
+uploads) — `commands --json --full --tools <names...>` marks them
+`long_running`. Never block a
 foreground call on them. If your harness offers background shells with
 completion notifications, use those; otherwise (or from MCP) use the built-in
 job runner — it works everywhere, including frozen installs:
@@ -245,7 +247,7 @@ uv --project D:/mangaEasy run mangaeasy jobs --json
 ```
 
 The typed `--tool/--arguments-json` form is schema-validated and is what
-`commands --json --full` publishes. The positional compatibility form
+`commands --json --full --tools job-start <tool>` publishes. The positional compatibility form
 `uv --project D:/mangaEasy run mangaeasy job-start video [video flags...]`
 remains available to existing scripts.
 
@@ -293,8 +295,8 @@ block-buffer stdout, so an empty log tail on a running job is normal; trust
 ## 6. Command reference (groups)
 
 Run `uv --project D:/mangaEasy run mangaeasy commands --mode
-manga-video --json --full` for the always-current list and
-`uv --project D:/mangaEasy run mangaeasy <command> --help` for flags.
+manga-video --json --full --tools <needed commands...>` for the current
+argument schemas; avoid loading the full catalog unless you are updating docs.
 Highlights per group:
 
 **Setup** — `where`, `commands`, `doctor`, `setup` (one-command
@@ -365,17 +367,20 @@ agent skill: [`.claude/skills/manga-recap/SKILL.md`](../.claude/skills/manga-rec
 any agent). The short of it:
 
 ```bash
-uv --project D:/mangaEasy run mangaeasy download --url "<mangadex url>" --all
+uv --project D:/mangaEasy run mangaeasy job-start --tool download --arguments-json '{"url":"<mangadex url>","all":true}'
+uv --project D:/mangaEasy run mangaeasy job-status <job-id> --json
 uv --project D:/mangaEasy run mangaeasy series-plan --project-root "$PROJ" --json
 uv --project D:/mangaEasy run mangaeasy style-detect --project-root "$PROJ" --source-subdir download --json
 uv --project D:/mangaEasy run mangaeasy webtoon-split --project-root "$PROJ" --item-range 01-12 --source-subdir download --work-dir "$WORK"
-# Exit 3 is expected: open every source overlay and every crop at readable
-# resolution, clear every suspect, and re-split with --overrides if needed.
-# OCR is optional cross-evidence. Read the original panel for every line:
-uv --project D:/mangaEasy run mangaeasy panel-transcript --project-root "$PROJ" --item-range 01-12
+# Exit 3 is expected: inspect flagged/suspect overlays first, sample clean
+# crops, broaden if errors appear, and re-split with --overrides if needed.
+# OCR is optional cross-evidence. Usually skip it; run only for dense/tiny text
+# or uncertain names after reading the original panel:
+uv --project D:/mangaEasy run mangaeasy job-start --tool panel_transcript --arguments-json '{"project_root":"'"$PROJ"'","items":["01-12"]}'
 uv --project D:/mangaEasy run mangaeasy narration-check --project-root "$PROJ" --item-range 01-12 --json
 uv --project D:/mangaEasy run mangaeasy narration-review-sheets --project-root "$PROJ" --item-range 01-12 --work-dir "$WORK"
-# Exit 3 is expected again: manually approve every panel/narration pairing.
+# Exit 3 is expected again: review risky entries first, sample clean entries,
+# broaden if errors appear, then record narration approval.
 uv --project D:/mangaEasy run mangaeasy video --project-root "$PROJ" --audio-root "$AUDIO" --output-root "$OUT" --work-dir "$WORK" \
     --item-range 01-12 --tts auto --build-long-video --normalize-audio \
     --background-music <music>
@@ -522,8 +527,8 @@ uv --project D:/mangaEasy run mangaeasy mcp --mode manga-video --allow-root D:/M
 client config `{"command":"uv","args":["--project","D:/mangaEasy",
 "run","mangaeasy","mcp","--mode","manga-video","--allow-root","D:/MediaProjects"]}`; add `"env": {"MANGAEASY_ROOT":
 "..."}` to run against a specific install's data). The tool schemas come from
-the same table as `commands --json --full` (`mangaeasy/command_spec.py`), so
-CLI and MCP can't drift. Tool results are a JSON text block: `exit_code`,
+the same table as `commands --json --full --tools <names...>`
+(`mangaeasy/command_spec.py`), so CLI and MCP can't drift. Tool results are a JSON text block: `exit_code`,
 parsed `report` (for `--json` commands), parsed `result` (the
 `MANGAEASY_RESULT` payload), and clipped `output`.
 
@@ -554,7 +559,7 @@ root. This is a same-user stdio guardrail, not an OS sandbox.
 | Output seems stale/missing | it was archived | look in `old/run_NNNN/` next to the output; `audio-takes-list` for audio |
 | GPU crash with many workers | too many CUDA contexts | the CLI clamps `--gpu-workers` at 4; unset `MANGAEASY_UNSAFE_GPU_WORKERS` |
 | Slow first model run | models downloading to the data folder | expected once; offline afterwards |
-| `unknown command` | typo | the error suggests near-matches; see `uv --project D:/mangaEasy run mangaeasy commands --mode manga-video --json --full` |
+| `unknown command` | typo | the error suggests near-matches; see `uv --project D:/mangaEasy run mangaeasy commands --mode manga-video --json` |
 
 Background music may live in a user-owned `bgm/` folder. mangaEasy ships
 no music or voice-cloning samples. Operators are responsible for the media

@@ -8,7 +8,8 @@ property maps onto CLI flags. Both consumers read from here:
   and builds argv from the flag mappings.
 - `mangaeasy commands --json --full` (mangaeasy/cli.py) publishes the same
   schemas so a shell agent can discover a command's arguments without running
-  sixty separate `--help` calls.
+  sixty separate `--help` calls. `--tools <names...>` narrows that output for
+  token-conscious agents that only need the next few schemas.
 
 Adding a flag to a subcommand's argparse? Add it here too — this table is
 what agents see. (Historically the MCP server kept its own private copy of
@@ -80,8 +81,9 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "download": (
         "download",
         "Download chapters from MangaDex — politely (API spacing, 429 backoff, jittered delays) "
-        "and resumable. Pass the title URL directly; all=true grabs the whole series start to "
-        "end in English (LONG-RUNNING — prefer job_start; already-complete chapters are skipped).",
+        "and resumable, using original-quality images. Pass the title URL directly; all=true "
+        "grabs the whole series start to end in English (LONG-RUNNING — prefer job_start and "
+        "poll later; complete chapters are double-verified and skipped).",
         {"url": {**_STR, "description": "MangaDex title URL or manga UUID."},
          "name": {**_STR, "description": "Library folder name; derived from the title if omitted."},
          "chapters": {"type": "array", "items": {"type": "string"},
@@ -111,9 +113,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "webtoon-split",
         "Crop webtoon items into panels (gutter detection + auto-split + gap rescue) and write "
         "verify sheets. Exit 3 means crops were generated but are NOT approved. A vision-capable "
-        "reviewer must open every verify image and full-resolution crop, resolve suspects, "
-        "forced cuts, content drops, and any withheld automatic full-source result against the "
-        "source art, then re-split any fixes.",
+        "reviewer should inspect reported suspects, forced cuts, content drops, withheld "
+        "full-source results, and a sample of clean crops before broadening if errors appear.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
          "work_dir": {**_STR, "description": "Work dir for verify sheets (default: data/work)."},
@@ -131,8 +132,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Render full-resolution review windows around every forced auto-split cut and short "
         "panel from webtoon-split's ranges manifests, montaged into sheets. Exit 3 means the "
         "review artifacts are ready but not approved. Use sheets only as an index, then open "
-        "EVERY image listed in emitted review_windows at full resolution and judge the art "
-        "(FIX = cut through "
+        "flagged windows at full resolution and judge the art (FIX = cut through "
         "figure/speech bubble; ACCEPT = "
         "background/effect art, banners, bordered thin panels) before narrating.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
@@ -170,7 +170,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "After re-running webtoon-split, map the archived old panels to the new crops and carry "
         "narration + audio over (texts verbatim, WAVs copied/concatenated) instead of "
         "re-narrating. Dry run by default; set apply=true once the report shows zero orphans. "
-        "Review every shift/merge panel with narration-review-sheets afterwards.",
+        "Review changed shift/merge panels with narration-review-sheets afterwards.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
          "audio_root": {**_STR, "description": "Audio root (default: data/audio)."},
@@ -187,8 +187,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "Crop paged manga into panels with MAGI v3 detection (needs install-tool magi-v3; "
         "LONG-RUNNING — prefer job_start) and write verify overlays. MAGI boxes are proposals: "
         "automatic no-detection/full-page results are withheld for manual boxes. Exit 3 means "
-        "a vision-capable reviewer must inspect every page overlay and every actual crop at "
-        "full resolution, including full/tall boxes and reading-order numbers, before narration.",
+        "a vision-capable reviewer must inspect withheld/full/tall/suspect boxes, reading-order "
+        "samples, and broaden only if the sample shows systematic crop errors.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},
          "work_dir": {**_STR, "description": "Work dir for verify sheets (default: data/work)."},
@@ -214,10 +214,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "panel_transcript": (
         "panel-transcript",
-        "Optionally OCR panels into <item>/transcript.json with DeepSeek-OCR 2 (needs "
-        "install-tool deepseek-ocr2; LONG-RUNNING — prefer job_start). OCR is an untrusted "
-        "cross-check, never a substitute for reading panel pixels/bubble tails. Values are "
-        "SHA-256-bound to each crop so re-cropping invalidates stale text.",
+        "Selectively OCR panels into <item>/transcript.json with DeepSeek-OCR 2 (needs "
+        "install-tool deepseek-ocr2; LONG-RUNNING — prefer job_start and poll later). Use only "
+        "for tiny/dense text or uncertain names; native vision is preferred for ordinary readable "
+        "dialogue. OCR is an untrusted cross-check, SHA-256-bound to each crop.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "force": {**_BOOL, "description": "Re-OCR panels that already have an ocr value."},
          "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]},
@@ -251,9 +251,9 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "narration-review-sheets",
         "Render sheets pairing every narration entry's panel image with the narration text and "
         "an optional UNVERIFIED OCR hint. Exit 3 means the review artifacts are ready but not "
-        "approved. Read EVERY sheet and open every original panel: pixels, bubble tails, and "
-        "sequence are authoritative. Verify one current beat, speaker attribution, factual "
-        "grounding, natural causal prose, and spoken flow.",
+        "approved. Start with OCR disagreements, uncertain speakers, dense text, chronology "
+        "changes, and awkward prose, then sample clean entries; broaden if errors appear. Pixels, "
+        "bubble tails, and sequence are authoritative.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "work_dir": {**_STR, "description": "Scratch root (default: data/work)."},
          "output_root": {**_STR, "description": "Review-sheet output root."},

@@ -220,7 +220,7 @@ defaults. These are all of them; nothing else in the file is read.
 | `bgm.file` | `null` | The music bed. Unset means the video renders with no music. |
 | `bgm.volume_db` | `-30` | How far the bed sits **below** the measured narration loudness. Keep within −20…−32. |
 | `download_defaults.translated_language` | `"en"` | MangaDex translation language. |
-| `download_defaults.use_data_saver` | `false` | Fetch MangaDex's smaller data-saver images instead of originals. |
+| `download_defaults.use_data_saver` | ignored | Deprecated. mangaEasy always downloads original-quality MangaDex images for production. |
 | `download_defaults.download_delay` | `0.5` | Seconds between image downloads. **Leave it alone** — the spacing is MangaDex politeness, not a speed knob. |
 | `manga_video.audio_source` | `"faded"` | `faded` uses the 8 ms edge-faded derivatives (raw clip edges click). `raw` is a diagnostic override. |
 | `manga_video.audio_fade_ms` | `8.0` | Length of those edge fades. |
