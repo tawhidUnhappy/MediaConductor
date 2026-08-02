@@ -31,6 +31,28 @@ is this crop readable, is this line attributed to the right speaker, does this
 video hold up — are surfaced as review items pointing at
 exact files, and are recorded as approvals bound to the bytes they cover.
 
+## Tool philosophy
+
+mangaEasy uses tools where they save attention, not where they merely add a
+ritual. Deterministic chores should be code-bound: discover the next stage with
+`work-status --next`, fetch only needed schemas with
+`commands --json --full --tools <names...>`, run long tasks through
+`job-start`, and let download/crop/audio checks report concrete problems
+instead of making an LLM re-derive them.
+
+For visual understanding, the hierarchy is deliberate:
+
+- **Native LLM vision is the narrator.** Use it for ordinary readable panels,
+  speaker ownership, chronology, reveal timing, and prose quality.
+- **DeepSeek OCR is a selective second opinion.** Run it for tiny/dense text,
+  stylized lettering, or uncertain name spelling; skip it when the panel is
+  already readable.
+- **MAGI is a bulk crop proposer for paged manga.** Keep it because proposing
+  hundreds of boxes from pages is cheaper as detector work; use LLM vision to
+  verify and fix boxes, not rediscover every box manually.
+- **Review is staged.** Inspect flagged/suspect artifacts first, sample clean
+  outputs, and broaden only when errors appear.
+
 ## Start from a repository link
 
 An AI agent can set up the complete application from only this URL:

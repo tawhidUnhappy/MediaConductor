@@ -24,6 +24,12 @@ Use the compact command catalog for orientation. Load full argument schemas only
 for commands you are about to run, for example
 `<mc> commands --mode manga-video --json --full --tools style-detect webtoon-split`.
 
+Follow the project tool philosophy: deterministic chores belong to mangaEasy,
+not to repeated LLM reasoning. Use `work-status --next` for code-derived next
+steps, `job-start` for long work, native vision for ordinary readable panels,
+DeepSeek OCR only as a selective second opinion, and MAGI as the paged-manga
+box proposer that LLM vision verifies.
+
 At the narration stage, also read
 [references/narration.md](references/narration.md) for the file schema, grounded
 authoring rules, and review loop.

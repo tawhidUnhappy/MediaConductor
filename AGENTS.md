@@ -22,6 +22,17 @@ there is no router mode and no all-tools escape hatch. Long operations must use
 the typed `job_start` MCP tool or `mangaeasy job-start --tool <name>
 --arguments-json <object>`.
 
+**Tool philosophy:** code handles deterministic chores; the LLM spends attention
+where judgment improves the video. Use `work-status --next` for next actions,
+`commands --json --full --tools <names...>` for only the schemas you need, and
+`job-start` for long downloads, crops, OCR, TTS, renders, and uploads. Native
+vision is preferred for ordinary readable panels and narration quality.
+DeepSeek OCR is a selective second opinion for tiny/dense text or uncertain
+names, not a default step. MAGI stays for paged manga because detector box
+proposals are cheaper than asking the LLM to rediscover every panel from full
+pages; the LLM verifies and fixes those proposals. Inspect flagged/suspect
+artifacts first, sample clean outputs, and broaden only when errors appear.
+
 **Review is recorded, never asserted.** There is no confirmation boolean
 anywhere in the CLI or the MCP schema. Approvals are bound to the exact bytes
 they cover and can be recorded by a human or an LLM agent:
