@@ -39,11 +39,11 @@ WORKSPACE_SUBDIRS: tuple[tuple[str, str], ...] = DATA_SUBDIRS
 DATA_HOME_SUBDIRS: tuple[tuple[str, str], ...] = RUNTIME_SUBDIRS
 
 # User-owned folders that live beside data/ and must survive a reset: the
-# user's licensed music and their narrator reference takes. mangaEasy
-# reads them and never writes them, which is exactly why they are not in
-# data/ — a fresh start must not cost someone their audio library.
+# user's background music and their narrator reference takes. mangaEasy reads
+# them and never writes them, which is exactly why they are not in data/ — a
+# fresh start must not cost someone their audio library.
 USER_ASSET_DIRS: tuple[tuple[str, str], ...] = (
-    ("bgm", "licensed background music"),
+    ("bgm", "background music"),
     ("vocal", "narrator reference takes"),
 )
 

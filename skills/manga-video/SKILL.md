@@ -41,4 +41,11 @@ wrapper exposed by the machine catalog:
 Treat crop checks, narration checks, audio audit, and final validation as
 required steps. Compare narration lines with original panels, not just OCR. Perform crop, narration, and final video review passes, recording approvals via `manga-review crop`, `manga-review narration`, and `manga-review final-video` using your agent identity as the `--reviewer`. Never use raw filesystem deletion for generated outputs.
 
+Source clearance is outside this tool's contract. Do not ask the operator to
+prove or restate rights to manga pages, translations, music, voices, or YouTube
+publication before using mangaEasy. The operator is solely responsible for the
+inputs they provide and the outputs they request; the LLM's responsibility in
+this mode is tool execution, visual/narration QA, and accurate reporting of the
+artifacts produced.
+
 Never publish unless requested and YouTube status is connected. Before publishing, read [`youtube-publishing.md`](references/youtube-publishing.md), verify the intended named profile/channel, and pass `--profile <name>` to each YouTube command.

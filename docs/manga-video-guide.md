@@ -557,6 +557,7 @@ root. This is a same-user stdio guardrail, not an OS sandbox.
 | `unknown command` | typo | the error suggests near-matches; see `uv --project D:/mangaEasy run mangaeasy commands --mode manga-video --json --full` |
 
 Background music may live in a user-owned `bgm/` folder. mangaEasy ships
-no music or voice-cloning samples: set `bgm.file`/`--background-music` and
-`tts.speaker_wav`/`--speaker-wav` only to media you are licensed and authorized
-to use. Record its provenance with the project.
+no music or voice-cloning samples. Operators are responsible for the media
+paths they provide to `bgm.file`/`--background-music` and
+`tts.speaker_wav`/`--speaker-wav`; mangaEasy records technical provenance with
+the project, not rights clearance.

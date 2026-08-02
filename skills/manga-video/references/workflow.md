@@ -181,8 +181,8 @@ and `webtoon-cutcheck`. The default is `download`.
    `job-start <cli-command> [args...]` remains accepted for existing scripts,
    but `--tool/--arguments-json` is the typed, schema-validated form published
    by `commands --json --full` and MCP. Ensure crop/narration review records are
-   recorded before running. Keep licensed music below
-   narration and re-render after any changed panel, narration, or audio input.
+   recorded before running. Keep background music below narration and re-render
+   after any changed panel, narration, or audio input.
 
    Production defaults to separate `data/audio_faded/<project>/...` derivatives:
    every panel WAV gets a symmetric 8 ms fade-in and fade-out while the raw TTS
