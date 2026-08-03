@@ -9,11 +9,12 @@ Narrate only after a vision-capable reviewer has cleared the crop pass. MAGI
 boxes and DeepSeek OCR are machine proposals, never approvals or ground truth.
 Use a staged crop review: inspect flagged/suspect overlays and crops first,
 sample clean output, and broaden only when the sample shows systematic errors.
-A complete source page or strip must not stand in for multiple panels; only a
-genuinely borderless single-panel splash may remain page-sized, after an
-explicit manual review decision. If you cannot inspect the images, stop and
-hand the item to a vision-capable agent or human. Never create narration from
-OCR alone.
+A complete source page or strip must not stand in for multiple panels. A cover,
+title page, or genuinely borderless single-panel splash may remain page-sized
+when visual review confirms it is one image beat; override it only when it
+hides multiple bordered story panels. If you cannot inspect the images, stop
+and hand the item to a vision-capable agent or human. Never create narration
+from OCR alone.
 
 ## File contract
 

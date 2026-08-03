@@ -186,8 +186,9 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
         "page-split",
         "Crop paged manga into panels with MAGI v3 detection (needs install-tool magi-v3; "
         "LONG-RUNNING — prefer job_start) and write verify overlays. MAGI boxes are proposals: "
-        "automatic no-detection/full-page results are withheld for manual boxes. Exit 3 means "
-        "a vision-capable reviewer must inspect withheld/full/tall/suspect boxes, reading-order "
+        "no-detection and unsafe full-page results are withheld for manual boxes, while likely "
+        "cover/splash full-page candidates are kept but review-listed. Exit 3 means a "
+        "vision-capable reviewer must inspect withheld/full/tall/suspect boxes, reading-order "
         "samples, and broaden only if the sample shows systematic crop errors.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "source_subdir": {**_STR, "description": "Page-image folder inside each item (default: download)."},

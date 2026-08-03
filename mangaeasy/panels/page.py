@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 
 from mangaeasy import runtime
@@ -71,8 +72,10 @@ Image.MAX_IMAGE_PIXELS = None
 Box = Dict[str, int]
 
 # A single detected box covering at least this fraction of the page area is
-# almost always MAGI returning the whole page instead of splitting it.
+# sometimes a real cover/splash, and sometimes MAGI returning the whole page
+# instead of splitting it. Treat it as a review class, not a universal error.
 FULL_PAGE_AREA_FRAC = 0.85
+COVER_PAGE_RE = re.compile(r"(?:^|[_\-. ])(?:cover|front|title|splash)(?:$|[_\-. ])", re.IGNORECASE)
 
 # height/width past this usually means the box swallowed gutter whitespace
 # above/below the actual panel art rather than hugging it. The final video
@@ -169,6 +172,17 @@ def boxes_for_page(
     return boxes, False
 
 
+def is_likely_single_panel_page(page_path: Path, page_no: int) -> bool:
+    """True for automatic full-page boxes that are plausible cover/splash art.
+
+    A full-page crop in the middle of a chapter is risky: it can hide several
+    bordered panels inside one video beat. The first page, or a filename that
+    explicitly says cover/title/splash/front, is different enough to keep as a
+    production crop while still requiring visual review.
+    """
+    return page_no == 1 or COVER_PAGE_RE.search(page_path.stem) is not None
+
+
 def write_page_overlay(
     page_img: Image.Image,
     boxes: List[Box],
@@ -262,6 +276,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
     review_crops: List[str] = []
     suspects: List[str] = []
     full_page_boxes: List[str] = []
+    full_page_candidates: List[str] = []
     tall_panel_boxes: List[str] = []
     total_panels = 0
     crop_index = 0
@@ -285,12 +300,23 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
             if (b["x2"] - b["x1"]) * (b["y2"] - b["y1"]) >= FULL_PAGE_AREA_FRAC * W * H:
                 full_page_boxes.append(f"{page_path.name} full-page-box")
                 if override is None:
-                    # An automatic near-whole-page detection is not a crop.
-                    # Keep it visible on the overlay, but never promote it to
-                    # production panels without deliberate manual boxes.
-                    suspects.append(f"{page_path.name} automatic-full-page-box")
-                    crop_boxes = []
-                    review_message = "AUTOMATIC FULL-PAGE BOX - MANUAL CROP REQUIRED"
+                    if is_likely_single_panel_page(page_path, page_no):
+                        # Covers/title pages/splashes can genuinely be one
+                        # page-sized panel. Keep them in production so the
+                        # chapter does not lose its opening art, but keep them
+                        # listed for review because MAGI is still only a
+                        # proposal.
+                        full_page_candidates.append(
+                            f"{page_path.name} likely-cover-or-splash")
+                        review_message = "FULL-PAGE CANDIDATE - VERIFY SINGLE PANEL"
+                    else:
+                        # A normal mid-chapter automatic full-page box is not
+                        # trustworthy: it may hide multiple story panels.
+                        # Keep it visible on the overlay, but never promote it
+                        # to production without deliberate manual boxes.
+                        suspects.append(f"{page_path.name} automatic-full-page-box")
+                        crop_boxes = []
+                        review_message = "AUTOMATIC FULL-PAGE BOX - MANUAL CROP REQUIRED"
                 else:
                     # A reviewer may deliberately preserve true splash art via
                     # an override, but the result still remains review-listed.
@@ -324,6 +350,7 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         f"[{item}] pages={len(paths)} panels={total_panels} "
         f"suspects={suspects if suspects else 'none'}"
         + (f" full_page_boxes={len(full_page_boxes)}" if full_page_boxes else "")
+        + (f" full_page_candidates={len(full_page_candidates)}" if full_page_candidates else "")
         + (f" tall_panel_boxes={len(tall_panel_boxes)}" if tall_panel_boxes else "")
         + (f" archived_previous={archived}" if archived else ""),
         flush=True,
@@ -339,6 +366,10 @@ def process_item(item_dir: Path, args, overrides: Dict, verify_dir: Path) -> Dic
         # withheld from production; an explicit override can preserve a real
         # splash/title page but does not waive visual review.
         "full_page_boxes": full_page_boxes,
+        # Automatic full-page crops that were kept because they look like a
+        # cover/title/front/splash page. They are production crops, but still
+        # review-listed before narration.
+        "full_page_candidates": full_page_candidates,
         # Crops far taller than wide (>= TALL_PANEL_ASPECT_RATIO) — often a
         # box that swallowed gutter above/below the panel art instead of
         # hugging it. Check against the page overlay: if it's gutter, trim it

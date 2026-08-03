@@ -304,11 +304,11 @@ just those page names. **Overlapping override boxes are fine and often
 correct** — for diagonal panel borders, overlap beats clipping a bubble.
 
 A complete source page is forbidden as a stand-in for multiple panels. A
-no-detection fallback or near-full-page box must be manually replaced. The
-only page-sized exception is a genuinely borderless single-panel splash or
-spread; inspect it yourself, confirm it remains readable in the 16:9 video
-frame, and record an explicit `crop-review` work-note. MAGI cannot grant that
-exception.
+no-detection fallback or near-full-page box must be checked. The page-sized
+exceptions are real covers/title pages and genuinely borderless single-panel
+splashes or spreads; inspect them yourself and confirm they remain readable in
+the 16:9 video frame. Override the page only when the full-page box hides
+multiple bordered story panels.
 
 Panel naming convention (everything downstream keys on it):
 `{chapter:02d}_{page:02d}_{panel:02d}.png` in

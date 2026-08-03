@@ -103,10 +103,11 @@ and `webtoon-cutcheck`. The default is `download`.
    A crop must fully contain its panel — never a partial edge, and never the
    whole source page/strip standing in for multiple panels or for a panel with
    its own border. A no-detection fallback, near-full-page MAGI box, or
-   automatic near-full-source-strip range must be manually replaced. The only
-   exception is a genuinely borderless single-panel splash; inspect it against
-   the source and record an explicit manual accept before using it. Frame for
-   the 16:9 landscape video frame the crop will be composited into: a squarish
+   automatic near-full-source-strip range must be checked. The page-sized
+   exceptions are real covers/title pages and genuinely borderless
+   single-panel splashes; keep them when they are truly one image beat, and
+   override only when the full-page box hides multiple bordered story panels.
+   Frame for the 16:9 landscape video frame the crop will be composited into: a squarish
    (1:1-ish) crop reads fine, but a box far taller than it is wide usually
    swallowed blank gutter above/below the art rather than hugging it, and
    shrinks to an unreadable sliver once fit to 16:9. `page-split` reports

@@ -1,5 +1,6 @@
 """Unit tests for the deterministic parts of `page-split` (no MAGI/GPU needed)."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image
@@ -11,6 +12,7 @@ from mangaeasy.panels.page import (
     TALL_PANEL_ASPECT_RATIO,
     _split_exit_code,
     boxes_for_page,
+    is_likely_single_panel_page,
 )
 
 
@@ -73,11 +75,11 @@ def test_reading_order_direction_flips_row_order():
     assert ltr[0] is left and ltr[1] is right
 
 
-def _process_single_page(tmp_path, monkeypatch, detection, overrides=None):
+def _process_single_page(tmp_path, monkeypatch, detection, overrides=None, page_name="001.png"):
     item_dir = tmp_path / "project" / "01"
     source = item_dir / "download"
     source.mkdir(parents=True)
-    Image.new("RGB", (100, 100), "white").save(source / "001.png")
+    Image.new("RGB", (100, 100), "white").save(source / page_name)
     verify_dir = tmp_path / "work" / "page_verify" / "project"
     stale_dir = verify_dir / "01"
     stale_dir.mkdir(parents=True)
@@ -101,6 +103,13 @@ def _process_single_page(tmp_path, monkeypatch, detection, overrides=None):
     return item_dir, verify_dir, report
 
 
+def test_likely_single_panel_page_is_limited_to_covers_and_first_pages():
+    assert is_likely_single_panel_page(Path("001.png"), 1)
+    assert is_likely_single_panel_page(Path("chapter_cover.png"), 8)
+    assert is_likely_single_panel_page(Path("05-title-page.jpg"), 8)
+    assert not is_likely_single_panel_page(Path("023.png"), 23)
+
+
 def test_no_detection_writes_obvious_overlay_but_no_production_crop(
     tmp_path, monkeypatch
 ):
@@ -120,7 +129,7 @@ def test_no_detection_writes_obvious_overlay_but_no_production_crop(
         assert r > 150 and g < 40 and b < 40
 
 
-def test_automatic_full_page_box_is_review_only_not_a_production_crop(
+def test_automatic_first_page_full_page_box_is_kept_as_reviewed_candidate(
     tmp_path, monkeypatch
 ):
     item_dir, _verify_dir, report = _process_single_page(
@@ -128,10 +137,49 @@ def test_automatic_full_page_box_is_review_only_not_a_production_crop(
     )
 
     assert report["review_required"] is True
-    assert report["panels"] == 0
+    assert report["panels"] == 1
     assert report["full_page_boxes"] == ["001.png full-page-box"]
-    assert "001.png automatic-full-page-box" in report["suspects"]
-    assert list((item_dir / "panels").glob("*.jpg")) == []
+    assert report["full_page_candidates"] == ["001.png likely-cover-or-splash"]
+    assert report["suspects"] == []
+    assert (item_dir / "panels" / "01_001_01.jpg").is_file()
+
+
+def test_mid_chapter_automatic_full_page_box_is_review_only_not_a_production_crop(
+    tmp_path, monkeypatch
+):
+    item_dir = tmp_path / "project" / "01"
+    source = item_dir / "download"
+    source.mkdir(parents=True)
+    Image.new("RGB", (100, 100), "white").save(source / "001.png")
+    Image.new("RGB", (100, 100), "white").save(source / "002.png")
+    verify_dir = tmp_path / "work" / "page_verify" / "project"
+    args = SimpleNamespace(
+        source_subdir="download",
+        panels_subdir="panels",
+        sort="numeric",
+        force_style=True,
+        device="cpu",
+        dtype="fp32",
+        reading_direction="ltr",
+        prefix_template="{item}_",
+    )
+    monkeypatch.setattr(
+        page_module,
+        "run_batch_detect",
+        lambda *_args, **_kwargs: {
+            "001.png": {"panels": [[0, 0, 50, 50]]},
+            "002.png": {"panels": [[0, 0, 100, 100]]},
+        },
+    )
+
+    report = page_module.process_item(item_dir, args, {}, verify_dir)
+
+    assert report["review_required"] is True
+    assert report["panels"] == 1
+    assert report["full_page_boxes"] == ["002.png full-page-box"]
+    assert "002.png automatic-full-page-box" in report["suspects"]
+    assert report["full_page_candidates"] == []
+    assert not (item_dir / "panels" / "01_002_01.jpg").exists()
 
 
 def test_explicit_full_page_override_is_saved_but_still_review_listed(

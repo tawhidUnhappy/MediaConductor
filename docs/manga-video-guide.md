@@ -191,8 +191,8 @@ both failures are silent.
 - MAGI boxes and DeepSeek OCR are unverified proposals, never approvals or
   ground truth. A vision-capable reviewer should inspect flagged/suspect crop
   outputs first, sample clean outputs, and broaden if errors appear. Multi-panel
-  source pages cannot be used as production stand-ins; only a manually
-  confirmed, genuinely borderless splash may remain page-sized.
+  source pages cannot be used as production stand-ins; covers/title pages and
+  confirmed, genuinely borderless splashes may remain page-sized.
 - Generated output is archived (`old/run_NNNN/`), never overwritten
   silently; use `video-clean-*` commands to clear it, never raw deletes.
 - Volume flags are dB-native (negative = quieter), e.g.

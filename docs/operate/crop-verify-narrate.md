@@ -136,14 +136,14 @@ often fails:
 
 - `<page> no-panels` — MAGI found nothing. No production crop is emitted for
   that page; supply deliberate manual boxes before continuing.
-- `<page> full-page-box` — a single box covers most of the sheet; MAGI likely
-  failed to split a multi-panel page.
+- `<page> full-page-box` — a single box covers most of the sheet. It may be a
+  real cover/splash, or MAGI may have failed to split a multi-panel page.
 
-A complete source page must never stand in for its component panels. The only
-page-sized exception is a genuinely borderless single-panel splash or spread:
-open it at full resolution, confirm there are no separate panels or unreadable
-story bubbles, and record the explicit manual accept in a `crop-review`
-work-note. MAGI cannot grant that exception.
+A complete source page must never stand in for its component panels. The
+page-sized exceptions are covers/title pages and genuinely borderless
+single-panel splashes or spreads: open them at full resolution and confirm
+there are no separate bordered panels or unreadable story bubbles. Override a
+full-page box only when it hides multiple story panels.
 
 Fix a page with `--overrides` (JSON keyed by item → page filename → pixel
 boxes that **fully replace** MAGI's boxes for that page):

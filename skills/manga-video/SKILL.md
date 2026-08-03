@@ -46,7 +46,10 @@ LLM agent, inspect page overlays and resulting crops before narration, starting
 with flagged/suspect outputs and then sampling clean runs before broadening only
 when the sample finds errors. Never use a complete source page or strip as a
 stand-in for its component panels. A genuinely borderless single-panel splash is
-the only exception, and it must be inspected and explicitly recorded as an accept.
+the exception, and covers/title pages are often exactly that. Treat automatic
+full-page outputs as review candidates: accept them when the page is truly one
+panel or cover art, and override them only when they hide multiple bordered
+story panels.
 
 Token and GPU budget are product quality inputs. Prefer native vision over
 DeepSeek OCR for ordinary, readable dialogue: OCR is useful only for tiny/dense
