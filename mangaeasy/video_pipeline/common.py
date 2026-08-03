@@ -130,7 +130,19 @@ def _format_item(number: int, width: int) -> str:
     return f"{number:0{width}d}"
 
 
-def expand_item_tokens(tokens: list[str] | None, width: int = 2) -> list[str] | None:
+ITEM_RANGE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:-|\.\.|:)\s*(\d+(?:\.\d+)?)")
+
+
+def is_item_range_token(token: str) -> bool:
+    return ITEM_RANGE_RE.fullmatch(token.strip()) is not None
+
+
+def expand_item_tokens(
+    tokens: list[str] | None,
+    width: int = 2,
+    *,
+    expand_ranges: bool = True,
+) -> list[str] | None:
     if not tokens:
         return None
 
@@ -140,12 +152,15 @@ def expand_item_tokens(tokens: list[str] | None, width: int = 2) -> list[str] | 
             if not token:
                 continue
 
-            range_match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:-|\.\.|:)\s*(\d+(?:\.\d+)?)", token)
+            range_match = ITEM_RANGE_RE.fullmatch(token)
             if range_match:
-                start = int(float(range_match.group(1)))
-                end = int(float(range_match.group(2)))
-                step = 1 if end >= start else -1
-                expanded.extend(_format_item(number, width) for number in range(start, end + step, step))
+                if expand_ranges:
+                    start = int(float(range_match.group(1)))
+                    end = int(float(range_match.group(2)))
+                    step = 1 if end >= start else -1
+                    expanded.extend(_format_item(number, width) for number in range(start, end + step, step))
+                else:
+                    expanded.append(token)
                 continue
 
             if token.isdigit():
@@ -178,7 +193,7 @@ def _parse_selection_specs(selected: list[str] | None) -> tuple[list[tuple[float
                 tokens.append(part)
 
     for token in tokens:
-        range_match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:-|\.\.|:)\s*(\d+(?:\.\d+)?)", token)
+        range_match = ITEM_RANGE_RE.fullmatch(token)
         if range_match:
             v1 = float(range_match.group(1))
             v2 = float(range_match.group(2))
@@ -217,7 +232,7 @@ def merge_item_selection(items: list[str] | None, item_range: str | None) -> lis
         tokens.extend(items)
     if item_range:
         tokens.append(item_range)
-    return expand_item_tokens(tokens)
+    return expand_item_tokens(tokens, expand_ranges=False)
 
 
 def _sort_key(path: Path) -> tuple[int, float, str]:

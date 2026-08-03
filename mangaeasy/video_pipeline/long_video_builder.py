@@ -10,6 +10,7 @@ from mangaeasy.defaults import default_music_volume_db
 from mangaeasy.utils import archive_before_overwrite
 from mangaeasy.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem, load_narration
 from mangaeasy.video_pipeline.common import (
+    _parse_selection_specs,
     item_dirs,
     item_value,
     merge_item_selection,
@@ -99,6 +100,11 @@ def discover_chapters(folder: Path) -> dict[str, Path]:
 def selected_range(config: LongVideoConfig, chapters: dict[str, Path]) -> tuple[float, float]:
     selected = merge_item_selection(config.items, config.item_range)
     if selected:
+        intervals, _wanted_names, wanted_values = _parse_selection_specs(selected)
+        bounds = [value for interval in intervals for value in interval]
+        bounds.extend(wanted_values)
+        if bounds:
+            return min(bounds), max(bounds)
         return min(item_value(chapter) for chapter in selected), max(item_value(chapter) for chapter in selected)
     if config.end:
         return item_value(config.start), item_value(config.end)
@@ -117,7 +123,7 @@ def included_chapters(
     genuine source gap (``allow_gaps`` skips it with a warning)."""
     values = {name: item_value(name) for name in chapters}
     covered = {int(v) for v in values.values() if v == int(v)}
-    first_integer = math.ceil(start)
+    first_integer = max(1, math.ceil(start))
     last_integer = math.floor(end)
     gaps = [n for n in range(first_integer, last_integer + 1) if n not in covered]
     included = sorted((name for name, v in values.items() if start <= v <= end),

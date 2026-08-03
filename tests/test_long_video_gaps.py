@@ -68,6 +68,23 @@ def test_exact_decimal_selection_does_not_collapse_to_its_integer_sibling():
     assert gaps == []
 
 
+def test_selected_range_includes_decimals_inside_integer_bounds():
+    chapters = _chapters("01", "01.1", "02", "04.5", "05")
+    config = LongVideoConfig(
+        project_root=Path("."),
+        output_root=Path("."),
+        work_dir=Path("."),
+        item_range="01-05",
+    )
+
+    start, end = selected_range(config, chapters)
+    names, gaps = included_chapters(chapters, start, end, allow_gaps=True)
+
+    assert (start, end) == (0.0, 5.0)
+    assert names == ["01", "01.1", "02", "04.5", "05"]
+    assert gaps == [3, 4]
+
+
 def test_default_range_keeps_a_trailing_decimal_item():
     chapters = _chapters("01", "02", "2.1")
     config = LongVideoConfig(

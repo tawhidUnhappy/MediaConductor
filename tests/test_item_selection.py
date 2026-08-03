@@ -37,7 +37,7 @@ def test_non_numeric_tokens_pass_through():
 
 
 def test_merge_items_and_range():
-    assert merge_item_selection(["01"], "03-04") == ["01", "03", "04"]
+    assert merge_item_selection(["01"], "03-04") == ["01", "03-04"]
     assert merge_item_selection(None, None) is None
 
 
@@ -76,9 +76,15 @@ def test_decimal_items_sort_by_value(tmp_path):
 
 
 def test_range_selects_decimal_chapters_in_interval(tmp_path):
-    _mk(tmp_path, "01", "02", "08", "09", "09.1", "09.2", "10", "11", "12")
+    _mk(tmp_path, "01", "01.1", "02", "04.5", "05", "08", "09", "09.1", "09.2", "10", "11", "12")
+    assert [p.name for p in item_dirs(tmp_path, merge_item_selection(None, "01-05"))] == [
+        "01", "01.1", "02", "04.5", "05"
+    ]
+    assert [p.name for p in item_dirs(tmp_path, merge_item_selection(["01-05"], None))] == [
+        "01", "01.1", "02", "04.5", "05"
+    ]
     assert [p.name for p in item_dirs(tmp_path, ["1-12"])] == [
-        "01", "02", "08", "09", "09.1", "09.2", "10", "11", "12"
+        "01", "01.1", "02", "04.5", "05", "08", "09", "09.1", "09.2", "10", "11", "12"
     ]
     assert [p.name for p in item_dirs(tmp_path, ["8-10"])] == [
         "08", "09", "09.1", "09.2", "10"
@@ -95,4 +101,3 @@ def test_range_starting_at_one_includes_zero_point_x_chapters(tmp_path):
     assert [p.name for p in item_dirs(tmp_path, ["1-13"])] == [
         "0.1", "0.2", "01", "02", "09", "13"
     ]
-

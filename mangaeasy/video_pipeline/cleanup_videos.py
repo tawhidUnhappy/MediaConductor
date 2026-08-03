@@ -8,6 +8,8 @@ from mangaeasy.video_pipeline.common import (
     DEFAULT_OUTPUT_ROOT,
     DEFAULT_PROJECT_ROOT,
     count_files,
+    is_item_range_token,
+    item_dirs,
     merge_item_selection,
     project_name,
 )
@@ -82,7 +84,14 @@ def safe_targets(
 def main() -> int:
     args = parse_args()
     name = project_name(args.project_root, args.project_name)
-    chapters = merge_item_selection(args.items, args.item_range)
+    selection = merge_item_selection(args.items, args.item_range)
+    chapters = None
+    if selection:
+        selected_dirs = item_dirs(args.project_root.resolve(), selection)
+        chapters = [path.name for path in selected_dirs]
+        for token in selection:
+            if not is_item_range_token(token) and token not in chapters:
+                chapters.append(token)
     targets = safe_targets(args.output_root, name, args.include_legacy and not chapters, chapters, args.include_long)
 
     if not targets:
