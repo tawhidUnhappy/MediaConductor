@@ -33,6 +33,13 @@ proposals are cheaper than asking the LLM to rediscover every panel from full
 pages; the LLM verifies and fixes those proposals. Inspect flagged/suspect
 artifacts first, sample clean outputs, and broaden only when errors appear.
 
+Every crop in `panels/` is production content. The generated video must include
+every panel in order with narration and motion-comic animation; do not use
+omission decisions to skip credits, notices, SFX-only panels, or weak story
+beats. If a crop should not be in the video, fix the crop set before
+narration. Use `panel-reading-sheets` before writing narration so the LLM reads
+bounded multi-panel sheets instead of spending tokens constructing them.
+
 **Review is recorded, never asserted.** There is no confirmation boolean
 anywhere in the CLI or the MCP schema. Approvals are bound to the exact bytes
 they cover and can be recorded by a human or an LLM agent:

@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from mangaeasy.audio.narration_safety import narration_quality_findings
+from mangaeasy.video_pipeline.common import IMAGE_EXTENSIONS  # noqa: F401  (single home: common.py)
 from mangaeasy.video_pipeline.common import project_name
 from mangaeasy.video_pipeline.ffmpeg_tools import probe_duration
 from mangaeasy.video_pipeline.narration_contract import validate_item_narration
 
 
-from mangaeasy.video_pipeline.common import IMAGE_EXTENSIONS  # noqa: F401  (single home: common.py)
+def fallback_motion() -> dict:
+    return {"type": "slow_zoom_in", "focus_x": 0.5, "focus_y": 0.45, "strength": 0.075}
+
+
+def frame_aligned_duration(audio_duration: float, fps: int) -> tuple[float, int]:
+    frames = max(1, math.ceil(audio_duration * fps))
+    return frames / fps, frames
 
 
 @dataclass(frozen=True)
@@ -20,11 +27,8 @@ class PanelAsset:
     audio_duration: float
     visual_duration: float
     frame_count: int
-
-
-def frame_aligned_duration(audio_duration: float, fps: int) -> tuple[float, int]:
-    frames = max(1, math.ceil(audio_duration * fps))
-    return frames / fps, frames
+    motion: dict = field(default_factory=fallback_motion)
+    pause_after_ms: int = 0
 
 
 def load_narration(item_dir: Path, *, require_files: bool = True) -> list[dict]:
@@ -83,6 +87,31 @@ def item_narration_path(audio_root: Path, project_root: Path, project_name_overr
     return item_narration_dir(audio_root, project_root, project_name_override) / f"item_{item_dir.name}_narration.wav"
 
 
+def panel_filenames(item_dir: Path, panels_subdir: str = "panels") -> list[str]:
+    panels_dir = Path(item_dir) / panels_subdir
+    if not panels_dir.is_dir():
+        return []
+    return sorted(
+        path.name
+        for path in panels_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+    )
+
+
+def assert_all_panels_narrated(item_dir: Path, entries: list[dict]) -> None:
+    panels = panel_filenames(item_dir)
+    narrated = [entry["image"] for entry in entries if isinstance(entry, dict) and entry.get("image")]
+    missing = [name for name in panels if name not in narrated]
+    if missing:
+        shown = ", ".join(missing[:20])
+        more = f"\n  ... and {len(missing) - 20} more" if len(missing) > 20 else ""
+        raise ValueError(
+            f"{item_dir.name}: {len(missing)} cropped panel(s) have no narration and "
+            f"would be skipped by the video: {shown}{more}. Strict mode requires every "
+            "panel in panels/ to appear in narration.json or intro.json."
+        )
+
+
 def collect_panel_assets(
     item_dir: Path,
     *,
@@ -93,7 +122,9 @@ def collect_panel_assets(
 ) -> list[PanelAsset]:
     assets: list[PanelAsset] = []
     audio_dir = item_audio_dir(audio_root, project_root, project_name_override, item_dir)
-    for item in load_narration(item_dir):
+    entries = load_narration(item_dir)
+    assert_all_panels_narrated(item_dir, entries)
+    for index, item in enumerate(entries):
         image_name = item.get("image")
         if not image_name:
             raise ValueError(f"Missing image key in {item_dir / 'narration.json'}")
@@ -104,6 +135,34 @@ def collect_panel_assets(
         if not audio_path.exists():
             raise FileNotFoundError(f"Missing audio for {image_name}: {audio_path}. Run generate_audio.py first.")
         audio_duration = probe_duration(audio_path)
-        visual_duration, frame_count = frame_aligned_duration(audio_duration, fps)
-        assets.append(PanelAsset(image_path, audio_path, audio_duration, visual_duration, frame_count))
+        pause_after_ms = int(item.get("pause_after_ms") or 0)
+        visual_duration, frame_count = frame_aligned_duration(
+            audio_duration + pause_after_ms / 1000.0,
+            fps,
+        )
+        motion = item.get("motion") or default_motion(index, len(entries))
+        assets.append(
+            PanelAsset(
+                image_path,
+                audio_path,
+                audio_duration,
+                visual_duration,
+                frame_count,
+                motion,
+                pause_after_ms,
+            )
+        )
     return assets
+
+
+def default_motion(index: int, _total: int) -> dict:
+    """Readable motion-comic default for panels without explicit direction."""
+    cycle = (
+        {"type": "slow_zoom_in", "focus_x": 0.50, "focus_y": 0.45, "strength": 0.075},
+        {"type": "pan_right", "focus_x": 0.50, "focus_y": 0.50, "strength": 0.065},
+        {"type": "slow_zoom_out", "focus_x": 0.50, "focus_y": 0.50, "strength": 0.065},
+        {"type": "pan_left", "focus_x": 0.50, "focus_y": 0.50, "strength": 0.065},
+        {"type": "pan_up", "focus_x": 0.50, "focus_y": 0.48, "strength": 0.055},
+        {"type": "pan_down", "focus_x": 0.50, "focus_y": 0.52, "strength": 0.055},
+    )
+    return cycle[index % len(cycle)]

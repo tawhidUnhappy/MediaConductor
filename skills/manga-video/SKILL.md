@@ -30,6 +30,12 @@ steps, `job-start` for long work, native vision for ordinary readable panels,
 DeepSeek OCR only as a selective second opinion, and MAGI as the paged-manga
 box proposer that LLM vision verifies.
 
+Strict video coverage is part of that contract: every image in `panels/` must
+be narrated and rendered in order. Use `panel-reading-sheets` before narration
+to get bounded multi-panel sheets, then write the JSON from the original crops.
+Do not rely on `panel-decisions` to skip production panels; it is legacy audit
+metadata only.
+
 At the narration stage, also read
 [references/narration.md](references/narration.md) for the file schema, grounded
 authoring rules, and review loop.

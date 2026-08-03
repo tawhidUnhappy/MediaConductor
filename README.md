@@ -18,7 +18,7 @@ download / import            MangaDex or your own chapter files
 → crop                       webtoon strips or paged manga (MAGI)
 → VERIFY CROPS               every overlay and crop, recorded as a review
 → narrate                    from the panels; OCR is a cross-check, not a source
-→ account for every panel    narrated, or a recorded omission decision
+→ cover every panel          each cropped panel is narrated and rendered
 → TTS                        Kokoro or IndexTTS, provenance-bound
 → render → join → BGM        one final whole-mix normalize
 → measure the encoded file   loudness, drift, black/frozen frames, silence
@@ -154,11 +154,12 @@ reviewed one once it exists.
 
 Related gates:
 
-- `mangaeasy panel-decisions` — every cropped panel must be narrated or
-  carry a hash-bound omission decision (`credit`, `scanlator_notice`,
-  `decorative`, `duplicate`, `sfx_only`, `platform_safety`, `other`).
-  It records content decisions only; source clearance remains solely the
-  operator's responsibility and is not a mangaEasy gate.
+- `mangaeasy panel-reading-sheets` — creates bounded 3–8 panel sheets before
+  narration so the LLM reads panels in order without spending tokens deciding
+  how to build contact sheets.
+- `mangaeasy narration-check` — requires every cropped panel to be narrated.
+  Legacy `panel-decisions` records remain as an audit trail, but omissions no
+  longer satisfy production coverage.
 - `mangaeasy video-quality` — measures the *encoded* deliverable, not the
   pre-encode filter, and extracts frames for the readability pass.
 

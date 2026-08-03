@@ -151,16 +151,19 @@ and `webtoon-cutcheck`. The default is `download`.
    Use exactly the established names in narration. OCR may suggest a spelling,
    but confirm it against the panel before recording it as fact.
 
-7. Read [narration.md](narration.md). Write one grounded
-   `<chapter>/narration.json`, structurally check it, render semantic review
-   sheets, and inspect every sheet:
+7. Read [narration.md](narration.md). Render bounded reading sheets first, then
+   write one grounded `<chapter>/narration.json` that covers every crop,
+   structurally check it, render semantic review sheets, and inspect every
+   sheet:
 
    ```bash
+   <mc> panel-reading-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
    <mc> narration-check --project-root D:/MediaProjects/library/example --items 01 --json
    <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
    ```
 
-   Open the original crop while reviewing every line. Focus first on entries
+   Use the reading sheets for sequence and cost control, but open the original
+   crop while writing and reviewing every line. Focus first on entries
    with OCR disagreement, uncertain speakers, dense text, unusual chronology,
    or awkward prose; then sample straightforward entries. If the sample finds
    errors, broaden the pass. Fix incorrect panel descriptions, dialogue meaning, speaker
@@ -168,9 +171,10 @@ and `webtoon-cutcheck`. The default is `download`.
    reason to re-read the pixels, not to overwrite them. Recap prose should
    connect already-established cause, choice, and consequence, keep pronouns
    clear, vary sentence openings, and avoid robotic panel-by-panel inventory.
-   It must not invent motives, facts, dialogue, or future knowledge. Rerun both
-   checks after every edit. Before proceeding to rendering, record crop and narration
-   reviews using `manga-review crop` and `manga-review narration` with your agent identity.
+   It must not invent motives, facts, dialogue, future knowledge, or skip any
+   panel. Rerun both checks after every edit. Before proceeding to rendering,
+   record crop and narration reviews using `manga-review crop` and
+   `manga-review narration` with your agent identity.
 
 8. Build using explicit roots. This complete foreground form is useful only
    when the harness can keep a long task alive:

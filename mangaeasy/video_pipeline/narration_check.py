@@ -13,9 +13,9 @@ generation. Three passes, one report:
 2. **Quality** — unspeakable text (phonetic screams, copied stammers, empty
    lines) is a problem; editorial style findings (repetition, meta phrasing,
    beats too short or too long) are warnings.
-3. **Coverage** — every cropped panel must be narrated or carry a recorded
-   omission decision (``mangaeasy panel-decisions``). An un-narrated,
-   un-decided panel is a problem, not an unfalsifiable warning.
+3. **Coverage** — every cropped panel must be narrated. Omission decisions are
+   retained as an audit trail for older projects, but no longer satisfy the
+   production video gate because strict output must include every panel.
 
 This is the machine half of narration verification. The semantic half — is
 the narration faithful to the panels, is dialogue attributed to the right
@@ -34,6 +34,7 @@ from pathlib import Path
 from mangaeasy.audio.narration_safety import narration_quality_findings
 from mangaeasy.brand import CLI_NAME
 from mangaeasy.panel_decisions import audit_item as audit_panel_decisions
+from mangaeasy.video_pipeline.item_assets import panel_filenames
 from mangaeasy.video_pipeline.narration_contract import (
     NarrationContractError,
     narration_problems,
@@ -66,25 +67,28 @@ def check_item(item_dir: Path) -> dict:
         message = f"{finding.beat}: {finding.message}"
         (problems if finding.is_error else warnings).append(message)
 
-    decisions = audit_panel_decisions(item_dir, [entry["image"] for entry in entries])
-    uncovered = decisions["unaccounted"]
+    narrated = [entry["image"] for entry in entries]
+    panels = panel_filenames(item_dir)
+    uncovered = [name for name in panels if name not in narrated]
     if uncovered:
         problems.append(
-            f"{len(uncovered)} panel image(s) are neither narrated nor recorded as a "
-            "deliberate omission: "
+            f"{len(uncovered)} cropped panel image(s) have no narration and would be skipped: "
             + ", ".join(uncovered[:5]) + ("…" if len(uncovered) > 5 else "")
-            + f". Narrate them, or run `{CLI_NAME} panel-decisions --item {item_dir.name} "
-            "--panels <image> --reason <reason> --reviewer <name>`."
+            + ". Strict mode requires every panel in panels/ to appear in narration.json "
+            "or intro.json."
         )
+    decisions = audit_panel_decisions(item_dir, narrated)
     for stale in decisions["stale_decisions"]:
         problems.append(f"{stale['panel']}: {stale['detail']}")
     if decisions["decided"]:
-        warnings.append(
-            f"{len(decisions['decided'])} panel(s) deliberately omitted: "
+        problems.append(
+            f"{len(decisions['decided'])} panel(s) have obsolete omission decisions that no "
+            "longer satisfy production coverage: "
             + ", ".join(
                 f"{entry['panel']} ({entry['reason']})" for entry in decisions["decided"][:5]
             )
             + ("…" if len(decisions["decided"]) > 5 else "")
+            + ". Narrate these panels instead."
         )
 
     return {
@@ -106,7 +110,7 @@ def main() -> int:
         description="Validate narration.json/intro.json per item against the strict "
                     "narration contract, lint the script for unspeakable text and "
                     "editorial repetition, and require every cropped panel to be "
-                    "narrated or recorded as a deliberate omission. Semantic review "
+                    "narrated. Semantic review "
                     "(accuracy, speaker attribution) remains an agent's reading job.",
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT,

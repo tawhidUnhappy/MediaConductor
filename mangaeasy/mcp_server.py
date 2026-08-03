@@ -95,6 +95,7 @@ _PATH_ARGUMENTS: dict[str, frozenset[str]] = {
     "narration_check": frozenset({"project_root"}),
     "panel_transcript": frozenset({"project_root"}),
     "narration_edit": frozenset({"project_root"}),
+    "panel_reading_sheets": frozenset({"project_root", "work_dir", "output_root"}),
     "narration_review_sheets": frozenset({"project_root", "work_dir", "output_root"}),
     "thumbnail_candidates": frozenset({"project_root", "review_root"}),
     "thumbnail_compose": frozenset({"base", "output", "spec_json", "spec"}),

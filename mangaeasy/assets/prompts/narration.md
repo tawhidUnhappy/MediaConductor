@@ -12,6 +12,10 @@ Your task is to create narration completely from scratch for the provided manga 
   with the relevant original crop open. Spend extra attention on dense text,
   unclear speakers, reveal timing, action ambiguity, and panels whose crop or
   OCR looks suspicious.
+- Include every provided panel exactly once in playback order. Do not skip
+  credits, notices, SFX-only panels, quiet reaction panels, or low-action
+  beats. If a crop should not appear, the crop set must be fixed before
+  narration; narration.json itself must cover all panels that remain.
 - Panel pixels, bubble tails, and the established reading sequence are the
   source of truth. MAGI boxes and DeepSeek OCR are machine proposals only; they
   never approve a crop or establish dialogue.
@@ -38,6 +42,9 @@ Your task is to create narration completely from scratch for the provided manga 
 - The prose must be original and source-grounded, not a copied transcript and
   not an invented rewrite.
 - Write like a clear, professional YouTube manga recap narrator.
+- Write a full motion-comic/anime-style narration track, not a short summary.
+  Each panel needs enough grounded narration for the rendered video to feel
+  continuous and intentional.
 - Keep the storytelling calm, immersive, and easy to follow.
 - Keep the pacing smooth and steady.
 - Add important contextual details, emotions, atmosphere, body language, and action descriptions when relevant.

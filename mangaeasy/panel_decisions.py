@@ -1,15 +1,12 @@
-"""Account for every cropped panel: narrated, or deliberately omitted.
+"""Legacy/audit ledger for deliberate panel omission decisions.
 
-``narration-check`` used to report un-narrated panels as a bare warning
-("fine for credits/banners/SFX; confirm none is a story panel"). That warning
-is unfalsifiable — nothing records that a human actually confirmed it, so a
-dropped story panel and a skipped credits page look identical in every report,
-and both survive to the render.
+Production coverage now requires every cropped panel to be narrated and
+rendered. Older projects may still carry omission decisions, and this module
+keeps those records hash-bound and auditable so stale metadata cannot silently
+survive a re-crop.
 
-This module makes the omission explicit. Every panel that carries no narration
-entry needs a recorded decision with a reason from a fixed vocabulary, bound to
-the panel's SHA-256 so a re-crop invalidates it rather than silently inheriting
-approval for different pixels.
+This is a legacy content/quality ledger only. It does not satisfy the current
+production video gate, and it is not a source-clearance or permission gate.
 
 Records live in ``<item>/panel_decisions.json``.
 """
@@ -159,7 +156,7 @@ def audit_item(
     *,
     panels_subdir: str = "panels",
 ) -> dict:
-    """Report every panel that is neither narrated nor deliberately omitted.
+    """Report every panel that is neither narrated nor in the legacy omission ledger.
 
     ``narrated_images`` defaults to the item's own contract-valid narration.
     A panel whose bytes changed since its decision was recorded counts as
@@ -245,9 +242,9 @@ def audit_problems(item_dir: Path, narrated_images: Sequence[str] | None = None)
         shown = ", ".join(report["unaccounted"][:5])
         more = "…" if len(report["unaccounted"]) > 5 else ""
         problems.append(
-            f"{len(report['unaccounted'])} panel(s) are neither narrated nor deliberately "
-            f"omitted: {shown}{more}. Narrate them, or record the omission with "
-            f"`{CLI_NAME} panel-decisions`."
+            f"{len(report['unaccounted'])} panel(s) are neither narrated nor in the "
+            f"legacy omission ledger: {shown}{more}. Production video still requires "
+            "narrating every panel."
         )
     for entry in report["stale_decisions"]:
         problems.append(f"{entry['panel']}: {entry['detail']}")
@@ -259,8 +256,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} panel-decisions",
-        description="Record and audit deliberate panel omissions so every cropped "
-                    "panel is either narrated or explicitly skipped for a stated reason.",
+        description="Record and audit legacy deliberate panel omissions. Production "
+                    "video still requires every cropped panel to be narrated.",
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
     parser.add_argument("--items", nargs="*", help="Item folders/ranges (default: all).")

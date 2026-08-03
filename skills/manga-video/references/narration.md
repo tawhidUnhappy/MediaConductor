@@ -71,15 +71,18 @@ attribution consistent across adjacent panels and chapters. Do not use future
 knowledge, reveal a name early, invent dialogue, motives, causes, or off-panel
 events, or turn an OCR guess into fact.
 
-Write a recap/explanation, not alt text or a bubble transcript. Each line
+Write a recap/explanation, not alt text or a bubble transcript. Every crop in
+`panels/` must have one narration entry in playback order; omissions do not
+satisfy production coverage. Each line
 should carry one current story beat and, when supported, connect an
 already-established cause, decision, consequence, contrast, or stake. Keep
 pronouns unambiguous, orient the listener when time/place/speaker changes, and
 vary sentence openings and sentence shape. Avoid robotic inventories
 (`"Then he..."` on every panel), filler, meta wording such as `"the panel
-shows"`, and repeated paraphrases. Avoid narrating credits, scanlator notices,
-and purely decorative/SFX panels unless they carry story information. Keep
-array order equal to the intended reading/playback order.
+shows"`, and repeated paraphrases. If credits, scanlator notices, or
+decorative/SFX-only images remain in `panels/`, narrate them briefly and
+factually; otherwise fix the crop set before narration. Keep array order equal
+to the intended reading/playback order.
 
 **Voice delivery is always restrained.** Describe dramatic events and
 characters' reactions accurately while the narrator remains a calm observer.
@@ -98,12 +101,16 @@ the audio/render preflight refuses to proceed if one remains.
 Run both gates:
 
 ```bash
+<mc> panel-reading-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
 <mc> narration-check --project-root D:/MediaProjects/library/example --items 01 --json
 <mc> narration-review-sheets --project-root D:/MediaProjects/library/example --items 01 --work-dir D:/MediaProjects/work
 ```
 
-`narration-check` verifies structure and file references. It cannot establish
-semantic accuracy. Use review sheets as an index: inspect OCR disagreements,
+`panel-reading-sheets` is the cheap pre-narration reading pass: bounded 3-8
+panel grids let the LLM follow sequence without spending tokens building its
+own contact sheets. `narration-check` verifies structure, file references, and
+strict all-panel coverage. It cannot establish semantic accuracy. Use review
+sheets as an index: inspect OCR disagreements,
 uncertain speakers, dense text, chronology changes, repetitive/robotic prose,
 unclear pronouns, and awkward spoken phrasing first, then sample
 straightforward entries. If the sample finds errors, broaden the pass. Compare

@@ -150,6 +150,48 @@ def render_blurred_panel_frame(image_path: Path, frame_path: Path, config: Video
         tmp_path.unlink(missing_ok=True)
 
 
+def _motion_expr(motion: dict, frame_count: int) -> tuple[str, str, str]:
+    motion_type = str((motion or {}).get("type") or "slow_zoom_in")
+    strength = float((motion or {}).get("strength", 0.07) or 0.0)
+    focus_x = float((motion or {}).get("focus_x", 0.5) or 0.5)
+    focus_y = float((motion or {}).get("focus_y", 0.5) or 0.5)
+    denom = max(1, frame_count - 1)
+    strength = max(0.0, min(0.25, strength))
+    focus_x = max(0.0, min(1.0, focus_x))
+    focus_y = max(0.0, min(1.0, focus_y))
+
+    if motion_type == "none" or strength <= 0:
+        return "1", "(iw-iw/zoom)*0.5", "(ih-ih/zoom)*0.5"
+    if motion_type == "slow_zoom_out":
+        zoom = f"1+{strength:.6f}*(1-on/{denom})"
+    else:
+        zoom = f"1+{strength:.6f}*on/{denom}"
+
+    max_x = "(iw-iw/zoom)"
+    max_y = "(ih-ih/zoom)"
+    if motion_type == "pan_left":
+        return f"1+{strength:.6f}", f"{max_x}*(1-on/{denom})", f"{max_y}*{focus_y:.6f}"
+    if motion_type == "pan_right":
+        return f"1+{strength:.6f}", f"{max_x}*on/{denom}", f"{max_y}*{focus_y:.6f}"
+    if motion_type == "pan_up":
+        return f"1+{strength:.6f}", f"{max_x}*{focus_x:.6f}", f"{max_y}*(1-on/{denom})"
+    if motion_type == "pan_down":
+        return f"1+{strength:.6f}", f"{max_x}*{focus_x:.6f}", f"{max_y}*on/{denom}"
+    return zoom, f"{max_x}*{focus_x:.6f}", f"{max_y}*{focus_y:.6f}"
+
+
+def animated_frame_filter(config: VideoBuildConfig, motion: dict, frame_count: int) -> str:
+    zoom, x, y = _motion_expr(motion, frame_count)
+    return (
+        f"scale={config.width}:{config.height}:force_original_aspect_ratio=increase,"
+        f"crop={config.width}:{config.height},setsar=1,"
+        f"zoompan=z='{zoom}':x='{x}':y='{y}':d={frame_count}:"
+        f"s={config.width}x{config.height}:fps={config.fps},"
+        f"scale={config.width}:{config.height}:out_range=tv,"
+        f"fps={config.fps},format=yuv420p"
+    )
+
+
 def write_video_concat_file(paths: list[Path], work_dir: Path, chapter: str) -> Path:
     work_dir.mkdir(parents=True, exist_ok=True)
     concat_path = work_dir / f"{chapter}_segments.ffconcat"
@@ -160,10 +202,12 @@ def write_video_concat_file(paths: list[Path], work_dir: Path, chapter: str) -> 
     return concat_path
 
 
-def render_panel_segment(image_path: Path, frame_count: int, segment_path: Path, config: VideoBuildConfig) -> Path | None:
+def render_panel_segment(asset: PanelAsset, segment_path: Path, config: VideoBuildConfig) -> Path | None:
     segment_path.parent.mkdir(parents=True, exist_ok=True)
     if segment_path.exists() and not config.overwrite:
         return None
+    image_path = asset.image_path
+    frame_count = asset.frame_count
     encoder = choose_h264_encoder(config.encoder)
     if config.background_style == "blur":
         frame_path = composed_blur_frame_path(segment_path)
@@ -172,7 +216,7 @@ def render_panel_segment(image_path: Path, frame_count: int, segment_path: Path,
             [
                 "ffmpeg", "-hide_banner", "-y", "-loop", "1", "-framerate", str(config.fps),
                 "-i", str(frame_path),
-                "-vf", f"scale={config.width}:{config.height}:out_range=tv,fps={config.fps},format=yuv420p",
+                "-vf", animated_frame_filter(config, asset.motion, frame_count),
                 "-map", "0:v:0", *h264_encoder_args(encoder, config.preset, config.cq),
                 "-frames:v", str(frame_count),
                 "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
@@ -199,7 +243,7 @@ def render_panel_segment(image_path: Path, frame_count: int, segment_path: Path,
     run(
         [
             "ffmpeg", "-hide_banner", "-y", "-loop", "1", "-framerate", str(config.fps),
-            "-i", str(image_path), "-vf", video_filter(config), "-map", "0:v:0",
+            "-i", str(image_path), "-vf", animated_frame_filter(config, asset.motion, frame_count), "-map", "0:v:0",
             *h264_encoder_args(encoder, config.preset, config.cq), "-frames:v", str(frame_count),
             "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
             "-an", "-movflags", "+faststart", str(segment_path),
@@ -258,7 +302,7 @@ def build_from_segments(chapter_dir: Path, assets: list[PanelAsset], work_dir: P
             f"audio={asset.audio_duration:.3f}s visual={asset.visual_duration:.3f}s",
             flush=True,
         )
-        composed_frame = render_panel_segment(asset.image_path, asset.frame_count, segment_path, config)
+        composed_frame = render_panel_segment(asset, segment_path, config)
         if composed_frame is not None:
             composed_frames.append(composed_frame)
         segments.append(segment_path)

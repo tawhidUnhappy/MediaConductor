@@ -159,17 +159,17 @@ def check_item(item_dir: Path, args: argparse.Namespace, totals: dict[str, int],
         errors.append(f"[{item_name}] Some narration entries are missing image keys.")
     if len(set(narration_stems)) != len(narration_stems):
         errors.append(f"[{item_name}] Duplicate narration image stems.")
-    # Narrated stems missing their panel or audio are real breakage; panels
-    # deliberately left out of narration (banners, junk slivers) are only
-    # worth a warning — the list doubles as the intentional-skip audit trail.
+    # Narrated stems missing their panel or audio are real breakage, and under
+    # strict full-panel production so are cropped panels that never appear in
+    # narration. A generated video must not silently skip panels.
     missing_panels = sorted(set(narration_stems) - set(panels))
     if missing_panels:
         errors.append(f"[{item_name}] Narration references missing panel image(s): "
                       + ", ".join(missing_panels[:10]))
     unnarrated = sorted(set(panels) - set(narration_stems))
     if unnarrated:
-        warnings.append(f"[{item_name}] {len(unnarrated)} panel(s) not narrated "
-                        f"(intentional skips are normal): " + ", ".join(unnarrated[:10]))
+        errors.append(f"[{item_name}] {len(unnarrated)} panel(s) not narrated "
+                      f"(strict output would skip them): " + ", ".join(unnarrated[:10]))
     missing_audio = sorted(set(narration_stems) - set(audios))
     if missing_audio:
         errors.append(f"[{item_name}] Narrated panel(s) missing audio: "

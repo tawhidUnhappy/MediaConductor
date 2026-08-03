@@ -205,9 +205,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     "narration_check": (
         "narration-check",
         "Validate narration.json/intro.json structure per item: files parse, every entry's image "
-        "exists, image/audio stems are unique, and no narration is empty. Deliberately omitted "
-        "panels are warnings. Semantic accuracy and speaker attribution still require a "
-        "vision-capable reviewer reading the original panels.",
+        "exists, every cropped panel is narrated, image/audio stems are unique, and no narration "
+        "is empty. Legacy omission decisions are production blockers, not coverage. Semantic "
+        "accuracy and speaker attribution still require a vision-capable reviewer reading the "
+        "original panels.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS},
         ["project_root"],
         {"project_root": ("--project-root", "value"), "items": ("--items", "list")},
@@ -265,6 +266,20 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "work_dir": ("--work-dir", "value"), "output_root": ("--output-root", "value"),
          "per_sheet": ("--per-sheet", "value"),
          "only_images": ("--only-images", "list")},
+    ),
+    "panel_reading_sheets": (
+        "panel-reading-sheets",
+        "Render bounded multi-panel reading sheets before narration so the LLM can read panels "
+        "in order without inventing contact sheets. Panels per sheet are clamped to 3..8 to "
+        "avoid tiny unreadable grids or wastefully small sheets.",
+        {"project_root": _PROJECT_ROOT, "items": _ITEMS,
+         "work_dir": {**_STR, "description": "Scratch root (default: data/work)."},
+         "output_root": {**_STR, "description": "Reading-sheet output root."},
+         "per_sheet": {**_INT, "description": "Panels per sheet, clamped to 3..8 (default 6)."}},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"), "items": ("--items", "list"),
+         "work_dir": ("--work-dir", "value"), "output_root": ("--output-root", "value"),
+         "per_sheet": ("--per-sheet", "value")},
     ),
     "thumbnail_candidates": (
         "thumbnail-candidates",
@@ -475,8 +490,9 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "render_videos": (
         "video-render",
-        "Render one video per item from panels + audio after confirmed manual crop/narration "
-        "review. Needs audio to exist (run generate_audio/audio_audit first).",
+        "Render one animated motion-comic video per item from panels + audio after confirmed "
+        "manual crop/narration review. Every cropped panel must be narrated; needs audio to "
+        "exist (run generate_audio/audio_audit first).",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR,
          "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL},
         ["project_root", "audio_root", "output_root"],
@@ -770,10 +786,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "panel_decisions": (
         "panel-decisions",
-        "Account for every cropped panel: narrated, or deliberately omitted for a stated "
-        "reason bound to the panel's SHA-256. Called with panels+reason+reviewer it records "
-        "omissions; called without them it audits which panels are still unaccounted for. "
-        "Re-cropping invalidates a decision rather than silently inheriting it.",
+        "Legacy/audit ledger for deliberate panel omission decisions from older projects. "
+        "Production video no longer accepts omissions as coverage: every cropped panel in panels/ "
+        "must be narrated and rendered. Re-cropping invalidates a decision rather than silently "
+        "inheriting it.",
         {"project_root": _PROJECT_ROOT, "items": _ITEMS,
          "item": {**_STR, "description": "Item folder the recorded decisions apply to, e.g. '01'."},
          "panels": {"type": "array", "items": {"type": "string"},
@@ -834,7 +850,7 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
 JSON_COMMANDS = {"modes", "doctor", "where", "library-list", "video-check", "video-validate", "video-chapters",
                  "video-audio-audit", "youtube-profiles", "youtube-status", "youtube-upload",
                  "style-detect", "narration-check", "series-plan", "workspace-layout",
-                 "panel-decisions", "video-quality",
+                 "panel-decisions", "panel-reading-sheets", "video-quality",
                  "work-status", "work-claim", "work-note", "work-todo", "work-qa", "work-artifacts",
                  "youtube-list", "youtube-delete", "youtube-thumbnail",
                  "job-status", "jobs"}

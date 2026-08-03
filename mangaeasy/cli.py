@@ -103,6 +103,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "video-add-bgm":        ("mangaeasy.video_pipeline.add_long_video_bgm",    "main",        "Video pipeline",   "Mix background music into an already-joined long video, without rebuilding it from item clips."),
     "video-check":          ("mangaeasy.video_pipeline.check_items",           "main",        "Video pipeline",   "Validate item inputs (panels + narration.json)."),
     "narration-check":      ("mangaeasy.video_pipeline.narration_check",       "main",        "Video pipeline",   "Validate narration.json/intro.json structure: coverage, dangling images, empty text (--json)."),
+    "panel-reading-sheets": ("mangaeasy.video_pipeline.panel_reading_sheets",  "main",        "Video pipeline",   "Render bounded multi-panel reading sheets before narration."),
     "narration-review-sheets": ("mangaeasy.video_pipeline.narration_sheets",   "main",        "Video pipeline",   "Render panel + narration + unverified-OCR sheets for mandatory visual review."),
     "narration-edit":       ("mangaeasy.video_pipeline.narration_edit",        "main",        "Video pipeline",   "Upsert/delete/list narration entries from the CLI (optionally pruning stale WAVs)."),
     "video-quality":        ("mangaeasy.video_pipeline.quality_gate",          "main",        "Video pipeline",   "Measure the ENCODED output: loudness/true peak, dwell, cuts, black/frozen frames, A/V drift, silence (--json)."),
@@ -130,7 +131,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
 
     # ── Review and panel accounting (the production gates) ────────────────────
     "manga-review":         ("mangaeasy.reviews",                              "main",        "Review",  "Record/check hash-bound crop, narration, and final-video reviews (crop|narration|final-video|check)."),
-    "panel-decisions":      ("mangaeasy.panel_decisions",                      "main",        "Review",  "Account for every panel: narrated, or deliberately omitted for a stated reason."),
+    "panel-decisions":      ("mangaeasy.panel_decisions",                      "main",        "Review",  "Legacy audit ledger for old deliberate panel omissions; production must narrate every panel."),
 
     # ── External AI tool environments ─────────────────────────────────────────
     "tools":                ("mangaeasy.tools.external",                       "main",        "External tools",   "Show where manga tool envs (Kokoro/IndexTTS/MAGI/DeepSeek OCR) resolve."),

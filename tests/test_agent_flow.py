@@ -144,10 +144,10 @@ def test_narration_check_fails_on_a_panel_nobody_decided_about(item):
     report = check_item(item)
     assert not report["ok"]
     assert report["uncovered_panels"] == ["b.jpg"]
-    assert any("deliberate omission" in problem for problem in report["problems"])
+    assert any("would be skipped" in problem for problem in report["problems"])
 
 
-def test_narration_check_passes_once_the_omission_is_recorded(item):
+def test_narration_check_still_fails_when_an_omission_is_recorded(item):
     from mangaeasy.panel_decisions import record_decisions
 
     (item / "narration.json").write_text(json.dumps([
@@ -155,9 +155,10 @@ def test_narration_check_passes_once_the_omission_is_recorded(item):
     ]))
     record_decisions(item, ["b.jpg"], reason="credit", reviewer="sam")
     report = check_item(item)
-    assert report["ok"], report["problems"]
-    assert report["uncovered_panels"] == []
+    assert not report["ok"]
+    assert report["uncovered_panels"] == ["b.jpg"]
     assert report["omitted_panels"][0]["reason"] == "credit"
+    assert any("no longer satisfy production coverage" in problem for problem in report["problems"])
 
 
 def test_recorded_omission_is_invalidated_when_the_panel_changes(item):
@@ -167,7 +168,7 @@ def test_recorded_omission_is_invalidated_when_the_panel_changes(item):
         {"image": "a.jpg", "narration": "one"},
     ]))
     record_decisions(item, ["b.jpg"], reason="decorative", reviewer="sam")
-    assert check_item(item)["ok"]
+    assert not check_item(item)["ok"]
 
     # A re-crop replaces the pixels the decision was made about.
     (item / "panels" / "b.jpg").write_bytes(b"different art entirely")
