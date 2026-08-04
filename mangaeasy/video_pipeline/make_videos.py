@@ -41,6 +41,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--blur-backend", choices=("auto", "vulkan", "cpu"), default="auto")
     parser.add_argument("--background-brightness", type=float, default=-0.06)
     parser.add_argument("--background-saturation", type=float, default=1.08)
+    parser.add_argument("--panel-scale", type=float, default=1.0,
+                        help="Scale factor for the foreground panel inside the canvas (e.g. 0.90 for 90% size with 5% margin).")
     parser.add_argument("--keep-work", action="store_true")
     parser.add_argument("--render-mode", choices=("segments", "concat-images"), default="segments")
     parser.add_argument("--workers", type=int, default=3,
@@ -87,6 +89,7 @@ def main() -> int:
             blur_backend=args.blur_backend,
             background_brightness=args.background_brightness,
             background_saturation=args.background_saturation,
+            panel_scale=args.panel_scale,
             keep_work=args.keep_work,
             render_mode=args.render_mode,
             workers=args.workers,

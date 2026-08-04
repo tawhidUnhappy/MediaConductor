@@ -20,6 +20,7 @@ class BlurBackgroundOptions:
     saturation: float = 1.08
     kernel_size: int = 19
     backend: str = "auto"
+    panel_scale: float = 1.0
 
     @classmethod
     def from_mapping(cls, values: Mapping[str, Any] | None) -> "BlurBackgroundOptions":
@@ -31,6 +32,7 @@ class BlurBackgroundOptions:
             saturation=_as_float(values.get("background_saturation"), cls.saturation),
             kernel_size=_as_int(values.get("blur_kernel_size"), cls.kernel_size),
             backend=str(values.get("blur_backend") or cls.backend).lower(),
+            panel_scale=_as_float(values.get("panel_scale"), cls.panel_scale),
         )
 
 
@@ -69,13 +71,16 @@ def vulkan_kernel_size(options: BlurBackgroundOptions) -> int:
 def ffmpeg_cpu_blur_filter(width: int, height: int, options: BlurBackgroundOptions) -> str:
     small_w, small_h = blur_work_size(width, height, options)
     sigma = scaled_blur_sigma(options)
+    scale_factor = max(0.2, min(1.0, float(options.panel_scale)))
+    fg_w = max(16, int(round(width * scale_factor)))
+    fg_h = max(16, int(round(height * scale_factor)))
     return (
         "[0:v]format=rgba,split=2[bgsrc][fgsrc];"
         f"[bgsrc]scale={width}:{height}:force_original_aspect_ratio=increase,"
         f"crop={width}:{height},setsar=1,scale={small_w}:{small_h},"
         f"gblur=sigma={sigma:.3f}:steps=1,scale={width}:{height},"
         f"eq=brightness={options.brightness}:saturation={options.saturation}[bg];"
-        f"[fgsrc]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"[fgsrc]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,"
         "setsar=1,format=rgba[fg];"
         "[bg][fg]overlay=(W-w)/2:(H-h)/2,format=rgb24,setsar=1[v]"
     )
@@ -85,6 +90,9 @@ def ffmpeg_vulkan_blur_filter(width: int, height: int, options: BlurBackgroundOp
     small_w, small_h = blur_work_size(width, height, options)
     sigma = scaled_blur_sigma(options)
     kernel = vulkan_kernel_size(options)
+    scale_factor = max(0.2, min(1.0, float(options.panel_scale)))
+    fg_w = max(16, int(round(width * scale_factor)))
+    fg_h = max(16, int(round(height * scale_factor)))
     return (
         "[0:v]format=rgba,split=2[bgsrc][fgsrc];"
         f"[bgsrc]scale={width}:{height}:force_original_aspect_ratio=increase,"
@@ -93,7 +101,7 @@ def ffmpeg_vulkan_blur_filter(width: int, height: int, options: BlurBackgroundOp
         f"gblur_vulkan=sigma={sigma:.3f}:size={kernel},"
         f"scale_vulkan=w={width}:h={height},hwdownload,format=rgba,"
         f"eq=brightness={options.brightness}:saturation={options.saturation}[bg];"
-        f"[fgsrc]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"[fgsrc]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,"
         "setsar=1,format=rgba[fg];"
         "[bg][fg]overlay=(W-w)/2:(H-h)/2,format=rgb24,setsar=1[v]"
     )

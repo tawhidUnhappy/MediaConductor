@@ -57,6 +57,7 @@ class VideoBuildConfig:
     blur_backend: str = "auto"
     background_brightness: float = -0.06
     background_saturation: float = 1.08
+    panel_scale: float = 1.0
     keep_work: bool = False
     render_mode: str = "segments"
     workers: int = 1
@@ -82,6 +83,7 @@ def blur_options(config: VideoBuildConfig) -> BlurBackgroundOptions:
         backend=config.blur_backend,
         brightness=config.background_brightness,
         saturation=config.background_saturation,
+        panel_scale=config.panel_scale,
     )
 
 
@@ -89,9 +91,12 @@ def video_filter(config: VideoBuildConfig) -> str:
     width = config.width
     height = config.height
     fps = config.fps
+    scale_factor = max(0.2, min(1.0, float(config.panel_scale)))
+    fg_w = max(16, int(round(width * scale_factor)))
+    fg_h = max(16, int(round(height * scale_factor)))
     if config.background_style == "black":
         return (
-            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,"
             f"scale={width}:{height}:out_range=tv,"
             f"fps={fps},format=yuv420p"
@@ -105,7 +110,7 @@ def video_filter(config: VideoBuildConfig) -> str:
         f"crop={width}:{height},setsar=1,scale={small_w}:{small_h},"
         f"gblur=sigma={sigma:.3f}:steps=1,scale={width}:{height},"
         f"eq=brightness={config.background_brightness}:saturation={config.background_saturation}[bg];"
-        f"[fg]scale={width}:{height}:force_original_aspect_ratio=decrease,setsar=1[fg];"
+        f"[fg]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,setsar=1[fg];"
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
         f"scale={width}:{height}:out_range=tv,fps={fps},format=yuv420p"
     )
@@ -115,10 +120,13 @@ def background_image_filter(config: VideoBuildConfig) -> str:
     width = config.width
     height = config.height
     fps = config.fps
+    scale_factor = max(0.2, min(1.0, float(config.panel_scale)))
+    fg_w = max(16, int(round(width * scale_factor)))
+    fg_h = max(16, int(round(height * scale_factor)))
     return (
         f"[0:v]scale={width}:{height}:force_original_aspect_ratio=increase,"
         f"crop={width}:{height},setsar=1,format=rgba[bg];"
-        f"[1:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"[1:v]scale={fg_w}:{fg_h}:force_original_aspect_ratio=decrease,"
         f"setsar=1,format=rgba[fg];"
         f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
         f"scale={width}:{height}:out_range=tv,fps={fps},format=yuv420p[v]"

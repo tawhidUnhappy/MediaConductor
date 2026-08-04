@@ -319,6 +319,7 @@ def main() -> int:
         "--blur-backend", args.blur_backend,
         "--background-brightness", str(args.background_brightness),
         "--background-saturation", str(args.background_saturation),
+        "--panel-scale", str(args.panel_scale),
         "--audio-bitrate", args.audio_bitrate,
         "--render-mode", args.render_mode,
         "--encoder", args.encoder,
