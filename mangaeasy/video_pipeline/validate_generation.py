@@ -35,9 +35,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--require-long", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--long-video", type=Path, default=None, help="Override the long video path to validate.")
     parser.add_argument("--duration-tolerance", type=float, default=3.0)
-    parser.add_argument("--fps", type=int, default=15,
+    parser.add_argument("--fps", type=int, default=30,
                         help="Render fps used for frame-aligned durations (must match "
-                             "video-render's --fps; default 15).")
+                             "video-render's --fps; default 30).")
     parser.add_argument(
         "--json",
         action="store_true",

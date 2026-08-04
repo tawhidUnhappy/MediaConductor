@@ -45,7 +45,7 @@ class VideoBuildConfig:
     overwrite: bool = False
     width: int = 1920
     height: int = 1080
-    fps: int = 15
+    fps: int = 30
     encoder: str = "auto"
     preset: str = "p5"
     cq: int = 18

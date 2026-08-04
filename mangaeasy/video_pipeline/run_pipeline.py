@@ -165,7 +165,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--encoder", default="auto")
     parser.add_argument("--video-preset", default="p5")
     parser.add_argument("--cq", type=int, default=18)
-    parser.add_argument("--fps", type=int, default=15)
+    parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--video-workers", type=int, default=3,
                          help="Item folders to render in parallel. NVENC consumer GPUs typically "
                               "cap at ~3 concurrent encode sessions, so going much higher than "

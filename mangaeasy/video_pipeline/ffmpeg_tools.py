@@ -136,7 +136,7 @@ def encoder_works(encoder: str) -> bool:
         runtime.run(
             [
                 "ffmpeg", "-hide_banner", "-loglevel", "error",
-                "-f", "lavfi", "-i", "color=c=black:s=64x64:d=1",
+                "-f", "lavfi", "-i", "color=c=black:s=256x256:d=1",
                 "-frames:v", "1", "-c:v", encoder,
                 "-f", "null", os.devnull,
             ],
