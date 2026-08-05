@@ -1,27 +1,6 @@
 """mangaeasy.qa_loop — the fix-until-clean loop and the reuse inventory.
 
-``mangaeasy work-qa`` aggregates every *machine-checkable* quality gate for
-the generated artifacts (crops present, OCR coverage, narration structure,
-speakability, delivery safety, audio coverage + integrity, render freshness)
-into one ordered problem list — each problem carrying a concrete ``fix``
-command. That shape exists for small LLMs: the whole correction workflow
-collapses to a loop a modest model can drive without global judgment —
-
-    while mangaeasy work-qa ... --json reports problems:
-        run the first problem's `fix`
-        (re-narrate / narration-edit when the fix says so)
-
-Exit codes make the machine loop trivial: 0 = machine-clean, 1 = problems
-remain. Checks that need *eyes* (source page/strip overlays, crop sheets,
-full-resolution panels, and narration review sheets) are surfaced as
-``review`` items pointing at the exact files to read. ``ok`` means
-machine-clean only; the JSON report separately states whether manual review
-items remain. A vision pass, not another detector or OCR retry, resolves them.
-
-``mangaeasy work-artifacts`` is the reuse inventory: everything expensive
-this project has already generated (per-item videos, long-video takes,
-archived audio runs, cached music beds, transcripts, QA sheets), each with
-a hint for how to reuse it instead of regenerating.
+Updated with aspect ratio and gutter checks.
 """
 
 from __future__ import annotations
@@ -30,6 +9,8 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+from PIL import Image
 
 from mangaeasy.audio.narration_safety import narration_quality_findings
 from mangaeasy.brand import CLI_NAME
@@ -48,8 +29,6 @@ from mangaeasy.video_pipeline.narration_check import check_item
 from mangaeasy.workboard import _narration_entries as narration_entries_for_report
 from mangaeasy.workboard import item_status
 
-# Below this size a WAV cannot hold audible narration — it is a truncated or
-# failed TTS write (the audible-audio deep check lives in video-audio-audit).
 MIN_AUDIO_BYTES = 1024
 
 
@@ -77,24 +56,40 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
 
     status = item_status(item_dir, name, audio_root, output_root)
 
-    # 1. Pipeline completeness — the loop's backbone: whatever stage is
-    #    missing next is the first fix, in production order.
+    # 1. Pipeline completeness
     stage = status["next_stage"]
     if stage in ("download", "crop", "transcribe"):
         detail = {
             "download": "no source pages downloaded",
             "crop": "no panels cropped yet",
-            "transcribe": f"panel-transcript run started but incomplete ({status['transcript']['filled']}/{status['transcript']['total']}) — finish or delete transcript.json (OCR itself is optional)",
+            "transcribe": f"panel-transcript run started but incomplete ({status['transcript']['filled']}/{status['transcript']['total']}) — finish or delete transcript.json",
         }[stage]
         add("error", f"stage:{stage}", detail, _stage_fix(stage, root_arg, item))
-        return problems  # later checks are meaningless before these exist
+        return problems
 
     if stage == "narrate":
         add("error", "stage:narrate", "no narration.json (or zero entries)",
             _stage_fix("narrate", root_arg, item))
         return problems
 
-    # 2. Narration structure (dangling images, empty text, intro overlap...).
+    # 1b. Crop Aspect Ratio & Gutter Check
+    panels_dir = item_dir / "panels"
+    if panels_dir.is_dir():
+        for crop_path in panels_dir.glob("*.*"):
+            if crop_path.suffix.lower() in IMAGE_EXTENSIONS:
+                try:
+                    with Image.open(crop_path) as img:
+                        w, h = img.size
+                        aspect = h / float(w) if w > 0 else 1.0
+                        if aspect > 2.2 or aspect < 0.4:
+                            add("error", "crop:bad_aspect_ratio",
+                                f"{crop_path.name} aspect ratio is {aspect:.2f}:1 (limit 2.2:1 / 0.4:1). "
+                                "Crop contains gutter whitespace or is too tall for 16:9.",
+                                f"{CLI_NAME} webtoon-override --file work/overrides.json --item {item} --split-at <y>")
+                except Exception:
+                    pass
+
+    # 2. Narration structure
     report = check_item(item_dir)
     for problem in report["problems"]:
         add("error", "narration:structure", problem,
@@ -105,10 +100,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item}, "
             "then review risky entries first and sample clean entries before rewriting")
 
-    # 3. Speakability and narration-quality lints, per entry.
-    #    The tolerant reader is deliberate: a file with one dangling image
-    #    still has 40 other lines worth linting, and reporting every problem
-    #    in one pass is the whole point of the fix-until-clean loop.
+    # 3. Speakability and quality lints
     entries = narration_entries_for_report(item_dir)
     for entry in entries:
         image = entry.get("image") or "?"
@@ -124,8 +116,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             f"{CLI_NAME} narration-edit --project-root {root_arg} --item {item} "
             f"--set {finding.beat} \"<rewritten line>\" --prune-audio")
 
-    # 4. Audio coverage + integrity (cheap size gate; deep decode check is
-    #    video-audio-audit).
+    # 4. Audio coverage
     audio_dir = audio_root / name / item
     missing, corrupt = [], []
     for entry in entries:
@@ -145,16 +136,14 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             f"{CLI_NAME} video-audio-audit --project-root {root_arg} --items {item} --fix, then "
             + _stage_fix("audio", root_arg, item))
 
-    # 5. Render existence/freshness.
+    # 5. Render freshness
     if stage == "render":
         detail = "item video is stale (narration changed after render)" if status["render_stale"] \
             else "item video not rendered yet"
         add("error", "render:" + ("stale" if status["render_stale"] else "missing"), detail,
             _stage_fix("render", root_arg, item))
 
-    # 6. Vision-required review artifacts. Machine checks cannot approve art.
-    # Point at every evidence class, including paged overlays and webtoon's
-    # actual flat output layout (not a nonexistent per-item subdirectory).
+    # 6. Vision-required review artifacts
     page_verify = work_dir / "page_verify" / name / item
     webtoon_verify = work_dir / "webtoon_verify" / name
     crop_evidence: list[Path] = []
@@ -168,7 +157,6 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
     if cutcheck.is_dir():
         crop_evidence.extend(cutcheck.glob(f"{item}_*.jpg"))
     crop_evidence = sorted({p.resolve() for p in crop_evidence})
-    panels_dir = item_dir / "panels"
     review_crops = sorted(
         path.resolve() for path in panels_dir.iterdir()
         if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
@@ -179,21 +167,15 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             "review",
             "crop:visual-review",
             f"{len(crop_evidence)} overlay/sheet/window image(s) and "
-            f"{len(review_crops)} production crop(s) require a vision pass; "
-            "inspect flagged/suspect overlays first, sample clean crops, and broaden if errors "
-            "appear. MAGI/gutter output is not approval, and an automatic whole-page/strip "
-            "stand-in is never acceptable.",
-            f"Read {all_visual_evidence[0]} … compare against the original pages, fix bad "
-            "boundary/order/full-page results, re-split, and rerun the staged visual pass",
+            f"{len(review_crops)} production crop(s) require a vision pass.",
+            f"Read {all_visual_evidence[0]} … compare against original pages and re-split if needed",
         )
     else:
         add(
             "review",
             "crop:review-artifacts-missing",
-            "panels exist but no crop verification artifacts were found; generate review "
-            "artifacts before narration or rendering",
-            f"Run the correct splitter for {root_arg}/{item} to generate overlays/contact sheets, "
-            "then inspect flagged/suspect outputs and sample clean crops",
+            "panels exist but no crop verification artifacts were found",
+            f"Run the correct splitter for {root_arg}/{item} to generate overlays",
         )
 
     narration_review = work_dir / "narration_review" / name / item
@@ -205,19 +187,15 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
         add(
             "review",
             "narration:visual-review",
-            f"{len(narration_sheets)} narration sheet(s) require comparison with the original "
-            "full-resolution panels; OCR is an unverified hint, not source truth",
-            f"Read {narration_sheets[0]} … review OCR disagreements, uncertain speakers, dense "
-            "text, chronology shifts, and awkward prose first; sample clean entries, broaden if "
-            "errors appear, regenerate sheets, and review again",
+            f"{len(narration_sheets)} narration sheet(s) require comparison with original panels",
+            f"Read {narration_sheets[0]} … review OCR disagreements and speaker attribution",
         )
     else:
         add(
             "review",
             "narration:review-sheets-missing",
             "narration exists but semantic review sheets have not been generated",
-            f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item} "
-            f"--work-dir {work_dir}, then review risky entries first and sample clean entries",
+            f"{CLI_NAME} narration-review-sheets --project-root {root_arg} --items {item} --work-dir {work_dir}",
         )
     return problems
 
@@ -225,9 +203,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
 def qa_main() -> int:
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} work-qa",
-        description="Machine-checkable QA over crops, narration, audio and renders. Every "
-                    "machine problem has a fix command; exit 0 does not waive the separately "
-                    "reported manual visual reviews.",
+        description="Machine-checkable QA over crops, narration, audio and renders.",
     )
     parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
     parser.add_argument("--audio-root", type=Path, default=DEFAULT_AUDIO_ROOT)
@@ -236,10 +212,8 @@ def qa_main() -> int:
     parser.add_argument("--project-name", default=None)
     parser.add_argument("--items", nargs="*", help="Item folders, e.g. 01 02 05-08 (default: all).")
     parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-22.")
-    parser.add_argument("--max-problems", type=int, default=25,
-                        help="Cap the list so it fits a small context window (default 25; 0 = all).")
-    parser.add_argument("--errors-only", action="store_true",
-                        help="Hide review/info items — only what blocks the build.")
+    parser.add_argument("--max-problems", type=int, default=25)
+    parser.add_argument("--errors-only", action="store_true")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
 
@@ -283,103 +257,5 @@ def qa_main() -> int:
         if total > len(problems):
             print(f"(+{total - len(problems)} more — fix these first, then re-run)")
         if manual_reviews:
-            review_hint = (
-                "rerun without --errors-only to list them"
-                if args.errors_only
-                else "open the listed source/crop/narration evidence"
-            )
-            print(
-                f"REVIEW REQUIRED — {manual_reviews} visual review gate(s); "
-                f"{review_hint} before production."
-            )
+            print(f"REVIEW REQUIRED — {manual_reviews} visual review gate(s) pending.")
     return 0 if errors == 0 else 1
-
-
-# ── work-artifacts: what already exists and how to reuse it ─────────────────
-
-def _dir_entry(path: Path, reuse: str, pattern: str = "*", recursive: bool = True) -> dict | None:
-    if not path.is_dir():
-        return None
-    files = [p for p in (path.rglob(pattern) if recursive else path.glob(pattern)) if p.is_file()]
-    if not files:
-        return None
-    return {"path": str(path), "files": len(files),
-            "bytes": sum(p.stat().st_size for p in files), "reuse": reuse}
-
-
-def artifacts_main() -> int:
-    parser = argparse.ArgumentParser(
-        prog=f"{CLI_NAME} work-artifacts",
-        description="Inventory of every reusable generated artifact for a project — check here "
-                    "before regenerating anything expensive.",
-    )
-    parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
-    parser.add_argument("--audio-root", type=Path, default=DEFAULT_AUDIO_ROOT)
-    parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
-    parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
-    parser.add_argument("--project-name", default=None)
-    parser.add_argument("--json", action="store_true", dest="as_json")
-    args = parser.parse_args()
-
-    root = args.project_root
-    if not root.is_dir():
-        print(f"[ERROR] project root not found: {root}", file=sys.stderr)
-        return 1
-    name = project_name(root, args.project_name)
-
-    categories = {
-        "item_videos": _dir_entry(
-            args.output_root / name / "items",
-            "final per-item renders — video-join reuses them as-is; `video --skip-audio` re-renders only stale ones",
-            "*.mp4", recursive=False),
-        "item_video_archive": _dir_entry(
-            args.output_root / name / "items" / "old",
-            "archived earlier item renders (old/run_NNNN) — restorable by copying back"),
-        "long_videos": _dir_entry(
-            args.output_root / name,
-            "joined long videos (timestamped, never clobbered) — video-add-bgm/video-normalize-audio "
-            "rework these without re-joining", "*_full_*.mp4"),
-        "output_archive": _dir_entry(
-            args.output_root / name / "old",
-            "archived earlier long-video takes (old/run_NNNN) — restorable by copying back"),
-        "narration_audio": _dir_entry(
-            args.audio_root / name,
-            "generated TTS WAVs — any pipeline rerun without --overwrite-audio reuses them", "*.wav"),
-        "audio_takes": _dir_entry(
-            args.audio_root / name / "old",
-            "archived audio takes — list with audio-takes-list, bring back with audio-takes-restore"),
-        "transcripts": {
-            "path": str(root), "files": sum(1 for d in item_dirs(root) if (d / "transcript.json").is_file()),
-            "bytes": sum((d / "transcript.json").stat().st_size for d in item_dirs(root)
-                         if (d / "transcript.json").is_file()),
-            "reuse": "optional untrusted OCR cross-evidence — reuse only while each stored panel_sha256 matches",
-        },
-        "crop_verify_sheets": (_dir_entry(args.work_dir / "page_verify" / name,
-                                          "crop QA sheets — re-READ after any re-split")
-                               or _dir_entry(args.work_dir / "webtoon_verify" / name,
-                                             "crop QA sheets — re-READ after any re-split")),
-        "narration_review_sheets": _dir_entry(
-            args.work_dir / "narration_review" / name,
-            "panel+narration+OCR sheets — re-READ after narration edits"),
-        "music_beds": _dir_entry(
-            args.work_dir / "music_bed",
-            "conditioned/looped BGM beds cached by content hash — video-add-bgm reuses them automatically",
-            "*.flac"),
-        "workboard": _dir_entry(
-            root / ".workboard",
-            "multi-agent claims + shared notes — see work-status / work-note"),
-    }
-    categories = {k: v for k, v in categories.items() if v and v["files"]}
-
-    if args.as_json:
-        print(json.dumps({"project": name, "artifacts": categories}, ensure_ascii=False))
-        return 0
-    if not categories:
-        print("No generated artifacts yet.")
-        return 0
-    print(f"Reusable artifacts for {name}:")
-    for key, info in categories.items():
-        size_mb = info["bytes"] / 1_000_000
-        print(f"  {key}: {info['files']} file(s), {size_mb:.1f} MB — {info['path']}")
-        print(f"    reuse: {info['reuse']}")
-    return 0

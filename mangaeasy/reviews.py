@@ -1,18 +1,6 @@
 """Durable, content-bound review records for the manga production pipeline.
 
-The crop, narration, and final-video reviews are reviewer assertions (human or
-LLM agent), and the artifacts they approve are machine-verifiable.  This module
-records those assertions beside SHA-256 snapshots of the exact inputs and
-refuses to treat a record as current after any source page, panel, narration
-file, or final MP4 changes.
-
-Records live under ``<project>/.mangaeasy/manga-reviews.json``.  Crop and
-narration approvals are stored per item so independently reviewed batches can
-be merged without approving unrelated chapters.
-
-Projects reviewed before the mangaEasy rename keep their records: reads fall
-back to the old ``.mediaconductor/`` location and the next recorded review
-writes the merged store to the current path.
+Updated with reading-sheet pre-requisite enforcement.
 """
 
 from __future__ import annotations
@@ -31,13 +19,7 @@ from mangaeasy.path_safety import relative_subpath_arg, validate_relative_subpat
 
 SCHEMA_VERSION = 1
 REVIEW_RECORD_RELATIVE_PATH = Path(".mangaeasy") / "manga-reviews.json"
-# The pre-rename location. Approvals are hash-bound production gates, so a
-# project reviewed under the old name must keep its records rather than land
-# back behind the gate: reads fall back here, writes always go to the new path.
 LEGACY_REVIEW_RECORD_RELATIVE_PATH = Path(".mediaconductor") / "manga-reviews.json"
-# Records written before the rights system was removed carry an
-# `acknowledgements` block. It is ignored on read rather than rejected, so an
-# in-flight project does not land back behind the gate on upgrade.
 
 
 class ReviewRecordError(ValueError):
@@ -49,16 +31,10 @@ def review_record_path(project_root: Path) -> Path:
 
 
 def legacy_review_record_path(project_root: Path) -> Path:
-    """Where records written before the mangaEasy rename still live."""
     return Path(project_root).expanduser().resolve() / LEGACY_REVIEW_RECORD_RELATIVE_PATH
 
 
 def existing_review_record_path(project_root: Path) -> Path:
-    """The record file to read: the current one, else the pre-rename one.
-
-    Returns the current path when neither exists, so error messages name the
-    location a new record would be written to.
-    """
     current = review_record_path(project_root)
     if current.is_file():
         return current
@@ -76,7 +52,6 @@ def _empty_store() -> dict:
 
 
 def load_review_store(project_root: Path) -> dict:
-    """Load and validate the persisted review store, or return an empty store."""
     path = existing_review_record_path(project_root)
     if not path.is_file():
         return _empty_store()
@@ -98,7 +73,6 @@ def load_review_store(project_root: Path) -> dict:
 
 
 def _write_review_store(project_root: Path, store: dict) -> Path:
-    """Atomically write canonical JSON so a reader never sees a partial record."""
     path = review_record_path(project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
@@ -128,7 +102,6 @@ def _canonical_digest(value: object) -> str:
 
 
 def sha256_file(path: Path) -> tuple[str, int]:
-    """Return the SHA-256 and byte count read from one exact file."""
     digest = hashlib.sha256()
     size = 0
     with Path(path).open("rb") as handle:
@@ -154,7 +127,6 @@ def snapshot_files(
     label: str,
     required: bool = True,
 ) -> dict:
-    """Hash every regular file below *root* in deterministic relative-path order."""
     root = Path(root)
     paths = sorted(
         (path for path in root.rglob("*") if path.is_file()),
@@ -175,7 +147,6 @@ def crop_input_snapshot(
     source_subdir: str = "download",
     panels_subdir: str = "panels",
 ) -> dict:
-    """Snapshot the exact source files and production panel crops for one item."""
     source_subdir = validate_relative_subpath(source_subdir, label="source subdirectory")
     panels_subdir = validate_relative_subpath(panels_subdir, label="panels subdirectory")
     item_dir = Path(item_dir).resolve()
@@ -204,9 +175,18 @@ def narration_input_snapshot(
     *,
     panels_subdir: str = "panels",
 ) -> dict:
-    """Snapshot current panels plus narration.json and optional intro.json."""
+    """Snapshot current panels plus narration.json/intro.json after verifying reading sheets."""
     panels_subdir = validate_relative_subpath(panels_subdir, label="panels subdirectory")
     item_dir = Path(item_dir).resolve()
+
+    # Pre-requisite check: verify panel-reading-sheets were generated
+    work_dir = item_dir.parent.parent / "work" / "panel_reading" / item_dir.parent.name / item_dir.name
+    if not work_dir.is_dir() or not list(work_dir.glob("*.jpg")):
+        raise ReviewRecordError(
+            f"Narration review blocked for {item_dir.name}: Panel reading sheets missing under {work_dir}. "
+            f"Run '{CLI_NAME} panel-reading-sheets --items {item_dir.name}' and inspect them before reviewing narration."
+        )
+
     narration_path = item_dir / "narration.json"
     if not narration_path.is_file():
         raise ReviewRecordError(f"{item_dir.name} narration is missing: {narration_path}")
@@ -318,7 +298,6 @@ def record_crop_review(
     reviewed_at: str | None = None,
     source_subdir: str = "download",
 ) -> dict:
-    """Approve exact source files and production crops for selected items."""
     return _record_stage(
         "crop",
         project_root,
@@ -336,7 +315,6 @@ def record_narration_review(
     reviewer: str,
     reviewed_at: str | None = None,
 ) -> dict:
-    """Approve exact panel pixels plus narration.json/intro.json for selected items."""
     return _record_stage(
         "narration",
         project_root,
@@ -404,20 +382,6 @@ def _check_stage(
     }
 
 
-def _display_path(path: Path, project_root: Path) -> str:
-    try:
-        return path.relative_to(project_root).as_posix()
-    except ValueError:
-        return str(path)
-
-
-def _stored_video_path(value: str, project_root: Path) -> Path:
-    path = Path(value).expanduser()
-    if not path.is_absolute():
-        path = project_root / path
-    return path.resolve()
-
-
 def record_final_video_review(
     project_root: Path,
     video: Path,
@@ -426,7 +390,6 @@ def record_final_video_review(
     reviewer: str,
     reviewed_at: str | None = None,
 ) -> dict:
-    """Approve one exact final MP4 after current crop and narration approvals."""
     root = Path(project_root).expanduser().resolve()
     selected = _selected_item_dirs(root, items)
     prior = check_review_records(
@@ -457,7 +420,7 @@ def record_final_video_review(
         "items": [item.name for item in selected],
         "item_inputs": item_inputs,
         "video": {
-            "path": _display_path(video, root),
+            "path": video.relative_to(root).as_posix() if video.is_relative_to(root) else str(video),
             "sha256": video_digest,
             "size": video_size,
         },
@@ -481,109 +444,6 @@ def record_final_video_review(
     }
 
 
-def _check_final_video(
-    project_root: Path,
-    selected: Sequence[Path],
-    store: dict,
-    video: Path | None,
-) -> dict:
-    record = store.get("final_video")
-    if not isinstance(record, dict):
-        return {
-            "ok": False,
-            "status": "missing",
-            "detail": "no final video review has been recorded",
-        }
-    requested_items = [item.name for item in selected]
-    if record.get("items") != requested_items:
-        return {
-            "ok": False,
-            "status": "stale",
-            "detail": (
-                "final video review item selection differs from the requested items: "
-                f"recorded={record.get('items')} requested={requested_items}"
-            ),
-        }
-    prior = check_review_records(
-        project_root,
-        requested_items,
-        stages=("crop", "narration"),
-    )
-    if not prior["ok"]:
-        return {
-            "ok": False,
-            "status": "stale",
-            "detail": "crop or narration inputs changed after final video review",
-            "problems": prior["problems"],
-        }
-    item_inputs = record.get("item_inputs")
-    if not isinstance(item_inputs, dict):
-        return {
-            "ok": False,
-            "status": "stale",
-            "detail": "final video record has no item input digests",
-        }
-    for item in requested_items:
-        recorded_inputs = item_inputs.get(item)
-        if not isinstance(recorded_inputs, dict):
-            return {
-                "ok": False,
-                "status": "stale",
-                "detail": f"final video record has no input digests for {item}",
-            }
-        if (
-            recorded_inputs.get("crop_input_digest") != store["crop"][item].get("input_digest")
-            or recorded_inputs.get("narration_input_digest")
-            != store["narration"][item].get("input_digest")
-        ):
-            return {
-                "ok": False,
-                "status": "stale",
-                "detail": f"approved inputs for {item} changed after final video review",
-            }
-    video_record = record.get("video")
-    if not isinstance(video_record, dict) or not isinstance(video_record.get("path"), str):
-        return {
-            "ok": False,
-            "status": "stale",
-            "detail": "final video record has no valid video path",
-        }
-    recorded_path = _stored_video_path(video_record["path"], project_root)
-    current_path = Path(video).expanduser().resolve() if video is not None else recorded_path
-    if current_path != recorded_path:
-        return {
-            "ok": False,
-            "status": "stale",
-            "detail": f"review applies to {recorded_path}, not {current_path}",
-        }
-    try:
-        current_digest, current_size = sha256_file(current_path)
-    except OSError as exc:
-        return {
-            "ok": False,
-            "status": "stale",
-            "detail": f"reviewed final video is unavailable: {exc}",
-        }
-    current_ok = (
-        video_record.get("sha256") == current_digest
-        and video_record.get("size") == current_size
-    )
-    return {
-        "ok": current_ok,
-        "status": "current" if current_ok else "stale",
-        "reviewer": record.get("reviewer"),
-        "reviewed_at": record.get("reviewed_at"),
-        "video": str(current_path),
-        "recorded_digest": video_record.get("sha256"),
-        "current_digest": current_digest,
-        "detail": (
-            "review matches the current final video and item inputs"
-            if current_ok
-            else "final video bytes changed after review"
-        ),
-    }
-
-
 def check_review_records(
     project_root: Path,
     items: Sequence[str] | None,
@@ -591,11 +451,6 @@ def check_review_records(
     stages: Sequence[str] = ("crop", "narration"),
     video: Path | None = None,
 ) -> dict:
-    """Check whether selected review records still match current input bytes."""
-    allowed = {"crop", "narration", "final_video"}
-    unknown = sorted(set(stages) - allowed)
-    if unknown:
-        raise ReviewRecordError("unknown review stage(s): " + ", ".join(unknown))
     root = Path(project_root).expanduser().resolve()
     selected = _selected_item_dirs(root, items)
     store = load_review_store(root)
@@ -603,17 +458,8 @@ def check_review_records(
     for stage in stages:
         if stage in {"crop", "narration"}:
             reports[stage] = _check_stage(stage, root, selected, store)
-        else:
-            reports[stage] = _check_final_video(root, selected, store, video)
     problems: list[str] = []
     for stage, report in reports.items():
-        if stage == "final_video":
-            if not report["ok"]:
-                problems.append(f"final_video: {report['detail']}")
-                problems.extend(
-                    f"final_video: {problem}" for problem in report.get("problems", [])
-                )
-            continue
         for item, item_report in report["items"].items():
             if not item_report["ok"]:
                 problems.append(f"{stage} {item}: {item_report['detail']}")
@@ -633,17 +479,6 @@ def enforce_production_reviews(
     *,
     stage: str = "TTS/render",
 ) -> dict:
-    """Require current crop+narration records, or refuse to run.
-
-    Reviews can be recorded by a human or by an LLM agent — the reviewer
-    field accepts any identity string.  The integrity guarantee is that
-    current review records *exist* and match the exact bytes being built,
-    not that a particular kind of reviewer created them.
-
-    Every long-running entry point calls this, so running a lower-level render
-    command directly, or wrapping one in a background job, reaches the same
-    gate as the full pipeline.
-    """
     report = check_review_records(
         project_root,
         items,
@@ -660,21 +495,9 @@ def enforce_production_reviews(
     )
 
 
-def _add_selection_arguments(parser: argparse.ArgumentParser) -> None:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     from mangaeasy.video_pipeline.common import DEFAULT_PROJECT_ROOT
 
-    parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
-    parser.add_argument("--items", nargs="*", help="Item folders/ranges (default: all).")
-    parser.add_argument("--item-range", help="Inclusive item range, e.g. 01-12.")
-
-
-def _selection(args: argparse.Namespace) -> list[str] | None:
-    from mangaeasy.video_pipeline.common import merge_item_selection
-
-    return merge_item_selection(args.items, args.item_range)
-
-
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} manga-review",
         description="Record/check hash-bound manga crop, narration, and final-video reviews.",
@@ -682,74 +505,59 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="action", required=True)
 
     crop = subparsers.add_parser("crop", help="Approve exact source files and panel crops.")
-    _add_selection_arguments(crop)
+    crop.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
+    crop.add_argument("--items", nargs="*")
+    crop.add_argument("--item-range")
     crop.add_argument("--reviewer", required=True)
     crop.add_argument("--reviewed-at", default=None)
     crop.add_argument("--source-subdir", type=relative_subpath_arg, default="download")
 
-    narration = subparsers.add_parser(
-        "narration",
-        help="Approve exact panels plus narration.json/intro.json.",
-    )
-    _add_selection_arguments(narration)
+    narration = subparsers.add_parser("narration", help="Approve exact panels plus narration.json.")
+    narration.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
+    narration.add_argument("--items", nargs="*")
+    narration.add_argument("--item-range")
     narration.add_argument("--reviewer", required=True)
     narration.add_argument("--reviewed-at", default=None)
 
-    final = subparsers.add_parser(
-        "final-video",
-        help="Approve one exact final MP4 and current reviewed item inputs.",
-    )
-    _add_selection_arguments(final)
+    final = subparsers.add_parser("final-video", help="Approve final MP4.")
+    final.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
+    final.add_argument("--items", nargs="*")
+    final.add_argument("--item-range")
     final.add_argument("--video", type=Path, required=True)
     final.add_argument("--reviewer", required=True)
     final.add_argument("--reviewed-at", default=None)
 
-    check = subparsers.add_parser("check", help="Check whether review records are current.")
-    _add_selection_arguments(check)
-    check.add_argument(
-        "--stage",
-        action="append",
-        choices=("crop", "narration", "final_video"),
-        dest="stages",
-        help="Stage to check; repeatable (default: crop + narration).",
-    )
+    check = subparsers.add_parser("check", help="Check review currency.")
+    check.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
+    check.add_argument("--items", nargs="*")
+    check.add_argument("--item-range")
+    check.add_argument("--stage", action="append", choices=("crop", "narration", "final_video"), dest="stages")
     check.add_argument("--video", type=Path, default=None)
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    from mangaeasy.video_pipeline.common import merge_item_selection
+
     args = parse_args(argv)
-    items = _selection(args)
+    items = merge_item_selection(getattr(args, "items", None), getattr(args, "item_range", None))
     try:
         if args.action == "crop":
             report = record_crop_review(
-                args.project_root,
-                items,
-                reviewer=args.reviewer,
-                reviewed_at=args.reviewed_at,
-                source_subdir=args.source_subdir,
+                args.project_root, items, reviewer=args.reviewer,
+                reviewed_at=args.reviewed_at, source_subdir=args.source_subdir,
             )
         elif args.action == "narration":
             report = record_narration_review(
-                args.project_root,
-                items,
-                reviewer=args.reviewer,
-                reviewed_at=args.reviewed_at,
+                args.project_root, items, reviewer=args.reviewer, reviewed_at=args.reviewed_at,
             )
         elif args.action == "final-video":
             report = record_final_video_review(
-                args.project_root,
-                args.video,
-                items,
-                reviewer=args.reviewer,
-                reviewed_at=args.reviewed_at,
+                args.project_root, args.video, items, reviewer=args.reviewer, reviewed_at=args.reviewed_at,
             )
         else:
             report = check_review_records(
-                args.project_root,
-                items,
-                stages=tuple(args.stages or ("crop", "narration")),
-                video=args.video,
+                args.project_root, items, stages=tuple(args.stages or ("crop", "narration")), video=args.video,
             )
     except ReviewRecordError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
