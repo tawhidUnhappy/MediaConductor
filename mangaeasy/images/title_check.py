@@ -54,10 +54,13 @@ The house recap-title pattern
 
 Shipped examples:
 
-    Reincarnated As Villain He Ditches Main Story To Live In Peace! - Manga Recap
-    REINCARNATED As VILLAIN But The Heroines Are YANDERE for Him - Manga Recap
-    ISEKAI'D In a 1:5 Ratio World, He Turns Every Girl YANDERE - Manga Recap
     He Refused To Become A Hero, So The Gods Cursed Him And He Became A Villain (1-6) - Manhwa Recap
+    REINCARNATED As VILLAIN But The Heroines Are YANDERE for Him - Manga Recap
+    Reincarnated As Villain He Ditches Main Story To Live In Peace! - Manga Recap
+    REINCARNATED As The SECRET VILLAIN He Ditches Main Story To Live In Peace! - Manga Recap
+    ISEKAI'D In a 1:5 Ratio World, He Turns Every Girl YANDERE - Manga Recap
+    Isekai'd as Evil Villain but the Heroines Fall in Love with Him - Manga Recap
+    When an Genius Reborn Into Valhalla Became The Valkyries Favorite!
     Farmer Accidentally Defeated The Demon Queen And She Fell In Love For His Strength | Manhwa Recap
 
 How they are built

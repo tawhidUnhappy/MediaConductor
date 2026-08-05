@@ -22,8 +22,8 @@ This module is the single validator.  It is deliberately strict:
 * Unknown properties are rejected.  A typo (``naration``) or a field invented
   by one tool and read by none is a bug, not data.
 
-The optional editorial fields (``beat_id``, ``evidence``, ``motion``,
-``pause_after_ms``) are what the motion-comic renderer and the reveal ledger
+The optional editorial fields (``beat_id``, ``evidence``,
+``pause_after_ms``) are what the video renderer and the reveal ledger
 consume; see :mod:`mangaeasy.video_pipeline.edit_timeline`.
 
 ``beat_id`` is stable and unique by construction.  Supplying one explicitly is
@@ -46,23 +46,11 @@ from mangaeasy.video_pipeline.common import IMAGE_EXTENSIONS
 SUPPORTED_IMAGE_EXTENSIONS = frozenset(IMAGE_EXTENSIONS)
 
 ALLOWED_ENTRY_FIELDS = frozenset({
-    "beat_id", "image", "narration", "evidence", "motion", "pause_after_ms",
+    "beat_id", "image", "narration", "evidence", "pause_after_ms",
 })
 REQUIRED_ENTRY_FIELDS = ("image", "narration")
 
-# Restrained, readable moves only — see docs/manga-quality-design.md. Random
-# effects are deliberately absent from this list.
-MOTION_TYPES = frozenset({
-    "none", "slow_zoom_in", "slow_zoom_out",
-    "pan_left", "pan_right", "pan_up", "pan_down",
-})
-ALLOWED_MOTION_FIELDS = frozenset({"type", "focus_x", "focus_y", "strength"})
-
-# Bounds keep a typo from producing an unwatchable render: a 0.9 "strength"
-# would fling the frame across the panel, and a 30-second pause reads as a
-# freeze. Both are cheap to check and impossible to notice late.
-MOTION_STRENGTH_MIN = 0.0
-MOTION_STRENGTH_MAX = 0.25
+# Bounds keep a typo from producing an unwatchable render.
 FOCUS_MIN = 0.0
 FOCUS_MAX = 1.0
 PAUSE_AFTER_MS_MIN = 0
@@ -144,38 +132,6 @@ def resolve_panel_path(image: str, panels_dir: Path, where: str) -> Path:
     return candidate
 
 
-def _validate_motion(motion: Any, where: str) -> dict:
-    if not isinstance(motion, dict):
-        _fail(where, "'motion' must be an object")
-    unknown = sorted(set(motion) - ALLOWED_MOTION_FIELDS)
-    if unknown:
-        _fail(where, f"unknown motion field(s): {', '.join(unknown)}")
-    motion_type = motion.get("type", "none")
-    if motion_type not in MOTION_TYPES:
-        _fail(where, f"motion.type must be one of: {', '.join(sorted(MOTION_TYPES))}")
-    validated: dict = {"type": motion_type}
-    for axis in ("focus_x", "focus_y"):
-        if axis in motion and motion[axis] is not None:
-            value = motion[axis]
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                _fail(where, f"motion.{axis} must be a number")
-            if not FOCUS_MIN <= float(value) <= FOCUS_MAX:
-                _fail(where, f"motion.{axis} must be between {FOCUS_MIN} and {FOCUS_MAX}")
-            validated[axis] = float(value)
-    if "strength" in motion and motion["strength"] is not None:
-        value = motion["strength"]
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            _fail(where, "motion.strength must be a number")
-        if not MOTION_STRENGTH_MIN <= float(value) <= MOTION_STRENGTH_MAX:
-            _fail(
-                where,
-                f"motion.strength must be between {MOTION_STRENGTH_MIN} and "
-                f"{MOTION_STRENGTH_MAX} (restrained moves only)",
-            )
-        validated["strength"] = float(value)
-    return validated
-
-
 def _validate_pause(value: Any, where: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         _fail(where, "'pause_after_ms' must be an integer number of milliseconds")
@@ -209,13 +165,7 @@ def validate_entries(
     seen_stems: dict[str, str] | None = None,
     seen_beats: dict[str, str] | None = None,
 ) -> list[dict]:
-    """Validate one narration file's entries and return normalized copies.
-
-    The ``seen_*`` maps are shared across ``intro.json`` and ``narration.json``
-    so the uniqueness rules hold over the *combined* playback list — the intro
-    is prepended at render time, so a panel used in both would render twice and
-    both beats would fight over one ``<stem>.wav``.
-    """
+    """Validate one narration file's entries and return normalized copies."""
     if not isinstance(entries, list):
         raise NarrationContractError(f"{label}: must be a JSON array")
     seen_images = {} if seen_images is None else seen_images
@@ -284,8 +234,6 @@ def validate_entries(
                     if not path.is_file():
                         _fail(where, f"evidence panel not found: {path}")
             normalized["evidence"] = evidence
-        if entry.get("motion") is not None:
-            normalized["motion"] = _validate_motion(entry["motion"], where)
         if entry.get("pause_after_ms") is not None:
             normalized["pause_after_ms"] = _validate_pause(entry["pause_after_ms"], where)
 

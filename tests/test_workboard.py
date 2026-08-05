@@ -15,6 +15,9 @@ from mangaeasy.workboard import (
     add_todo,
     item_status,
     list_todos,
+    init_memory,
+    memory_load_and_verify,
+    memory_path,
     next_tasks,
     release_claim,
     remove_todo,
@@ -337,3 +340,60 @@ def test_respect_claims_gate_blocks_only_live_foreign_claims(tmp_path):
     # unselected item does not block
     make_item(root, "06")
     assert respect_claims_gate(root, ["06"], None, ("crop",), agent="other")
+
+
+def test_memory_path_is_canonical_under_project_root(tmp_path):
+    root = tmp_path / "my_manga"
+    root.mkdir()
+    path = memory_path(root)
+    assert path == root / "MEMORY.json"
+
+
+def test_memory_init_creates_fresh_file_with_project_field(tmp_path):
+    root = tmp_path / "solo_leveling"
+    root.mkdir()
+    path = init_memory(root, agent="test_agent")
+    assert path.is_file()
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["version"] == 2
+    assert data["project"] == "solo_leveling"
+    assert data["updated_by"] == "test_agent"
+    assert data["brief"] == []
+    assert data["characters"] == {}
+
+
+def test_memory_init_refuses_overwrite_without_force(tmp_path):
+    import pytest
+
+    root = tmp_path / "solo_leveling"
+    root.mkdir()
+    init_memory(root, agent="test_agent")
+
+    with pytest.raises(FileExistsError):
+        init_memory(root, agent="test_agent")
+
+    # With force=True it overwrites cleanly
+    path = init_memory(root, agent="test_agent", force=True)
+    assert path.is_file()
+
+
+def test_memory_load_and_verify_catches_wrong_project(tmp_path):
+    proj_a = tmp_path / "manga_a"
+    proj_b = tmp_path / "manga_b"
+    proj_a.mkdir()
+    proj_b.mkdir()
+
+    init_memory(proj_a, agent="agent_a")
+    data, err = memory_load_and_verify(proj_a)
+    assert data is not None
+    assert err is None
+    assert data["project"] == "manga_a"
+
+    # Copy proj_a's MEMORY.json into proj_b (simulating cross-project memory contamination)
+    (proj_b / "MEMORY.json").write_text((proj_a / "MEMORY.json").read_text(encoding="utf-8"), encoding="utf-8")
+
+    data_b, err_b = memory_load_and_verify(proj_b)
+    assert data_b is None
+    assert err_b is not None
+    assert "mismatch" in err_b

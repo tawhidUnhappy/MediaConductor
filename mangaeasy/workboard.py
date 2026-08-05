@@ -60,6 +60,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from mangaeasy.brand import CLI_NAME
+from mangaeasy.layout import project_memory_path
 from mangaeasy.ocr.panel_transcript import load_bound_ocr
 from mangaeasy.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem
 from mangaeasy.video_pipeline.common import (
@@ -893,4 +894,99 @@ def todo_main() -> int:
         marker = {"pending": "[ ]", "in_progress": "[~]", "done": "[x]"}
         for t in todos:
             print(f"{marker.get(t['status'], '[ ]')} #{t['id']} [{t['topic']}] {t['text']}  (by {t['created_by']})")
+    return 0
+
+
+def memory_path(project_root: Path) -> Path:
+    """Canonical memory path for a project root."""
+    return project_memory_path(project_root)
+
+
+def memory_load_and_verify(project_root: Path) -> tuple[dict | None, str | None]:
+    """Load MEMORY.json for project_root and verify project identity match.
+
+    Returns (data, error_reason). If file missing, returns (None, None).
+    If project identity mismatches or file is invalid, returns (None, error_reason).
+    """
+    path = memory_path(project_root)
+    if not path.is_file():
+        return None, None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return None, f"corrupt MEMORY.json at {path}: {exc}"
+    if not isinstance(data, dict):
+        return None, f"invalid MEMORY.json structure at {path} (expected object)"
+    expected_project = project_root.name
+    file_project = data.get("project")
+    if file_project and file_project != expected_project:
+        return None, (
+            f"MEMORY.json project mismatch: file specifies project {file_project!r} "
+            f"but current project is {expected_project!r} at {project_root}"
+        )
+    return data, None
+
+
+def init_memory(project_root: Path, *, agent: str, force: bool = False) -> Path:
+    """Initialise fresh MEMORY.json for a project."""
+    path = memory_path(project_root)
+    if path.is_file() and not force:
+        raise FileExistsError(f"MEMORY.json already exists at {path}; use --force to overwrite.")
+
+    source_url = None
+    manga_json_path = project_root / "manga.json"
+    if manga_json_path.is_file():
+        try:
+            m_data = json.loads(manga_json_path.read_text(encoding="utf-8"))
+            if isinstance(m_data, dict):
+                source_url = m_data.get("source_url") or m_data.get("url")
+        except Exception:
+            pass
+
+    data = {
+        "version": 2,
+        "project": project_root.name,
+        "updated_at": _iso(_utcnow()),
+        "updated_by": agent,
+        "source_url": source_url,
+        "brief": [],
+        "characters": {},
+        "beats": {},
+        "decisions": [],
+        "open_questions": [],
+    }
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return path
+
+
+def memory_init_main() -> int:
+    parser = argparse.ArgumentParser(
+        prog=f"{CLI_NAME} memory-init",
+        description="Initialise a fresh, isolated MEMORY.json for a manga project root.",
+    )
+    parser.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
+    parser.add_argument("--agent", default=None, help="Author (default: $MANGAEASY_AGENT or user@host).")
+    parser.add_argument("--force", action="store_true", help="Overwrite existing MEMORY.json if present.")
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    args = parser.parse_args()
+
+    root = args.project_root
+    if not root.is_dir():
+        print(f"[ERROR] project root not found: {root}", file=sys.stderr)
+        return 1
+    agent = args.agent or default_agent()
+
+    try:
+        mem_path = init_memory(root, agent=agent, force=args.force)
+    except FileExistsError as exc:
+        if args.as_json:
+            print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+        else:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+        return 1
+
+    if args.as_json:
+        print(json.dumps({"ok": True, "project": root.name, "path": str(mem_path)}, ensure_ascii=False))
+    else:
+        print(f"Initialised fresh MEMORY.json for project '{root.name}' at {mem_path}")
     return 0

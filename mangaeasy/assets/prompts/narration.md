@@ -41,34 +41,64 @@ Your task is to create narration completely from scratch for the provided manga 
 - Read all speech bubbles, narration boxes, sound effects, expressions, background details, and panel transitions carefully.
 - The prose must be original and source-grounded, not a copied transcript and
   not an invented rewrite.
-- Write like a clear, professional YouTube manga recap narrator.
+- Write in a high-engagement, modern YouTube manga recap storyteller tone (matching `/mnt/datadisk/narraction_example.txt`).
+  - Open line 1 with an immediate, gripping narrative hook that drops into the high-stakes scene or action.
+  - Use casual, dynamic, and engaging storytelling phrasing ("our boy", "bro", "this guy", "the low-ranked kid", "dusted himself off", "played dumb", "insane feat", "messed up", "which brings us back to...", "and here's the creepy part because...", "and this is where it gets interesting because...").
+  - Connect panels with smooth narrative momentum, explaining cause, choice, consequence, and stakes without using meta language (NEVER write `"this panel shows"`, `"we can see"`, or `"in this image"`).
 - Write a full motion-comic/anime-style narration track, not a short summary.
   Each panel needs enough grounded narration for the rendered video to feel
   continuous and intentional.
-- Keep the storytelling calm, immersive, and easy to follow.
+- Keep the storytelling immersive, fast-paced, and easy to follow for binge-watching.
 - Keep the pacing smooth and steady.
 - Add important contextual details, emotions, atmosphere, body language, and action descriptions when relevant.
 - Avoid robotic descriptions and repetitive wording.
-- Avoid excessive use of character names.
+- Avoid excessive use of character names — use dynamic terms ("our boy", "the protagonist", "this guy").
 - Make transitions between panels feel natural.
 - Keep the narration comfortable to listen to when converted into voice-over.
-- Write recap/explanation prose, not panel inventory or alt text. Connect an
-  already-established cause, choice, consequence, contrast, or stake when it
-  helps the listener understand why the beat matters.
 - Keep pronouns unambiguous and orient the listener when time, place, or
   viewpoint changes.
 - Vary sentence openings and sentence shape. Do not begin several consecutive
-  lines with `"Then"`, a character name, or the same pronoun, and do not write
-  meta phrases such as `"this panel shows"` or `"we can see"`.
+  lines with `"Then"`, a character name, or the same pronoun.
 
 ---
 
-## Priorities
+## Panel Synchronization & Anti-Desync Rules (STRICT)
 
-1. Accuracy
-2. Clarity
-3. Engagement
-4. Calm, consistent delivery
+To guarantee that narration **NEVER goes out of sync with the visual panel on screen**:
+
+1. **Strict 1-to-1 Beat Alignment**: The narration text for entry `N` (`{"image": "panel_N.jpg", "narration": "..."}`) MUST describe ONLY the action, speech, or expression visible in `panel_N.jpg`.
+2. **No Early Reveals (Zero Anti-Preview Desync)**: NEVER describe an action, event, dialogue, or reveal that takes place in panel `N+1` or later while narrating panel `N`. Revealing future panel events early causes the audio to get ahead of the video screen.
+3. **No Retrospective Lag (Zero Lag Desync)**: NEVER spend panel `N`'s narration string describing panel `N-1`'s past event, unless panel `N` visually displays a character's direct reaction to it.
+4. **Preserve Exact Panel Filename Sequence**: Entries in `narration.json` MUST be ordered in strict reading sequence matching the filenames in `panels/`. Never re-order panel filenames.
+5. **No Panel Smearing or Skips**: Every single image file in `panels/` MUST have exactly one corresponding entry in `narration.json`. Never combine multiple panels into one entry or omit story panels.
+6. **No Duplicate Intro Panels**: `intro.json` entries play before `narration.json`. Never reference the same panel filename in both `intro.json` and `narration.json` — repeating a panel filename causes the video frame to play twice, resulting in a visual stutter desync.
+
+---
+
+## Ground Narration in Stored Story Memory (STRICT)
+
+**Before writing any narration line, load story memory from disk — not from re-reading prior narration files.**
+
+```bash
+cat data/library/<Project>/MEMORY.json   # read "brief" block first
+# Then load beats for the chapter you are narrating:
+# python -c "import json; d=json.load(open('data/library/<P>/MEMORY.json')); print(json.dumps(d['beats'].get('07', []), indent=2))"
+```
+
+**Memory-grounded narration rules:**
+
+1. **Read `brief` first (≤40 lines).** This is the complete cold-start working set. It contains premise, cast, tone, style, and current batch state. You can write narration from `brief` alone for a chapter you haven't opened yet.
+2. **Load `beats["N"]` for the chapter you are narrating.** Do NOT open all prior `narration.json` files to "remember what happened." Prior chapter beats are already summarized in `MEMORY.json`.
+3. **Load `characters["Name"]` when you need character details.** Do NOT re-read prior chapters to confirm a name or appearance.
+4. **`conf: low` facts from `open_questions` are hypotheses only.** Never state them as established in narration. Use neutral attribution: "the dragon", "the figure", "her companion."
+5. **Write new facts to disk immediately when you establish them:**
+   - New character name confirmed on-panel → write `MEMORY.characters["Name"]` + `work-note --topic characters`
+   - New power, ability, title, relationship established → append to `MEMORY.beats[chN]` + `work-note --topic story`
+   - Ambiguous speaker or unresolved name → append to `MEMORY.open_questions` with `conf: low`
+   - Do NOT wait until the session ends to write — if the session is cut off, the fact is lost.
+6. **Update MEMORY.json before stopping or handing off.** Trim `brief` to ≤40 lines; push completed chapter summaries down; update `updated_at` and `updated_by`.
+
+
 
 ---
 

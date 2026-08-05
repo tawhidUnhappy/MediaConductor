@@ -233,14 +233,82 @@ dispatcher renders it; never `sys.exit` from library code). Note
   vanish again. Compare `pages` against the number that actually produced files
   rather than trusting the exit code.
 - **A project's durable context lives in `data/library/<P>/MEMORY.json`**
-  (story bible: premise, characters with per-fact confidence, beats tied to
-  panel ids, decisions and their reasons). It is a *summary*: the workboard
-  (`.workboard/*.jsonl`, via `work-status`) stays authoritative for progress,
-  `manga.json` for the source record, `manga-reviews.json` for approvals. Its
-  `brief` block is meant to be the entire working set for a fresh agent, with
-  everything else loaded on demand — keep it short and push detail down. A
-  fact tagged `conf: low` must never be stated as established, in narration or
-  anywhere else.
+  (story memory: premise, characters with per-fact confidence, beats tied to
+  panel ids, decisions and their reasons). Schema and protocol:
+
+  ```jsonc
+  {
+    "version": 2,
+    "project": "<ProjectFolder>",         // Mandatory project isolation anchor
+    "updated_at": "<ISO-8601>",
+    "updated_by": "<MANGAEASY_AGENT value>",
+
+    "brief": [
+      // ≤ 40 lines. THE ENTIRE COLD-START WORKING SET an agent needs to act.
+      // Format: "<topic>: <one compact sentence per line>"
+      // Example: "premise: Low-ranked hunter absorbs powers he defeats.",
+      //          "cast: Ren (M, silver hair, conf:high), Labyris (F, knight, conf:high)",
+      //          "batch: 01-12 in progress; ch07 audio pending.",
+      //          "style: high-engagement YouTube recap; casual persona."
+    ],
+
+    "characters": {
+      // One object per named character. Keys are canonical name spellings.
+      // "conf": "high" | "medium" | "low" — never state low-conf name as established.
+      "<Name>": {
+        "role": "...", "appearance": "...", "speech_style": "...",
+        "introduced": "<panel filename>", "conf": "high"
+      }
+    },
+
+    "beats": {
+      // Per-chapter plot beats tied to panel IDs. Load beats["N"] only when narrating chapter N.
+      "<chapter>": [
+        {"panel": "<filename>", "beat": "<one sentence>", "conf": "high"}
+      ]
+    },
+
+    "decisions": [
+      // Crop, narration, and tone decisions with reasoning. Load only when revisiting.
+      {"ts": "<ISO>", "agent": "<id>", "topic": "crop|narration|tone",
+       "decision": "...", "reason": "..."}
+    ],
+
+    "open_questions": [
+      // Unresolved facts. Cleared (removed) when resolved.
+      {"id": "q1", "question": "...", "conf": "low"}
+    ]
+  }
+  ```
+
+  **Memory Protocol (NON-NEGOTIABLE for all agents writing this project):**
+
+  READ — always hierarchical; never load the full story into context:
+  1. `brief` first (≤40 lines = the working set). Can act from this alone.
+  2. Narrating chapter N → load `beats["N"]`. Do NOT open all `narration.json` files.
+  3. Recalling character → load `characters["Name"]`. Do NOT re-read prior chapters.
+  4. `conf: low` = hypothesis only. Never state in narration as established fact.
+
+  WRITE — immediately on learn, before continuing (atomic fact per event):
+  - New character name/appearance → `work-note --topic characters` + append `MEMORY.characters`
+  - New power/title/reveal → `work-note --topic story` + append `MEMORY.beats[chN]`
+  - Crop/narration decision + reasoning → append `MEMORY.decisions`
+  - Unresolved speaker/name → append `MEMORY.open_questions` (`conf: low`)
+  Never batch writes to session end — a cut-off session loses the batch.
+
+  TRIM — when `brief` grows past 40 lines:
+  - Compress finished chapters: `"ch01-03: <one sentence summary>."` per range.
+  - Push character detail to `characters`; keep only `name + role` in `brief`.
+  - Keep only current batch window in `brief`; push older windows to `beats`.
+
+  SESSION END — mandatory before stopping or handing off:
+  1. Update `MEMORY.json` — trim `brief`, flush new facts, update `updated_at` + `updated_by`.
+  2. `work-note --topic handoff --add "<exactly what step was in flight>"`.
+  3. `work-todo --add "<next concrete step>"` for anything not yet visible on disk.
+
+  Two authority rules: the **workboard is authoritative for progress**
+  (`MEMORY.json` is a summary and can be stale — if they disagree, believe
+  `work-status`). And `manga.json` is authoritative for the source record.
 - **Production manga renders use faded derivatives, not raw clip edges**:
   `data/audio_faded/` contains symmetric 8 ms fade-in/fade-out copies and `data/audio/`
   remains the recoverable TTS source. Keep `--audio-source raw` opt-in.

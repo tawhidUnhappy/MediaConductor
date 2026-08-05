@@ -22,6 +22,27 @@ uv run mangaeasy doctor --mode manga-video --json
 uv run mangaeasy commands --mode manga-video --json
 ```
 
+**Before any production work — read story memory first:**
+
+```bash
+# 1. Project progress (filesystem-derived — always accurate)
+mangaeasy work-status --project-root data/library/<Project> --json
+
+# 2. Story memory — the cold-start working set for this project
+cat data/library/<Project>/MEMORY.json   # read the "brief" block first
+
+# 3. If MEMORY.json does not exist yet — initialise a fresh isolated memory file:
+mangaeasy memory-init --project-root data/library/<Project>
+```
+
+> [!IMPORTANT]
+> **Never load all `narration.json` files into context to "remember the story."**
+> That burns tokens on every session, breaks on long series, and loses
+> everything at session end anyway.
+> Use `MEMORY.json` `brief` (≤40 lines) as the working set.
+> Load `beats["N"]` only when narrating chapter N.
+> See [docs/multi-agent.md](multi-agent.md) for the full Memory Protocol.
+
 Use `commands --json --full --tools <names...>` only when you need exact
 arguments for the next command or two. Loading the full mode schema on every
 turn wastes context; `work-status --next --json` and the compact catalog are

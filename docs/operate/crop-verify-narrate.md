@@ -292,9 +292,7 @@ One object per panel you narrate, keyed by the crop's **filename**:
 **Per-panel grounding rules** (each one traces back to shipped-video
 feedback):
 
-- **One beat per panel.** The line describes what is visible in THAT panel
-  only. Story summary belongs across consecutive panels' lines, never inside
-  one panel's line while the viewer stares at a different image.
+- **One beat per panel (Strict Panel Synchronization).** The line describes what is visible in THAT panel only. Never describe panel N+1's or N+2's upcoming events early while showing panel N (causes the audio narration to get ahead of the video frame). Never lag behind recounting past events unless visually shown as a reaction beat.
 - **Anchor dialogue to the visible bubbles.** Paraphrase freely for voice and
   pacing, but the meaning must match the original panel pixels. OCR is
   unverified cross-evidence only; a disagreement means re-open the original,

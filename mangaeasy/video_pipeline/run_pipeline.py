@@ -135,6 +135,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--blur-backend", choices=("auto", "vulkan", "cpu"), default="auto")
     parser.add_argument("--background-brightness", type=float, default=-0.06)
     parser.add_argument("--background-saturation", type=float, default=1.08)
+    parser.add_argument("--panel-scale", type=float, default=1.0,
+                        help="Scale factor for the foreground panel inside the canvas (e.g. 0.90 for 90%% size with 5%% margin).")
     parser.add_argument("--background-music", type=Path, default=None,
                         help="Music file for the final long-video mix. Defaults to config.system.json -> bgm.file "
                              "or the tracked default music asset when present; use --no-background-music to skip.")

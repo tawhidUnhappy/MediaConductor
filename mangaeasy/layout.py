@@ -163,6 +163,15 @@ def work_root() -> Path:
     return data_root() / "work"
 
 
+def project_memory_path(project_root: Path) -> Path:
+    """The one canonical path for a project's durable story memory.
+
+    Always scoped to ``data/library/<project>/MEMORY.json``.
+    Never global; never shared across projects.
+    """
+    return project_root / "MEMORY.json"
+
+
 # ── runtime/ sub-roots ────────────────────────────────────────────────────────
 
 def tools_root() -> Path:

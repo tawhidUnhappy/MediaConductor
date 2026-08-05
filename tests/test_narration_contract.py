@@ -156,27 +156,11 @@ def test_valid_strict_entry_round_trips(item):
         "image": "a.png",
         "narration": "He realizes the gate was opened from inside.",
         "evidence": ["a.png", "b.png"],
-        "motion": {"type": "slow_zoom_in", "focus_x": 0.52, "focus_y": 0.38, "strength": 0.05},
         "pause_after_ms": 240,
     }])
     assert entries[0]["beat_id"] == "ch01-b0042"
-    assert entries[0]["motion"] == {
-        "type": "slow_zoom_in", "focus_x": 0.52, "focus_y": 0.38, "strength": 0.05,
-    }
     assert entries[0]["pause_after_ms"] == 240
     assert entries[0]["evidence"] == ["a.png", "b.png"]
-
-
-@pytest.mark.parametrize("motion,match", [
-    ({"type": "barrel_roll"}, "motion.type"),
-    ({"type": "slow_zoom_in", "focus_x": 1.4}, "focus_x"),
-    ({"type": "slow_zoom_in", "focus_y": -0.1}, "focus_y"),
-    ({"type": "slow_zoom_in", "strength": 0.9}, "strength"),
-    ({"type": "slow_zoom_in", "wobble": 1}, "unknown motion field"),
-    ({"type": "slow_zoom_in", "strength": "a lot"}, "strength must be a number"),
-])
-def test_invalid_motion_values_are_rejected(item, motion, match):
-    expect_error(item, [{"image": "a.png", "narration": "x", "motion": motion}], match)
 
 
 @pytest.mark.parametrize("pause", [-1, 60_000, 1.5, True, "240"])

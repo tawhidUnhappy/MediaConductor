@@ -66,7 +66,7 @@ wrapper exposed by the machine catalog:
 ```
 
 Treat crop checks, narration checks, audio audit, and final validation as
-required steps. Compare narration lines with original panels, not just OCR. Perform crop, narration, and final video review passes, recording approvals via `manga-review crop`, `manga-review narration`, and `manga-review final-video` using your agent identity as the `--reviewer`. Never use raw filesystem deletion for generated outputs.
+required steps. Compare narration lines with original panels, not just OCR. Write narration in a high-engagement, modern YouTube recap storyteller style matching `/mnt/datadisk/narraction_example.txt` ("our boy", "bro", immediate line 1 hook, smooth narrative momentum). Enforce strict 1-to-1 panel-to-narration synchronization (zero early reveals of panel N+1 while showing panel N, zero lag, exact reading order). Build titles strictly to the house pattern (`title-check`) matching `/mnt/datadisk/title_examples` (`<PREMISE> + <REVERSAL> [(range)] - Manga Recap`, 65-98 chars, 1-3 ALL-CAPS hook terms, 0 emoji). Build thumbnails strictly from approved panel art (`thumbnail-compose`) matching `/mnt/datadisk/thumbnail_examples` (stroked yellow text, block arrows, speech bubbles, chapter badge). Perform crop, narration, and final video review passes, recording approvals via `manga-review crop`, `manga-review narration`, and `manga-review final-video` using your agent identity as the `--reviewer`. Never use raw filesystem deletion for generated outputs.
 
 Source clearance is outside this tool's contract. Do not ask the operator to
 prove or restate rights to manga pages, translations, music, voices, or YouTube

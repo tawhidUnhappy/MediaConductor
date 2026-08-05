@@ -14,6 +14,146 @@ live only in one model's context window. See
 [Switching LLM providers mid-project](#switching-llm-providers-mid-project)
 below for the handoff recipe.
 
+---
+
+## Story Memory: MEMORY.json
+
+`data/library/<Project>/MEMORY.json` is the project's **external episodic
+memory**. It exists because:
+
+- Context windows are finite. A 12-chapter batch can easily exceed 100K tokens
+  of narration text — loading all of it burns budget, hits limits, and still
+  loses everything at session end.
+- Sessions end unexpectedly (budget, context, crashes). When they do, anything
+  only in the model's working memory is gone.
+- LLM providers change mid-project. The next model has no shared memory with
+  the last one.
+
+The solution — consistent with MemGPT (Packer et al., 2023) and Anthropic's
+external memory guidance — is **hierarchical disk-based memory** where the
+model reads the compact working set (`brief`), loads detail sections on demand,
+and writes new facts to disk the moment they are established.
+
+### Schema
+
+```jsonc
+{
+  "version": 2,
+  "project": "solo_leveling",              // Mandatory project isolation anchor
+  "updated_at": "2026-08-05T10:00:00Z",   // ISO-8601, set on every write
+  "updated_by": "claude-fable",            // MANGAEASY_AGENT value
+
+  // ── HOT: read first, every session ───────────────────────────────────────
+  "brief": [
+    // ≤ 40 lines. THE ENTIRE COLD-START WORKING SET.
+    // Each line: "<topic>: <one compact sentence>"
+    // A fresh agent reads only this and can act on the project.
+    // When this block grows past 40 lines, trim it (see protocol below).
+    "premise: Low-ranked hunter silently absorbs the powers of everything he defeats.",
+    "cast: Ren (M, protagonist, silver hair, E-rank → rising, conf:high), Labyris (F, red-haired knight, tsundere, conf:high), unnamed dragon (conf:low — name not yet revealed as of ch06)",
+    "tone: Dark isekai, dry humor, occasional betrayal twist.",
+    "style: high-engagement YouTube recap; casual persona (\"our boy\", \"bro\").",
+    "batch: 01-12 in progress. ch07 audio pending.",
+    "overrides: ch03 page5 is a montage — overrides.json must always be passed to page-split."
+  ],
+
+  // ── WARM: load only the section you need ─────────────────────────────────
+  "characters": {
+    // One entry per named character. Load only the entry you need, not the whole object.
+    // conf: "high" | "medium" | "low"
+    // NEVER state a conf:low name as established in narration.
+    "Ren": {
+      "role": "protagonist",
+      "appearance": "silver hair, one-star badge on introduction page",
+      "speech_style": "quiet, direct; rarely expresses surprise aloud",
+      "introduced": "01_001_01.jpg",
+      "aliases": [],
+      "conf": "high"
+    }
+  },
+
+  "beats": {
+    // Per-chapter plot beats tied to panel IDs.
+    // Load beats["N"] ONLY when narrating chapter N. Do NOT load all chapters.
+    "01": [
+      {"panel": "01_003_02.jpg", "beat": "Ren announced as E-rank in the guild assessment.", "conf": "high"},
+      {"panel": "01_015_01.jpg", "beat": "First absorption: Ren silently takes the goblin's speed.", "conf": "high"}
+    ]
+  },
+
+  // ── COLD: load on demand, not routinely ──────────────────────────────────
+  "decisions": [
+    // Crop, narration, and tone decisions with reasoning.
+    // Load a decision only when revisiting that chapter or panel.
+    {
+      "ts": "2026-08-05T08:00:00Z",
+      "agent": "claude-fable",
+      "topic": "crop",
+      "decision": "ch03 page5 is a montage — explicit boxes in overrides.json.",
+      "reason": "MAGI returned automatic-full-page-box; visual inspection confirmed 4 bordered panels hidden by black fill."
+    }
+  ],
+
+  "open_questions": [
+    // Unresolved facts. Use conf:low. Remove an entry when resolved.
+    {"id": "q1", "question": "Dragon name — not revealed on page as of ch06.", "conf": "low"}
+  ]
+}
+```
+
+### Memory Protocol (NON-NEGOTIABLE)
+
+#### READ — hierarchical, never load the full story
+
+| What you need | What to read | What NOT to do |
+|---|---|---|
+| Starting a session | `brief` only (≤40 lines) | Do not open all `narration.json` files |
+| Narrating chapter N | `beats["N"]` | Do not load all other chapters' beats |
+| Recalling a character | `characters["Name"]` | Do not re-read prior chapters |
+| Revisiting a decision | `decisions` filtered by chapter | Do not re-derive from scratch |
+
+`conf: low` facts are hypotheses. **Never state them as established in narration or decisions.**
+
+#### WRITE — immediately on learn, not batched at session end
+
+Every new fact goes to disk **before you continue**. A cut-off session loses anything you only intended to write later.
+
+| What you established | Write immediately |
+|---|---|
+| New character name, appearance, speech style | `work-note --topic characters` **+** append entry to `MEMORY.characters` |
+| New power, title, relationship, reveal | `work-note --topic story` **+** append beat to `MEMORY.beats[chN]` |
+| Crop or narration decision with reasoning | Append to `MEMORY.decisions` |
+| Unresolved name, unclear speaker, ambiguous panel | Append to `MEMORY.open_questions` with `conf: low` |
+| A `conf: low` fact confirmed on-panel | Remove from `open_questions`, move to `characters`/`beats` as `conf: high` |
+
+Write `MEMORY.json` as a complete file each time (read → update in memory → write back). Keep `updated_at` and `updated_by` current on every write.
+
+#### TRIM — when `brief` exceeds 40 lines
+
+1. Compress finished chapters to one line per range: `"ch01-03: Ren rises from E-rank to C-rank; meets Labyris."`.
+2. Move character detail to `characters`; keep only `name + role + conf` in `brief`.
+3. Keep only the current batch window active in `brief`; push older windows to `beats`.
+4. After trimming, write the file and confirm `brief` ≤ 40 lines.
+
+#### SESSION END — mandatory before stopping or handing off
+
+```bash
+# 1. Write updated MEMORY.json (trim brief, flush new facts, update updated_at + updated_by)
+# 2. Leave a handoff note — the narrative, not just the stage:
+mangaeasy work-note --project-root data/library/<P> --topic handoff \
+    --add "item 07 video-render was running in the background; verify job-status before re-launching. \
+           Next: ch08 narration (reading sheet shows dense text panel 08_012_03 — OCR optional)."
+# 3. Leave next steps that aren't visible on disk:
+mangaeasy work-todo --project-root data/library/<P> \
+    --add "Redo ch10 thumbnail — user wants split-preset variant" --topic publishing
+```
+
+**The next agent — any model, any vendor — reads `MEMORY.json` (step 0b) and picks up exactly where you left off, without re-reading the entire story.**
+
+---
+
+
+
 ## The session protocol
 
 Every session — first or fiftieth, alone or with other agents (or other

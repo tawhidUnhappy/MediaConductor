@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from mangaeasy.audio.narration_safety import narration_quality_findings
@@ -9,10 +9,6 @@ from mangaeasy.video_pipeline.common import IMAGE_EXTENSIONS  # noqa: F401  (sin
 from mangaeasy.video_pipeline.common import project_name
 from mangaeasy.video_pipeline.ffmpeg_tools import probe_duration
 from mangaeasy.video_pipeline.narration_contract import validate_item_narration
-
-
-def fallback_motion() -> dict:
-    return {"type": "slow_zoom_in", "focus_x": 0.5, "focus_y": 0.45, "strength": 0.075}
 
 
 def frame_aligned_duration(audio_duration: float, fps: int) -> tuple[float, int]:
@@ -27,7 +23,6 @@ class PanelAsset:
     audio_duration: float
     visual_duration: float
     frame_count: int
-    motion: dict = field(default_factory=fallback_motion)
     pause_after_ms: int = 0
 
 
@@ -124,7 +119,7 @@ def collect_panel_assets(
     audio_dir = item_audio_dir(audio_root, project_root, project_name_override, item_dir)
     entries = load_narration(item_dir)
     assert_all_panels_narrated(item_dir, entries)
-    for index, item in enumerate(entries):
+    for item in entries:
         image_name = item.get("image")
         if not image_name:
             raise ValueError(f"Missing image key in {item_dir / 'narration.json'}")
@@ -140,7 +135,6 @@ def collect_panel_assets(
             audio_duration + pause_after_ms / 1000.0,
             fps,
         )
-        motion = item.get("motion") or default_motion(index, len(entries))
         assets.append(
             PanelAsset(
                 image_path,
@@ -148,21 +142,7 @@ def collect_panel_assets(
                 audio_duration,
                 visual_duration,
                 frame_count,
-                motion,
                 pause_after_ms,
             )
         )
     return assets
-
-
-def default_motion(index: int, _total: int) -> dict:
-    """Readable motion-comic default for panels without explicit direction."""
-    cycle = (
-        {"type": "slow_zoom_in", "focus_x": 0.50, "focus_y": 0.45, "strength": 0.075},
-        {"type": "pan_right", "focus_x": 0.50, "focus_y": 0.50, "strength": 0.065},
-        {"type": "slow_zoom_out", "focus_x": 0.50, "focus_y": 0.50, "strength": 0.065},
-        {"type": "pan_left", "focus_x": 0.50, "focus_y": 0.50, "strength": 0.065},
-        {"type": "pan_up", "focus_x": 0.50, "focus_y": 0.48, "strength": 0.055},
-        {"type": "pan_down", "focus_x": 0.50, "focus_y": 0.52, "strength": 0.055},
-    )
-    return cycle[index % len(cycle)]

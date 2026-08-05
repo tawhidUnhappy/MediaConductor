@@ -119,6 +119,7 @@ _PATH_ARGUMENTS: dict[str, frozenset[str]] = {
     "work_claim": frozenset({"project_root"}),
     "work_note": frozenset({"project_root"}),
     "work_todo": frozenset({"project_root"}),
+    "memory_init": frozenset({"project_root"}),
     "work_qa": frozenset({"project_root"}),
     "work_artifacts": frozenset({"project_root"}),
     # Review records, panel decisions, and quality reports are

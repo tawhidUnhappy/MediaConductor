@@ -91,6 +91,7 @@ COMMANDS: dict[str, tuple[str, str, str, str]] = {
     "work-claim":           ("mangaeasy.workboard",                            "claim_main",  "Multi-agent",      "Atomically claim an item+stage or a shared --resource (e.g. gpu) with a TTL lease so agents never collide."),
     "work-note":            ("mangaeasy.workboard",                            "note_main",   "Multi-agent",      "Append/read the project's shared notebook (characters, speakers, tone, decisions) for agent handoff."),
     "work-todo":            ("mangaeasy.workboard",                            "todo_main",   "Multi-agent",      "Shared session todo list (batch scope, redo requests, things to confirm) that survives a switch to a different LLM/vendor mid-project."),
+    "memory-init":          ("mangaeasy.workboard",                            "memory_init_main", "Multi-agent", "Initialise a fresh, isolated MEMORY.json for a manga project root."),
     "work-qa":              ("mangaeasy.qa_loop",                              "qa_main",     "Multi-agent",      "Machine QA gate with fix commands; exit 0 does not waive reported manual visual reviews."),
     "work-artifacts":       ("mangaeasy.qa_loop",                              "artifacts_main", "Multi-agent",   "Inventory of reusable generated artifacts (renders, audio takes, transcripts, sheets, music beds) with reuse hints."),
 

@@ -72,18 +72,15 @@ attribution consistent across adjacent panels and chapters. Do not use future
 knowledge, reveal a name early, invent dialogue, motives, causes, or off-panel
 events, or turn an OCR guess into fact.
 
-Write a recap/explanation, not alt text or a bubble transcript. Every crop in
-`panels/` must have one narration entry in playback order; omissions do not
-satisfy production coverage. Each line
-should carry one current story beat and, when supported, connect an
-already-established cause, decision, consequence, contrast, or stake. Keep
-pronouns unambiguous, orient the listener when time/place/speaker changes, and
-vary sentence openings and sentence shape. Avoid robotic inventories
-(`"Then he..."` on every panel), filler, meta wording such as `"the panel
-shows"`, and repeated paraphrases. If credits, scanlator notices, or
-decorative/SFX-only images remain in `panels/`, narrate them briefly and
-factually; otherwise fix the crop set before narration. Keep array order equal
-to the intended reading/playback order.
+Write a high-engagement recap/explanation matching `/mnt/datadisk/narraction_example.txt`, not alt text or a bubble transcript. Open line 1 with an immediate narrative hook that drops directly into the scene. Use casual, dynamic storytelling phrasing ("our boy", "bro", "this guy", "the low-ranked kid", "dusted himself off", "played dumb", "insane feat", "messed up", "which brings us back to...", "and here's the creepy part because..."). Every crop in `panels/` must have one narration entry in playback order; omissions do not satisfy production coverage. Each line should carry one current story beat and, when supported, connect an already-established cause, decision, consequence, contrast, or stake. Keep pronouns unambiguous, orient the listener when time/place/speaker changes, and vary sentence openings and sentence shape. Avoid robotic inventories (`"Then he..."` on every panel), filler, meta wording such as `"the panel shows"`, and repeated paraphrases. If credits, scanlator notices, or decorative/SFX-only images remain in `panels/`, narrate them briefly and factually; otherwise fix the crop set before narration. Keep array order equal to the intended reading/playback order.
+
+### Panel Synchronization & Anti-Desync Rules
+
+- **Strict 1-to-1 Panel Alignment**: Entry `N` (`{"image": "panel_N.jpg", "narration": "..."}`) must describe ONLY the beat, dialogue, or action happening inside `panel_N.jpg`.
+- **Zero Anti-Preview Desync**: Never describe panel `N+1`'s or `N+2`'s future action while showing panel `N`. Revealing upcoming events early causes audio to get ahead of the video screen.
+- **Zero Retrospective Lag Desync**: Never spend panel `N`'s narration line describing past panel `N-1`'s action unless panel `N` visually displays a character's direct reaction to it.
+- **Preserve Reading Filename Sequence**: `narration.json` array order must strictly match `panels/` reading order.
+- **No Duplicate Intro Panels**: `intro.json` entries play before `narration.json`. Never use the same panel filename in both files — repeating a panel filename causes the video frame to play twice, resulting in a visual stutter desync.
 
 **Voice delivery is always restrained.** Describe dramatic events and
 characters' reactions accurately while the narrator remains a calm observer.

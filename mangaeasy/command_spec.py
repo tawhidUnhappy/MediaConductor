@@ -491,15 +491,19 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
     ),
     "render_videos": (
         "video-render",
-        "Render one animated motion-comic video per item from panels + audio after confirmed "
+        "Render one manga video per item from panels + audio after confirmed "
         "manual crop/narration review. Every cropped panel must be narrated; needs audio to "
         "exist (run generate_audio/audio_audit first).",
         {"project_root": _PROJECT_ROOT, "audio_root": _STR, "output_root": _STR,
-         "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL},
+         "project_name": _STR, "items": _ITEMS, "overwrite": _BOOL,
+         "panel_scale": {**_NUM, "default": 1.0,
+                         "description": "Scale factor for the foreground panel inside the canvas "
+                                        "(e.g. 0.90 for 90% size with 5% margin)."}},
         ["project_root", "audio_root", "output_root"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "project_name": ("--project-name", "value"),
-         "items": ("--items", "list"), "overwrite": ("--overwrite", "flag")},
+         "items": ("--items", "list"), "overwrite": ("--overwrite", "flag"),
+         "panel_scale": ("--panel-scale", "value")},
     ),
     "build_long_video": (
         "video-join",
@@ -559,7 +563,10 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "no_background_music": {**_BOOL, "description":
              "Render with no music bed, ignoring the configured default."},
          "background_music": {**_STR, "description": "Path to the music file. Optional: defaults to config.system.json -> bgm.file. Accepts a Windows absolute path, a Linux absolute path, or a path relative to config.system.json. Any audio format: wav, mp3, m4a, aac, flac, ogg, opus, wma, aiff, or anything else ffmpeg reads."},
-         "music_volume_db": _NUM},
+         "music_volume_db": _NUM,
+         "panel_scale": {**_NUM, "default": 1.0,
+                         "description": "Scale factor for the foreground panel inside the canvas "
+                                        "(e.g. 0.90 for 90% size with 5% margin)."}},
         ["project_root", "audio_root", "output_root"],
         {"project_root": ("--project-root", "value"), "audio_root": ("--audio-root", "value"),
          "output_root": ("--output-root", "value"), "items": ("--items", "list"),
@@ -575,7 +582,8 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "overwrite_video": ("--overwrite-video", "flag"),
          "no_background_music": ("--no-background-music", "flag"),
          "background_music": ("--background-music", "value"),
-         "music_volume_db": ("--music-volume-db", "value")},
+         "music_volume_db": ("--music-volume-db", "value"),
+         "panel_scale": ("--panel-scale", "value")},
     ),
     "youtube_profiles": (
         "youtube-profiles",
@@ -738,6 +746,18 @@ TOOLS: dict[str, tuple[str, str, dict, list[str], dict]] = {
          "topic": ("--topic", "value"), "start": ("--start", "value"), "done": ("--done", "value"),
          "reopen": ("--reopen", "value"), "remove": ("--remove", "value"),
          "agent": ("--agent", "value"), "pending_only": ("--pending-only", "flag")},
+    ),
+    "memory_init": (
+        "memory-init",
+        "Initialise a fresh, isolated MEMORY.json for a manga project root. Refuses to overwrite "
+        "an existing MEMORY.json unless force=true is passed.",
+        {"project_root": _PROJECT_ROOT,
+         "force": {**_BOOL, "description": "Overwrite existing MEMORY.json if present."},
+         "agent": _STR},
+        ["project_root"],
+        {"project_root": ("--project-root", "value"),
+         "force": ("--force", "flag"),
+         "agent": ("--agent", "value")},
     ),
     "work_qa": (
         "work-qa",

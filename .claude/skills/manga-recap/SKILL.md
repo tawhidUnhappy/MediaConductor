@@ -41,26 +41,86 @@ the log. Only foreground the quick `--json`/validation commands.
 
 ## 0. Orient (every session)
 
+### Step 0a — Orient the workspace
+
 ```bash
 mangaeasy where --json      # install paths + version
 mangaeasy doctor --json     # ffmpeg/GPU/tool readiness
 mangaeasy work-status --project-root data/library/<Project> --json   # resuming? exact per-item stage
-cat data/library/<Project>/MEMORY.json                               # story bible, if one exists
 ```
 
-**Read `MEMORY.json` first when it exists.** It is the project's durable story
-memory: premise, character bible with per-name confidence, per-chapter beats
-tied to panel ids, and *why* earlier decisions were made. Its `brief` block is
-designed to be the whole working set — read that and you can act; everything
-below it is detail to load only when needed. It exists because a context loss
-between sessions otherwise costs the next narrator every established character
-name and every crop decision.
+### Step 0b — Load story memory (MANDATORY before any narration or decision)
 
-Two rules for it: the **workboard is authoritative for progress** (MEMORY.json
-is a summary and can be stale — if they disagree, believe `work-status`), and
-**never state a `conf: low` fact as established**, in narration or anywhere
-else. Append atomic facts as you learn them and keep `brief` short; when it
-grows past ~40 lines, push detail down and leave a pointer.
+```bash
+# For a fresh manga project, initialise a clean isolated memory file:
+mangaeasy memory-init --project-root data/library/<Project>
+
+# Read story memory:
+cat data/library/<Project>/MEMORY.json
+```
+
+**`MEMORY.json` is the project's durable external memory.** Every manga gets its own isolated, unpolluted memory file stored at `data/library/<Project>/MEMORY.json`. Never share or copy memory across different manga titles. Always verify `data["project"] == <Project>` to guarantee zero context leakage between projects.
+
+It replaces putting the whole story in your active context window — which wastes tokens,
+breaks on context-length limits, and loses everything when a session ends or
+a different LLM takes over. Read it first. Act from it. Write to it the moment
+you learn something new.
+
+The file has a strict hierarchical structure (full schema: `docs/multi-agent.md`):
+
+```
+brief        — ≤ 40 lines. THE ENTIRE COLD-START WORKING SET.
+               Read this block. You can act on the project from it alone.
+               Never load all narration.json files instead — that wastes tokens.
+characters   — One object per named character. Load only the entry you need.
+beats        — Per-chapter plot beats tied to panel IDs.
+               Load beats["N"] only when narrating chapter N.
+decisions    — Crop/narration/tone decisions with reasoning. Load on demand.
+open_questions — Unresolved facts (conf: low). Cleared when resolved.
+```
+
+#### Memory Protocol (NON-NEGOTIABLE)
+
+**READ — always hierarchical, never load the full story:**
+
+1. Read `brief` first (≤40 lines). This is your working set.
+2. To narrate chapter N: read `beats["N"]` only. Do **NOT** open all prior `narration.json` files.
+3. To recall a character: look up `characters["Name"]`. Do **NOT** re-read prior chapters.
+4. `conf: low` facts are hypotheses only — narrate neutrally; **never state as established**.
+
+**WRITE — immediately on learn, not at session end:**
+
+Every time you establish a new fact, write it to disk **before continuing**:
+
+| What you learned | Where to write |
+|---|---|
+| New character name, appearance, speech style | `work-note --topic characters` + append to `MEMORY.characters` |
+| New power, ability, title, relationship | `work-note --topic story` + append to `MEMORY.beats[chN]` |
+| Crop override or detection decision | append to `MEMORY.decisions` with reasoning |
+| Unresolved name, unclear speaker, ambiguous panel | append to `MEMORY.open_questions` with `conf: low` |
+
+Never batch writes to the end of a session — if the session is cut off, the batch is lost.
+
+**TRIM — when `brief` grows past 40 lines:**
+
+1. Compress completed chapters to one line each: `"ch01-03: Ren rises from E-rank to C-rank; meets Labyris."`.
+2. Move character detail to `MEMORY.characters`; keep only `name + role` in `brief`.
+3. Keep only the current batch window in `brief`; push older windows to `beats`.
+
+**SESSION END — mandatory before stopping or handing off:**
+
+```bash
+# 1. Save updated MEMORY.json (trim brief, flush new facts, update updated_at + updated_by)
+# 2. Leave a handoff note:
+mangaeasy work-note --project-root data/library/<P> --topic handoff \
+    --add "<exactly what step you were mid-step on and what to check first>"
+# 3. Leave any not-yet-visible next steps on the shared todo:
+mangaeasy work-todo --project-root data/library/<P> --add "<next concrete step>"
+```
+
+**The next agent — any model, any vendor — runs steps 0a and 0b and picks up exactly where you left off.**
+
+---
 
 Resuming a project — including picking it back up on a **different LLM**
 after another one ran out of budget or context mid-batch — or working
@@ -229,8 +289,8 @@ chapter's `narration.json`, so its panels must be ones the chapter's
 replays a beat, then it shows again in-context — a viewer-reported "why is the
 start repeating?"). Either give the intro its own distinct panels, or drop
 those panels from `narration.json`; `narration-check` now fails on the overlap.
-Grounding rules (each traces to real viewer complaints about a shipped recap):
-
+- **strict panel synchronization (zero desync guarantee)** — entry N must describe ONLY panel N; never describe panel N+1 or N+2's upcoming events early while showing panel N (causes audio to preview ahead of video); never lag behind; preserve exact filename array order;
+- **high-engagement recap storyteller tone** — write in the modern YouTube recap persona matching `/mnt/datadisk/narraction_example.txt` ("our boy", "bro", "this guy", "the low-ranked kid", "dusted himself off", "played dumb", "insane feat", "messed up", "which brings us back to...", "and here's the creepy part because..."); open line 1 with an immediate narrative hook;
 - **one beat per panel** — the line describes THAT panel, never a summary of
   several panels smeared over one image;
 - **paraphrase anchored to the visible bubble text** — reword freely, but the
@@ -358,17 +418,21 @@ art the video does not contain. Full recipe: `docs/thumbnail.md`.
    the title, or a composition that reads as explicit or minor-coded — and
    these leads are usually teenagers, so that is a live constraint. Compose
    2–3 candidates and pick deliberately.
-5. **Write the title** to the house pattern
+5. **Write the title** to the house pattern matching `/mnt/datadisk/title_examples`
    (`mangaeasy title-check --pattern` prints it in full):
    `<STATUS or PREMISE> + <REVERSAL> [+ CONSEQUENCE] [(1-12)] - Manga Recap`.
+   Examples from the house catalog:
+   - `REINCARNATED As VILLAIN But The Heroines Are YANDERE for Him - Manga Recap`
+   - `Farmer Accidentally Defeated The Demon Queen And She Fell In Love For His Strength | Manhwa Recap`
+   - `He Refused To Become A Hero, So The Gods Cursed Him And He Became A Villain (1-6) - Manhwa Recap`
    The reversal *is* the title — what the premise led you to expect, and what
-   happened instead. Title Case, 65–97 chars, at most three ALL-CAPS emphasis
-   words (none is fine), one `!`/`?` at most, no emoji. Generate several and
+   happened instead. Title Case, 65–98 chars, 1–3 ALL-CAPS emphasis words
+   (`VILLAIN`, `YANDERE`, `SECRET VILLAIN`), max one `!`/`?`, zero emoji. Generate several and
    check them together:
    `mangaeasy title-check "candidate one" "candidate two" --json`.
    It validates shape only — every claim must be supported by a beat that
    actually appears in the video, and the title and thumbnail must agree.
-5. Iterating after upload? Reuse the exact verified account with
+6. Iterating after upload? Reuse the exact verified account with
    `mangaeasy youtube-thumbnail --profile <profile> --video-id <id>
    --image final_thumb.png` so a multi-channel install cannot target the
    legacy `default` account accidentally.
