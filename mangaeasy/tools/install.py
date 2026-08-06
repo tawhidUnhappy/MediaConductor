@@ -1,23 +1,21 @@
-"""mangaeasy.tools.install — provision external AI tool environments.
-
-Tools download model weights directly from HuggingFace Hub repositories.
-"""
+"""mangaeasy.tools.install — provision external AI tool environments."""
 
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from mangaeasy.brand import CLI_NAME, PRODUCT_NAME
 from mangaeasy import runtime
+from mangaeasy.brand import CLI_NAME, PRODUCT_NAME
 from mangaeasy.tools.external import (
     python_command,
     resolve_tool_dir,
@@ -209,6 +207,33 @@ def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None =
     _run_pipe(cmd, log, cwd=cwd, env=env)
 
 
+def _clone_or_update(
+    git_url: str,
+    dest: Path,
+    ref: str | None,
+    log: LogFn,
+    *,
+    skip_lfs_smudge: bool = True,
+) -> None:
+    env = dict(tool_env())
+    if skip_lfs_smudge:
+        env["GIT_LFS_SKIP_SMUDGE"] = "1"
+
+    if not (dest / ".git").is_dir():
+        log(f"Cloning {git_url} -> {dest}...")
+        _run(
+            ["git", "clone", "--filter=blob:none", "--depth", "1", "--no-tags", "--no-checkout", git_url, str(dest)],
+            log,
+            cwd=dest.parent,
+            env=env,
+        )
+
+    if ref:
+        log(f"Fetching ref {ref}...")
+        _run(["git", "fetch", "--depth", "1", "--filter=blob:none", "origin", ref], log, cwd=dest, env=env)
+        _run(["git", "checkout", "--detach", "FETCH_HEAD"], log, cwd=dest, env=env)
+
+
 def _download_hf_snapshot(
     repo: str,
     revision: str | None,
@@ -289,10 +314,20 @@ def install_tool(
     gpu_mode = gpu if gpu in ("cuda", "cpu") else default_torch_build()
     log(f"=== Installing {spec.title} -> {target} ===")
 
-    _write_managed_pyproject(spec, target, gpu_mode)
-    _install_adapter_files(spec, target, log)
+    if spec.kind == "uv_project" and spec.git_url:
+        _clone_or_update(spec.git_url, target, ref or spec.ref, log)
+        sync_cmd = ["uv", "sync", "--python", spec.python]
+        if spec.exclude_extras:
+            for ex in spec.exclude_extras:
+                sync_cmd.extend(["--no-extra", ex])
+        elif spec.sync_args:
+            sync_cmd.extend(spec.sync_args)
+        _run(sync_cmd, log, cwd=target)
+    else:
+        _write_managed_pyproject(spec, target, gpu_mode)
+        _run(["uv", "sync", "--python", spec.python], log, cwd=target)
 
-    _run(["uv", "sync", "--python", spec.python], log, cwd=target)
+    _install_adapter_files(spec, target, log)
 
     if spec.verify_import:
         _verify_tool_python(target, spec.verify_import, log)
@@ -330,46 +365,6 @@ def doctor(*, check_updates: bool = False, mode: str | None = None) -> dict:
         "executables": executables,
         "tools": tools,
     }
-
-
-def _configured_media() -> dict:
-    from mangaeasy.config import SYSTEM_CONFIG_FILE
-    from mangaeasy.defaults import default_speaker_wav, default_tts_engine
-
-    speaker = default_speaker_wav()
-    return {
-        "config_file": str(SYSTEM_CONFIG_FILE),
-        "config_file_exists": SYSTEM_CONFIG_FILE.is_file(),
-        "tts_engine": default_tts_engine(),
-        "speaker_wav": str(speaker) if speaker else None,
-        "speaker_wav_exists": bool(speaker and speaker.is_file()),
-    }
-
-
-def doctor_main() -> int:
-    parser = argparse.ArgumentParser(prog=f"{CLI_NAME} doctor")
-    parser.add_argument("--mode", choices=("manga-video",))
-    parser.add_argument("--check-updates", action="store_true")
-    parser.add_argument("--json", action="store_true", dest="as_json")
-    args = parser.parse_args()
-
-    report = doctor(check_updates=args.check_updates, mode=args.mode)
-    if args.as_json:
-        print(json.dumps(report, ensure_ascii=False))
-        return 0
-
-    print(f"{PRODUCT_NAME} doctor\n")
-    print(f"Tools dir: {report['tools_home']}\n")
-    print("Prerequisites:")
-    for exe, where in report["executables"].items():
-        mark = "ok " if where else "MISSING"
-        print(f"  [{mark}] {exe:10s} {where or ''}")
-    print()
-    print("External AI tools:")
-    for key, info in report["tools"].items():
-        status = f"installed ({info['path']})" if info["installed"] else "not installed"
-        print(f"  {key:15s} {status}")
-    return 0
 
 
 def main() -> int:
