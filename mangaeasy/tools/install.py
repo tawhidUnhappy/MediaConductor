@@ -265,6 +265,16 @@ def _download_model(spec: ToolSpec, dest: Path, log: LogFn) -> None:
             (),
             log,
         )
+    if spec.key == "index-tts":
+        w2v_target = dest / "checkpoints" / "hf_cache" / "w2v-bert-2.0"
+        _download_hf_snapshot(
+            "facebook/w2v-bert-2.0",
+            None,
+            w2v_target,
+            (),
+            (),
+            log,
+        )
 
 
 def _verify_tool_python(dest: Path, import_check: str, log: LogFn) -> None:
@@ -326,6 +336,12 @@ def install_tool(
     else:
         _write_managed_pyproject(spec, target, gpu_mode)
         _run(["uv", "sync", "--python", spec.python], log, cwd=target)
+
+    if spec.key == "index-tts":
+        try:
+            _run(["uv", "pip", "install", "ninja"], log, cwd=target)
+        except Exception as exc:
+            log(f"[warn] ninja installation skipped: {exc}")
 
     _install_adapter_files(spec, target, log)
 
