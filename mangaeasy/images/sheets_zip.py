@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import zipfile
 from pathlib import Path
 from typing import Callable
@@ -19,6 +20,7 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 def pack_sheets_to_zips(
     project_root: Path,
     out_dir: Path | None = None,
+    items: list[str] | None = None,
     max_bytes: int = MAX_ZIP_BYTES,
     log: Callable[[str], None] = print,
 ) -> list[Path]:
@@ -48,14 +50,47 @@ def pack_sheets_to_zips(
                 if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS and p not in files:
                     files.append(p)
 
+    if items:
+        wanted_items = set(items)
+        filtered_files = []
+        for p in files:
+            posix = p.as_posix()
+            if any(f"/{it}/" in posix or f"_{it}_" in posix or f"ch{it}" in posix for it in wanted_items):
+                filtered_files.append(p)
+        files = filtered_files
+
     if not files:
         log(f"[sheets-zip] No generated sheet images found for {project_root.name}.")
         return []
 
+    # Detect chapter/item numbers from file paths
+    detected_items = set()
+    for p in files:
+        if re.match(r"^\d+(\.\d+)?$", p.parent.name):
+            detected_items.add(p.parent.name)
+        else:
+            m = re.search(r"/(0?\d+|[1-9]\d*)/", p.as_posix())
+            if m:
+                detected_items.add(m.group(1).zfill(2))
+
+    sorted_items = sorted(
+        detected_items,
+        key=lambda x: (float(x) if x.replace(".", "", 1).isdigit() else 9999, x),
+    )
+
+    if len(sorted_items) == 1:
+        chapter_tag = f"_ch{sorted_items[0]}"
+    elif len(sorted_items) > 1:
+        chapter_tag = f"_ch{sorted_items[0]}-{sorted_items[-1]}"
+    else:
+        chapter_tag = ""
+
+    zip_prefix = f"{project_root.name}{chapter_tag}_sheets"
+
     created_zips: list[Path] = []
     volume_index = 1
     current_zip_bytes = 0
-    current_zip_path = output_directory / f"sheets_part_{volume_index:02d}.zip"
+    current_zip_path = output_directory / f"{zip_prefix}_part_{volume_index:02d}.zip"
     current_zip = zipfile.ZipFile(current_zip_path, "w", compression=zipfile.ZIP_STORED)
 
     for file_path in files:
@@ -65,7 +100,7 @@ def pack_sheets_to_zips(
             created_zips.append(current_zip_path)
             log(f"[sheets-zip] Finalized volume {current_zip_path.name} ({current_zip_bytes / (1024*1024):.1f} MB)")
             volume_index += 1
-            current_zip_path = output_directory / f"sheets_part_{volume_index:02d}.zip"
+            current_zip_path = output_directory / f"{zip_prefix}_part_{volume_index:02d}.zip"
             current_zip = zipfile.ZipFile(current_zip_path, "w", compression=zipfile.ZIP_STORED)
             current_zip_bytes = 0
 
@@ -86,18 +121,25 @@ def pack_sheets_to_zips(
 
 
 def main(argv: list[str] | None = None) -> int:
+    from mangaeasy.video_pipeline.common import merge_item_selection
+
     parser = argparse.ArgumentParser(
         prog=f"{CLI_NAME} sheets-pack",
         description="Pack generated reading and review sheets into split ZIP files <= 1 GB stored in <project_root>/zips/.",
     )
     parser.add_argument("--project-root", type=Path, required=True, help="Path to manga project directory.")
+    parser.add_argument("--items", nargs="*", help="Optional item/chapter filter, e.g. 01 02 05-08.")
+    parser.add_argument("--item-range", help="Convenience range filter, e.g. 01-05.")
     parser.add_argument("--max-size-mb", type=int, default=1000, help="Maximum ZIP size in MB (default: 1000 MB).")
     parser.add_argument("--out-dir", type=Path, default=None, help="Output directory.")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
 
+    selection = merge_item_selection(args.items, args.item_range)
     max_bytes = args.max_size_mb * 1024 * 1024
-    created_zips = pack_sheets_to_zips(args.project_root, args.out_dir, max_bytes=max_bytes)
+    created_zips = pack_sheets_to_zips(
+        args.project_root, args.out_dir, items=selection, max_bytes=max_bytes
+    )
 
     result = {
         "ok": True,
