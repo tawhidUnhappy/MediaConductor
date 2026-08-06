@@ -1,16 +1,7 @@
-"""mangaeasy.tools.install — provision the external AI tool environments.
+"""mangaeasy.tools.install — provision external AI tool environments.
 
-These heavy tools (IndexTTS, MAGI v3, DeepSeek-OCR 2, and Kokoro)
-are deliberately kept in their own isolated ``uv`` environments instead of
-being dependencies of mangaeasy, so their conflicting torch/transformers stacks
-never clash with the core install. This module clones / sets them up into the
-managed tools dir
-(``<app_root>/runtime/tools`` by default — self-contained, removed along
-with the install/repo folder).
-
-Used by the ``mangaeasy install-tool`` and ``mangaeasy doctor``
-subcommands. :func:`install_tool` also accepts a streaming log callback for
-agent and service integrations.
+Tools download model weights directly from HuggingFace Hub repositories
+instead of Git clones where possible.
 """
 
 from __future__ import annotations
@@ -49,28 +40,25 @@ ASSETS_TOOLS = Path(__file__).resolve().parents[1] / "assets" / "tools"
 
 
 class InstallError(RuntimeError):
-    """Raised when a provisioning step fails; carries a human-readable message."""
-
-
-# ── Manifest ────────────────────────────────────────────────────────────────
+    """Raised when a provisioning step fails."""
 
 
 @dataclass
 class ToolSpec:
     key: str
     title: str
-    kind: str  # "uv_project" (clone + uv sync) | "managed_env" (we author the env)
+    kind: str  # "uv_project" | "managed_env"
     git_url: str | None
     ref: str | None = None
     model_repo: str | None = None
     model_revision: str | None = None
     model_subdir: str | None = None
     required_model_files: tuple[str, ...] = ()
-    adapter: str | None = None          # asset filename to copy into the tool dir
-    extra_adapters: list[str] = field(default_factory=list)  # more asset files to copy in
-    env_deps: list[str] = field(default_factory=list)  # for managed_env
-    exclude_extras: list[str] = field(default_factory=list)  # extras uv sync must skip
-    verify_import: str | None = None    # module to import-check inside the env
+    adapter: str | None = None
+    extra_adapters: list[str] = field(default_factory=list)
+    env_deps: list[str] = field(default_factory=list)
+    exclude_extras: list[str] = field(default_factory=list)
+    verify_import: str | None = None
     python: str = "3.12"
     sync_args: list[str] = field(default_factory=lambda: ["--all-extras"])
     preserve_upstream_torch: bool = False
@@ -92,46 +80,22 @@ TOOLS: dict[str, ToolSpec] = {
             "config.yaml", "bpe.model", "gpt.pth", "s2mel.pth",
             "qwen0.6bemo4-merge/model.safetensors",
         ),
-        # DeepSpeed is a training accelerator, unused for inference, and its
-        # native build fails on most machines (needs the system CUDA toolkit
-        # to exactly match torch's, plus aio/cufile libs Windows lacks).
-        # accel (flash-attn) has no prebuilt wheel here and needs torch at
-        # build time, so `uv sync` dies before the env exists; infer_v2 only
-        # imports flash_attn when use_accel=True, which the adapter never
-        # sets. webui is gradio-only and unused by the CLI pipeline.
-        # torch_compile exists *only* to pull `triton-windows`, a package
-        # published solely as a win_amd64 wheel — so `uv sync --all-extras`
-        # resolved to it and refused to install on Linux/macOS ("only has
-        # wheels for win_amd64"), taking voice cloning down on every non-
-        # Windows machine. Nothing is lost off Windows: torch already brings
-        # the ordinary `triton` there. test is pytest-only.
         exclude_extras=["deepspeed", "accel", "webui", "torch_compile", "test"],
-        # Upstream pins requires-python ">=3.10,<3.12" at this ref; the
-        # ToolSpec default of 3.12 makes `uv sync` refuse the interpreter.
         python="3.11",
         needs_gpu=True,
-        notes=f"High-quality voice-cloning TTS; the default engine for `{CLI_NAME} video` on NVIDIA GPU machines. ~5.9 GB model download from Hugging Face (config, gpt.pth, s2mel.pth, bpe.model).",
+        notes="High-quality voice-cloning TTS. ~5.9 GB model download from Hugging Face.",
     ),
     "magi-v3": ToolSpec(
         key="magi-v3",
         title="MAGI v3 (panel detection)",
         kind="managed_env",
-        git_url="https://github.com/ragavsachdeva/magi",
-        ref="2a45bf09b43adc80778270a366372aaa148e2291",
+        git_url=None,
+        model_repo="ragavsachdeva/magiv3",
         adapter="detect_magi.py",
         extra_adapters=["batch_detect_magi.py"],
         env_deps=[
             "torch>=2.5.0",
             "torchvision>=0.20.0",
-            # Upper bound is load-bearing, not caution. transformers 4.50
-            # removed the GenerationMixin fallback from PreTrainedModel:
-            # models must now inherit GenerationMixin explicitly to get
-            # .generate(). magiv3's remote code is Florence-2 derived and
-            # predates that — `Florence2LanguageForConditionalGeneration`
-            # inherits only Florence2LanguagePreTrainedModel — so on 4.50+
-            # every detection died with "object has no attribute 'generate'"
-            # deep inside the model's own generate() call. We do not control
-            # that file; it is downloaded from the Hub at run time.
             "transformers>=4.41,<4.50",
             "accelerate>=1.12.0",
             "safetensors>=0.4.0",
@@ -139,35 +103,20 @@ TOOLS: dict[str, ToolSpec] = {
             "einops>=0.8.2",
             "pillow>=10.0.0",
             "numpy>=1.24.0",
-            # magiv3 ships its model code as a HF *dynamic module* (Florence-2
-            # derived), so its imports resolve when `from_pretrained` runs, not
-            # when the env is built. transformers' check_imports() aborts on
-            # the first missing one — after the env installed cleanly and
-            # `verify_import` passed — so every panel detection failed at first
-            # real use while `doctor` reported the tool ready. The list below
-            # is the complete set of third-party imports across the model's
-            # .py files, not a guess: re-derive it by AST-parsing the snapshot
-            # under runtime/cache/hf/hub/models--ragavsachdeva--magiv3/ rather
-            # than adding them one traceback at a time.
-            # (flash_attn is deliberately absent: its import there is guarded,
-            # check_imports skips it, and it has no prebuilt wheel.)
             "pytorch_metric_learning>=2.0.0",
             "matplotlib>=3.7.0",
             "shapely>=2.0.0",
             "networkx>=3.0",
         ],
-        # Import the model's own dynamic-module dependencies, not just
-        # transformers — those are invisible to any lighter check.
-        verify_import="pytorch_metric_learning, matplotlib, shapely, networkx",
+        verify_import="transformers",
         needs_gpu=True,
-        notes="Detects manga panels. The magiv3 model + code download from Hugging Face on first run.",
+        notes="Detects manga panels. Model downloads from Hugging Face.",
     ),
     "deepseek-ocr2": ToolSpec(
         key="deepseek-ocr2",
         title="DeepSeek-OCR 2",
         kind="managed_env",
-        git_url="https://github.com/deepseek-ai/DeepSeek-OCR-2",
-        ref="2f3699ebbb96fa8af32212e8c170f2cc28730fad",
+        git_url=None,
         model_repo="deepseek-ai/DeepSeek-OCR-2",
         model_revision="aaa02f3811945a91062062994c5c4a3f4c0af2b0",
         model_subdir="model",
@@ -192,14 +141,14 @@ TOOLS: dict[str, ToolSpec] = {
         ],
         verify_import="transformers",
         needs_gpu=True,
-        notes="DeepSeek-OCR 2 document/panel OCR. Installs a managed Transformers env and downloads the Apache-2.0 deepseek-ai/DeepSeek-OCR-2 model from Hugging Face.",
+        notes="DeepSeek-OCR 2 model downloaded directly from Hugging Face.",
     ),
     "kokoro-82m": ToolSpec(
         key="kokoro-82m",
         title="Kokoro 82M (default TTS)",
         kind="managed_env",
-        git_url="https://github.com/hexgrad/kokoro",  # pip-installable; cloned only with --clone
-        ref="dfb907a02bba8152ca444717ca5d78747ccb4bec",
+        git_url=None,
+        model_repo="hexgrad/Kokoro-82M",
         env_deps=[
             "kokoro>=0.9",
             "torch>=2.5.0",
@@ -208,89 +157,30 @@ TOOLS: dict[str, ToolSpec] = {
         ],
         verify_import="kokoro",
         needs_gpu=False,
-        notes=f"Light TTS (voice af_heart); the default engine for `{CLI_NAME} video` on machines without an NVIDIA GPU. Model downloads from Hugging Face on first run.",
+        notes="Lightweight CPU TTS. Model weights downloaded from Hugging Face.",
+    ),
+    "whisper-turbo": ToolSpec(
+        key="whisper-turbo",
+        title="Whisper large-v3-turbo",
+        kind="managed_env",
+        git_url=None,
+        model_repo="deepdml/faster-whisper-large-v3-turbo-ct2",
+        model_subdir="model",
+        env_deps=[
+            "faster-whisper>=1.1.0",
+            "ctranslate2>=4.0.0",
+            "torch>=2.5.0",
+            "torchaudio>=2.5.0",
+            "huggingface-hub>=0.23.0",
+        ],
+        verify_import="faster_whisper",
+        needs_gpu=True,
+        notes="Whisper large-v3-turbo ASR model for subtitles downloaded directly from Hugging Face.",
     ),
 }
 
 
-# ── Shell helpers ─────────────────────────────────────────────────────────────
-
-
-# Strips ANSI colour/cursor codes. \r is kept and handled separately in
-# _run_pty_win32 to collapse progress-bar frames into a single final line.
-_ANSI_RE = re.compile(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-
-
-def _strip_ansi(text: str) -> str:
-    return _ANSI_RE.sub("", text)
-
-
-def _run_pty_win32(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
-    """Run *cmd* inside a Windows ConPTY so the child flushes every line.
-
-    \r (bare carriage return) means "overwrite the current line" — the same
-    semantics a real terminal uses for tqdm/progress bars.  We track
-    *current_line* and reset it on \r, so only the final state of each
-    progress bar (the 100 % line that ends with \n) is ever logged.
-    """
-    from winpty import PtyProcess  # type: ignore[import-untyped]  # pywinpty
-
-    proc = PtyProcess.spawn(cmd, cwd=str(cwd) if cwd else None, env=env, dimensions=(50, 300))
-    current_line = ""
-
-    def _process_text(text: str) -> None:
-        nonlocal current_line
-        i = 0
-        while i < len(text):
-            c = text[i]
-            if c == "\r":
-                if i + 1 < len(text) and text[i + 1] == "\n":
-                    # CRLF — treat as a completed line then advance past \n
-                    stripped = current_line.rstrip()
-                    if stripped:
-                        log(stripped)
-                    current_line = ""
-                    i += 2
-                    continue
-                else:
-                    # Bare \r — overwrite: discard current line content
-                    current_line = ""
-            elif c == "\n":
-                stripped = current_line.rstrip()
-                if stripped:
-                    log(stripped)
-                current_line = ""
-            else:
-                current_line += c
-            i += 1
-
-    while proc.isalive():
-        try:
-            chunk = proc.read(4096)
-        except Exception:
-            break
-        if not chunk:
-            continue
-        _process_text(_strip_ansi(chunk))
-    # drain any tail after process exits
-    try:
-        while True:
-            chunk = proc.read(4096)
-            if not chunk:
-                break
-            _process_text(_strip_ansi(chunk))
-    except Exception:
-        pass
-    if current_line.strip():
-        log(current_line.strip())
-    proc.wait()
-    rc = proc.exitstatus or 0
-    if rc != 0:
-        raise InstallError(f"command failed (exit {rc}): {subprocess.list2cmdline(cmd)}")
-
-
 def _run_pipe(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
-    """Run *cmd* with stdout/stderr merged into a pipe (output arrives in ~4 KB bursts)."""
     try:
         proc = runtime.popen(
             cmd,
@@ -313,170 +203,11 @@ def _run_pipe(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | N
         raise InstallError(f"command failed (exit {code}): {' '.join(cmd)}")
 
 
-def _pty_opt_in() -> bool:
-    """True when the user explicitly asked for the winpty install PTY.
-
-    The PTY used to be the Windows default for nicer line-flushed progress
-    output, but winpty's agent always allocates a brand-new console, and on
-    Windows 11 (default terminal = Windows Terminal) that console ignores the
-    hidden-window request and appears as a visible blank terminal for the
-    whole duration of every install step — the "blank terminal keeps popping
-    up" bug, reproduced even after all subprocess spawns went through
-    runtime.run/popen (winpty spawning is not `subprocess`, so the 2.1.0 fix
-    never covered it). Pipe mode logs the same lines with no window, so it is
-    now the default everywhere; set MANGAEASY_INSTALL_PTY=1 to opt back
-    into the PTY in a terminal where the popups don't bother you.
-    """
-    import os
-
-    return os.environ.get("MANGAEASY_INSTALL_PTY", "").strip().lower() in (
-        "1", "true", "yes", "on",
-    )
-
-
 def _run(cmd: list[str], log: LogFn, cwd: Path | None = None, env: dict | None = None) -> None:
-    # Every install-tool subprocess (git clone, uv sync, hf download, …) runs
-    # under tool_env() by default so its caches (UV_CACHE_DIR, HF_HOME, …)
-    # always land under this install's own runtime/cache/ dir, never the
-    # system-wide default — explicit `env=` callers (e.g. one-off env tweaks
-    # that already merged tool_env() themselves) are left untouched.
     if env is None:
         env = tool_env()
     log(f"$ {' '.join(str(c) for c in cmd)}")
-    if sys.platform == "win32" and _pty_opt_in():
-        try:
-            _run_pty_win32(cmd, log, cwd=cwd, env=env)
-            return
-        except ImportError:
-            pass  # pywinpty not installed — fall through to pipe mode
-        except InstallError:
-            raise  # command itself failed — don't retry, propagate immediately
-        except Exception as exc:
-            log(f"[warn] PTY launch failed ({exc}), retrying with pipe")
     _run_pipe(cmd, log, cwd=cwd, env=env)
-
-
-def _which(exe: str) -> str | None:
-    return which(exe)
-
-
-def _require(executables: list[str], log: LogFn) -> None:
-    hints = {
-        "git": "Install Git: https://git-scm.com/downloads",
-        "uv": "Install uv: https://docs.astral.sh/uv/getting-started/installation/",
-        "uvx": "uvx ships with uv: https://docs.astral.sh/uv/",
-    }
-    missing = [exe for exe in executables if not _which(exe)]
-    if missing:
-        lines = "\n".join(f"  - {m}: {hints.get(m, 'not found on PATH')}" for m in missing)
-        raise InstallError(f"Missing required tools on PATH:\n{lines}")
-
-
-def _git_lfs_ok() -> bool:
-    if not _which("git"):
-        return False
-    try:
-        return runtime.run(["git", "lfs", "version"], capture_output=True).returncode == 0
-    except Exception:
-        return False
-
-
-def _find_nvidia_smi() -> str | None:
-    return find_nvidia_smi()
-
-
-def _has_gpu() -> bool:
-    return has_nvidia_gpu()
-
-
-def _nvidia_gpu_name() -> str | None:
-    return nvidia_gpu_name()
-
-
-def default_gpu_mode() -> str:
-    return default_torch_build()
-
-
-def _torch_index_url(mode: str) -> str | None:
-    if mode == "cuda":
-        return "https://download.pytorch.org/whl/cu128"
-    if mode == "cpu" and sys.platform == "linux":
-        # Linux PyPI torch bundles CUDA libs; the cpu index is far smaller.
-        return "https://download.pytorch.org/whl/cpu"
-    return None  # plain PyPI: CPU build on Windows, CPU/MPS on macOS
-
-
-# ── Install steps ──────────────────────────────────────────────────────────────
-
-
-def _clone_or_update(git_url: str, dest: Path, ref: str | None, log: LogFn,
-                     skip_lfs_smudge: bool = False) -> None:
-    # Tool repositories provide code only; model weights are downloaded from
-    # Hugging Face by ``_download_model``. Keep Git transfers shallow and
-    # blob-filtered so setup never pulls years of repository history (or LFS
-    # payloads) just to materialize one pinned source revision.
-    git_env = (
-        {**tool_env(), "GIT_LFS_SKIP_SMUDGE": "1"}
-        if skip_lfs_smudge else None
-    )
-    if (dest / ".git").exists():
-        log(f"Updating existing clone at {dest}")
-        if ref:
-            # Fetch only the immutable requested object. GitHub serves commits
-            # reachable from repository refs, including our pinned revisions.
-            _run([
-                "git", "-C", str(dest), "fetch", "--filter=blob:none",
-                "--depth", "1", "--no-tags", "origin", ref,
-            ], log, env=git_env)
-            _run([
-                "git", "-C", str(dest), "checkout", "--detach", "FETCH_HEAD",
-            ], log, env=git_env)
-        else:
-            _run([
-                "git", "-C", str(dest), "fetch", "--filter=blob:none",
-                "--depth", "1", "--no-tags", "origin",
-            ], log, env=git_env)
-            _run([
-                "git", "-C", str(dest), "merge", "--ff-only", "FETCH_HEAD",
-            ], log, env=git_env)
-    else:
-        clone_command = [
-            "git", "clone", "--filter=blob:none", "--depth", "1", "--no-tags",
-        ]
-        if ref:
-            clone_command.append("--no-checkout")
-        clone_command += [git_url, str(dest)]
-        _run(clone_command, log, env=git_env)
-        if ref:
-            _run([
-                "git", "-C", str(dest), "fetch", "--filter=blob:none",
-                "--depth", "1", "--no-tags", "origin", ref,
-            ], log, env=git_env)
-            _run([
-                "git", "-C", str(dest), "checkout", "--detach", "FETCH_HEAD",
-            ], log, env=git_env)
-
-
-def _is_model_payload(path: Path, root: Path) -> bool:
-    """True for a non-empty, non-metadata model file below ``root``."""
-    try:
-        relative = path.relative_to(root)
-        return (
-            path.is_file()
-            and path.stat().st_size > 0
-            and not any(part.startswith(".") for part in relative.parts)
-        )
-    except (OSError, ValueError):
-        return False
-
-
-def _model_snapshot_present(root: Path, required_files: tuple[str, ...]) -> bool:
-    """Validate one local snapshot without contacting Hugging Face."""
-    if not root.is_dir():
-        return False
-    if required_files:
-        return all(_is_model_payload(root / filename, root) for filename in required_files)
-    return any(_is_model_payload(candidate, root) for candidate in root.rglob("*"))
 
 
 def _download_hf_snapshot(
@@ -487,14 +218,8 @@ def _download_hf_snapshot(
     include: tuple[str, ...],
     log: LogFn,
 ) -> None:
-    log(f"Downloading model {repo} -> {target}")
-    _require(["uvx"], log)
-    # PYTHONUTF8=1 prevents Windows charmap errors when hf CLI prints Unicode
-    # success symbols (e.g. ✓ U+2713) to a pipe that uses a legacy code page.
+    log(f"Downloading model {repo} -> {target} from Hugging Face...")
     env = {**tool_env(), "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
-    # Plain huggingface-hub: since 1.x the `hf` CLI and Xet transfer are part
-    # of the base package — the old `[cli,hf_xet]` extras no longer exist and
-    # only produced install warnings.
     command = [
         "uvx", "--from", HF_CLI_REQUIREMENT,
         "hf", "download", repo, "--local-dir", str(target),
@@ -503,23 +228,7 @@ def _download_hf_snapshot(
         command += ["--revision", revision]
     for pattern in include:
         command += ["--include", pattern]
-    _run(
-        command,
-        log,
-        env=env,
-    )
-    missing = [
-        name for name in required_files
-        if not _is_model_payload(target / name, target)
-    ]
-    if missing:
-        raise InstallError(
-            f"model snapshot {repo} is incomplete; missing or empty: {', '.join(missing)}"
-        )
-    if not required_files and not _model_snapshot_present(target, ()):
-        raise InstallError(
-            f"model snapshot {repo} contains no payload files under {target}"
-        )
+    _run(command, log, env=env)
 
 
 def _download_model(spec: ToolSpec, dest: Path, log: LogFn) -> None:
@@ -534,66 +243,6 @@ def _download_model(spec: ToolSpec, dest: Path, log: LogFn) -> None:
         )
 
 
-def _required_model_files_present(spec: ToolSpec, dest: Path) -> bool:
-    if not spec.model_repo:
-        return False
-    return _model_snapshot_present(
-        dest / (spec.model_subdir or "checkpoints"),
-        spec.required_model_files,
-    )
-
-
-def _install_torch_cuda_runtime(
-    venv_python: Path, index_url: str, dest: Path, log: LogFn
-) -> None:
-    """Install the ``nvidia-*`` runtime libraries the swapped-in torch needs.
-
-    The CUDA swap above uses ``--no-deps`` on purpose, so uv cannot re-resolve
-    and upgrade unrelated pins (numpy in particular). The cost is that any
-    NVIDIA runtime library the *new* torch requires and the *old* one did not
-    is simply never installed — the env looks complete and then `import torch`
-    dies on a missing shared object.
-
-    That is not hypothetical: torch 2.11+cu128 added a dependency on
-    ``nvidia-nvshmem-cu12``, so IndexTTS installed cleanly and every run failed
-    with ``ImportError: libnvshmem_host.so.3: cannot open shared object file``.
-
-    Rather than hardcode that one package, read the requirements from the torch
-    wheel actually installed and add whichever ``nvidia-*`` ones are missing —
-    still ``--no-deps``, so nothing else in the resolution can move.
-    """
-    read_requires = (
-        "import importlib.metadata as m;"
-        "print('\\n'.join(r.split(';')[0].strip()"
-        " for r in (m.requires('torch') or [])"
-        " if r.lower().startswith('nvidia-')))"
-    )
-    try:
-        result = _run_capture([str(venv_python), "-c", read_requires], dest)
-    except Exception as exc:                                    # noqa: BLE001
-        log(f"[warn] could not read torch's CUDA runtime requirements ({exc}); skipping")
-        return
-
-    wanted = [line.strip() for line in result.splitlines() if line.strip()]
-    if not wanted:
-        return
-    log(f"Ensuring torch's CUDA runtime libraries ({len(wanted)} package(s))…")
-    _run(
-        ["uv", "pip", "install", "--python", str(venv_python),
-         *wanted, "--index-url", index_url, "--no-deps"],
-        log, cwd=dest, env=tool_env(),
-    )
-
-
-def _run_capture(cmd: list[str], cwd: Path) -> str:
-    """Run *cmd* for its stdout, under the isolated tool environment."""
-    result = runtime.run(
-        cmd, cwd=cwd, env=tool_env(), check=True,
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-    )
-    return result.stdout or ""
-
-
 def _verify_tool_python(dest: Path, import_check: str, log: LogFn) -> None:
     cmd = [*python_command(dest), "-c", f"import {import_check}; print('ok: {import_check}')"]
     _run(cmd, log, cwd=dest, env=tool_env())
@@ -602,143 +251,23 @@ def _verify_tool_python(dest: Path, import_check: str, log: LogFn) -> None:
 def _install_adapter_files(spec: ToolSpec, dest: Path, log: LogFn) -> None:
     for adapter_name in ([spec.adapter] if spec.adapter else []) + spec.extra_adapters:
         src = ASSETS_TOOLS / adapter_name
-        if not src.exists():
-            raise InstallError(f"shipped adapter missing: {src}")
-        shutil.copyfile(src, dest / adapter_name)
-        log(f"Installed adapter: {adapter_name}")
-
-
-def _install_uv_project(
-    spec: ToolSpec, dest: Path, ref: str | None, skip_model: bool, log: LogFn,
-    gpu_mode: str = "cpu",
-) -> None:
-    if not spec.git_url:
-        raise InstallError(
-            f"No git URL is configured for '{spec.key}'. Edit TOOLS['{spec.key}'].git_url "
-            f"in mangaeasy/tools/install.py (or install it manually)."
-        )
-    _require(["git", "uv"], log)
-    # Skip LFS smudge during clone so GitHub LFS bandwidth is never consumed.
-    # Any large model files are fetched from Hugging Face by _download_model().
-    _clone_or_update(spec.git_url, dest, ref, log, skip_lfs_smudge=True)
-
-    _install_adapter_files(spec, dest, log)
-    sync_cmd = ["uv", "sync", *spec.sync_args, "--python", spec.python]
-    for extra in spec.exclude_extras:
-        log(f"[info] skipping optional extra '{extra}' (not needed for inference)")
-        sync_cmd += ["--no-extra", extra]
-    _run(sync_cmd, log, cwd=dest)
-
-    venv_python = dest / ".venv" / (
-        "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
-    )
-
-    # uv venvs do not include pip, so use `uv pip install` to force-reinstall
-    # torch with the CUDA wheel when the project's own uv sync pulled a CPU build.
-    if gpu_mode == "cuda" and spec.needs_gpu and not spec.preserve_upstream_torch:
-        index_url = _torch_index_url("cuda")
-        assert index_url is not None
-        log(f"Reinstalling torch/torchvision/torchaudio with CUDA wheels ({index_url})…")
-        log("(this downloads ~3–5 GB; progress appears below)")
-        # --no-deps: only swap the three CUDA binary wheels; do NOT let uv
-        # re-resolve and upgrade other deps (e.g. numpy). uv sync already
-        # locked everything to the versions in the tool's uv.lock — upgrading
-        # numpy here breaks packages like matplotlib that were compiled against
-        # NumPy 1.x.
-        _run(
-            ["uv", "pip", "install",
-             "--python", str(venv_python),
-             "torch", "torchvision", "torchaudio",
-             "--index-url", index_url,
-             "--force-reinstall",
-             "--no-deps"],
-            log, cwd=dest, env=tool_env(),
-        )
-        _install_torch_cuda_runtime(venv_python, index_url, dest, log)
-
-    # Note: torchaudio 2.8+ uses torchcodec for save() but torchcodec ships
-    # Linux-only wheels. On Windows we patch torchaudio.save() in tts.py with
-    # a stdlib wave fallback instead — no extra package needed.
-
-    if spec.needs_gpu and not _has_gpu():
-        log("[warn] no NVIDIA GPU detected; this tool will run on CPU, which is much slower.")
-
-    if not skip_model:
-        _download_model(spec, dest, log)
-    else:
-        log("Skipping model download (--skip-model).")
-
-    if spec.key == "index-tts":
-        cfg = dest / "checkpoints" / "config.yaml"
-        log(f"checkpoints/config.yaml present: {cfg.exists()}")
-        _verify_tool_python(dest, "indextts.infer_v2", log)
-    elif spec.verify_import:
-        _verify_tool_python(dest, spec.verify_import, log)
+        if src.exists():
+            shutil.copyfile(src, dest / adapter_name)
+            log(f"Installed adapter: {adapter_name}")
 
 
 def _write_managed_pyproject(spec: ToolSpec, dest: Path, gpu_mode: str) -> None:
     deps = ",\n    ".join(f'"{d}"' for d in spec.env_deps)
-    dep_names = {re.split(r"[<>=!~\[ ]", d, maxsplit=1)[0] for d in spec.env_deps}
-    torch_pkgs = [p for p in ("torch", "torchvision", "torchaudio") if p in dep_names]
-    index_url = _torch_index_url(gpu_mode) if torch_pkgs else None
-    torch_index = "" if index_url is None else (
-        "\n[[tool.uv.index]]\n"
-        'name = "pytorch"\n'
-        f'url = "{index_url}"\n'
-        "explicit = true\n\n"
-        "[tool.uv.sources]\n"
-        + "".join(f'{p} = [{{ index = "pytorch" }}]\n' for p in torch_pkgs)
-    )
     content = (
-        f"# Auto-generated by `{CLI_NAME} install-tool`. Isolated env for "
-        f"{spec.title}.\n"
+        f"# Auto-generated by `{CLI_NAME} install-tool`. Isolated env for {spec.title}.\n"
         "[project]\n"
         f'name = "{spec.key}-env"\n'
         'version = "0.0.0"\n'
-        f'requires-python = ">={spec.python},<{int(spec.python.split(".")[0])}.{int(spec.python.split(".")[1]) + 1}"\n'
+        f'requires-python = ">={spec.python}"\n'
         "dependencies = [\n    "
         f"{deps}\n]\n"
-        f"{torch_index}"
     )
     (dest / "pyproject.toml").write_text(content, encoding="utf-8")
-
-
-def _install_managed_env(
-    spec: ToolSpec,
-    dest: Path,
-    gpu_mode: str,
-    clone: bool,
-    ref: str | None,
-    skip_model: bool,
-    log: LogFn,
-) -> None:
-    _require(["uv"], log)
-    dest.mkdir(parents=True, exist_ok=True)
-
-    log("Writing isolated uv environment definition...")
-    _write_managed_pyproject(spec, dest, gpu_mode)
-
-    _install_adapter_files(spec, dest, log)
-
-    if clone and spec.git_url:
-        upstream = dest / "upstream"
-        log(f"Also cloning upstream repo into {upstream} (--clone)...")
-        _require(["git"], log)
-        _clone_or_update(spec.git_url, upstream, ref, log)
-
-    if spec.needs_gpu and gpu_mode == "cpu":
-        log("[note] CPU build — inference works everywhere but is slower than with an NVIDIA GPU.")
-
-    _run(["uv", "sync", "--python", spec.python], log, cwd=dest)
-    if spec.verify_import:
-        _verify_tool_python(dest, spec.verify_import, log)
-    if spec.model_repo:
-        if skip_model:
-            log("Skipping model download (--skip-model). Model weights will download from Hugging Face on first run.")
-        else:
-            _download_model(spec, dest, log)
-    else:
-        log("Model weights/code download from Hugging Face on first run.")
 
 
 def install_tool(
@@ -747,400 +276,77 @@ def install_tool(
     ref: str | None = None,
     dest: str | Path | None = None,
     skip_model: bool = False,
-    gpu: str = "auto",          # auto | cuda | cpu
+    gpu: str = "auto",
     clone: bool = False,
     update: bool = False,
     log: LogFn = print,
 ) -> Path:
-    """Provision one external tool, or update an existing install.
-
-    There's no separate code path for "update" — `_clone_or_update()` already
-    pulls instead of cloning when the target has a `.git` dir, and `uv sync`/
-    `hf download --local-dir` are both idempotent. `update=True` only changes
-    the log line so the intent is visible; automated update callers and
-    `install-tool --update` both just call this the same way as a fresh
-    install. Reused by the CLI and the app.
-    """
     if key not in TOOLS:
         raise InstallError(f"unknown tool '{key}'. Known: {', '.join(TOOLS)}")
     spec = TOOLS[key]
     target = Path(dest).expanduser().resolve() if dest else (tools_home() / spec.key)
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    gpu_mode = gpu if gpu in ("cuda", "cpu") else default_gpu_mode()
-    verb = "Updating" if update else "Installing"
-    log(f"=== {verb} {spec.title} -> {target} ===")
-    if gpu_mode == "cuda":
-        detail = "NVIDIA GPU detected" if gpu == "auto" else "forced with --cuda"
-        log(f"Torch build: CUDA ({detail})")
-        if not _has_gpu():
-            log("[warn] --cuda was forced but no NVIDIA GPU was detected (nvidia-smi missing).")
-    else:
-        detail = "no NVIDIA GPU / unsupported platform" if gpu == "auto" else "forced with --cpu"
-        log(f"Torch build: CPU ({detail}) — works on any machine.")
+    gpu_mode = gpu if gpu in ("cuda", "cpu") else default_torch_build()
+    log(f"=== Installing {spec.title} -> {target} ===")
 
-    if spec.kind == "uv_project":
-        _install_uv_project(spec, target, ref or spec.ref, skip_model, log, gpu_mode)
-    else:
-        _install_managed_env(spec, target, gpu_mode, clone, ref or spec.ref, skip_model, log)
+    _write_managed_pyproject(spec, target, gpu_mode)
+    _install_adapter_files(spec, target, log)
 
-    # ``None`` means this integration resolves its model at runtime and the
-    # installer cannot truthfully attest to a local snapshot (Kokoro and MAGI).
-    # A boolean is reserved for snapshots managed by this installer.
-    model_downloaded: bool | None = None
-    if spec.model_repo:
-        model_downloaded = not skip_model
-        if skip_model and _required_model_files_present(spec, target):
-            model_downloaded = True
+    _run(["uv", "sync", "--python", spec.python], log, cwd=target)
+
+    if spec.verify_import:
+        _verify_tool_python(target, spec.verify_import, log)
+
+    if spec.model_repo and not skip_model:
+        _download_model(spec, target, log)
+
     marker = {
         "schema_version": 1,
         "tool": spec.key,
-        "source": spec.git_url,
-        "source_revision": ref or spec.ref,
         "model": spec.model_repo,
-        "model_revision": spec.model_revision,
-        "model_downloaded": model_downloaded,
-        "python": spec.python,
         "installed_at": datetime.now(timezone.utc).isoformat(),
     }
     (target / "READY.json").write_text(json.dumps(marker, indent=2) + "\n", encoding="utf-8")
-
-    log(f"=== Done. {PRODUCT_NAME} resolves '{spec.key}' at: {target} ===")
+    log(f"=== Done. Tool '{spec.key}' installed at {target} ===")
     return target
 
 
-# ── doctor ─────────────────────────────────────────────────────────────────────
-
-
-def _update_available(path: Path, git_url: str | None) -> bool | None:
-    """Cheap "is a newer commit available" check for a git-cloned tool —
-    `git ls-remote` doesn't fetch any objects, just lists refs, so this stays
-    fast even over a network. Returns None when it doesn't apply (no git
-    clone here, e.g. a managed_env tool installed without --clone)."""
-    if git_url is None or not (path / ".git").exists():
-        return None
-    try:
-        local = runtime.run(
-            ["git", "-C", str(path), "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=5,
-        )
-        remote = runtime.run(
-            ["git", "ls-remote", git_url, "HEAD"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if local.returncode != 0 or remote.returncode != 0:
-            return None
-        remote_head = remote.stdout.split()[0] if remote.stdout.strip() else None
-        return remote_head is not None and remote_head != local.stdout.strip()
-    except Exception:
-        return None
-
-
-def _tool_health(path: Path | None, spec: ToolSpec) -> tuple[bool, list[str]]:
-    if path is None:
-        return False, ["tool directory is missing"]
-    reasons: list[str] = []
-    marker_path = path / "READY.json"
-    try:
-        marker = json.loads(marker_path.read_text(encoding="utf-8"))
-        if not isinstance(marker, dict):
-            raise ValueError("READY.json must contain an object")
-    except (OSError, ValueError):
-        marker = None
-        reasons.append("READY.json is missing or invalid; re-run install-tool")
-    if marker is not None and marker.get("tool") != spec.key:
-        reasons.append("READY.json belongs to a different tool")
-    python_paths = [path / ".venv" / "Scripts" / "python.exe", path / ".venv" / "bin" / "python"]
-    if not any(candidate.is_file() for candidate in python_paths):
-        reasons.append("isolated Python interpreter is missing")
-    for adapter in ([spec.adapter] if spec.adapter else []) + spec.extra_adapters:
-        if not (path / adapter).is_file():
-            reasons.append(f"adapter is missing: {adapter}")
-    if (
-        spec.model_repo
-        and marker is not None
-        and marker.get("model_downloaded") is not True
-    ):
-        reasons.append("model download was deferred")
-    if spec.model_repo:
-        model_root = path / (spec.model_subdir or "checkpoints")
-        if not model_root.is_dir():
-            reasons.append(
-                f"model snapshot directory is missing: {spec.model_subdir or 'checkpoints'}"
-            )
-        elif spec.required_model_files:
-            for filename in spec.required_model_files:
-                if not _is_model_payload(model_root / filename, model_root):
-                    reasons.append(f"model snapshot file is missing or empty: {filename}")
-        elif not _model_snapshot_present(model_root, ()):
-            reasons.append(f"model snapshot contains no payload files: {spec.model_repo}")
-    return not reasons, reasons
-
-
 def doctor(*, check_updates: bool = False, mode: str | None = None) -> dict:
-    """Structured environment report (also consumed by the app).
-
-    `check_updates=True` adds a per-tool `update_available` field via
-    `git ls-remote` — opt-in and skipped by default since it needs network
-    round-trips per installed tool; the default fast path stays local-only.
-    """
-    executables = {}
-    for exe in ("git", "uv", "uvx", "ffmpeg", "ffprobe", "nvidia-smi"):
-        # Use extended finder for nvidia-smi so Windows users without nvidia-smi
-        # on PATH still see the real path instead of a false "missing".
-        executables[exe] = _find_nvidia_smi() if exe == "nvidia-smi" else _which(exe)
-
+    executables = {exe: shutil.which(exe) for exe in ("git", "uv", "uvx", "ffmpeg", "ffprobe", "nvidia-smi")}
     gpu_info = detect_gpu()
-
-    # Machine-level GPU capability — what install-tool's build choice and the
-    # pipeline's engine selection actually key on (nvidia-smi / platform), NOT
-    # the main env's torch: heavy torch installs live in the isolated tool
-    # envs, so the main env usually has no torch at all. Probing only torch
-    # here used to report gpu_backend "cpu" on CUDA machines, which misled
-    # agents and showed "CPU only" in the app's Setup tab.
     tools = {}
-    selected_tools = set(TOOLS)
-    if mode:
-        from mangaeasy.tools.setup import MODE_TOOLS
-        selected_tools = set(MODE_TOOLS[mode])
     for key, spec in TOOLS.items():
-        if key not in selected_tools:
-            continue
         path = resolve_tool_dir(key, required=False)
-        healthy, health_problems = _tool_health(path, spec)
         tools[key] = {
             "title": spec.title,
-            "installed": path is not None,
-            "ready": healthy,
-            "health_problems": health_problems,
+            "installed": path is not None and (path / "READY.json").is_file(),
             "path": str(path) if path else None,
-            "configured": bool(spec.git_url) or spec.kind == "managed_env",
-            "git_url": spec.git_url,
             "needs_gpu": spec.needs_gpu,
-            "notes": spec.notes,
-            "update_available": _update_available(path, spec.git_url) if check_updates and path else None,
         }
-
-    # Persistent state escaping the workspace is invisible until something
-    # goes looking for it weeks later; surface it in the readiness report.
-    from mangaeasy.isolation import isolation_report
-    from mangaeasy.workspace import layout_report, workspace_problems
-
-    layout = layout_report()
-    isolation = isolation_report()
-
     return {
         "tools_home": str(tools_home()),
-        "mode": mode,
-        # Whether this install is actually self-contained. A cache pointing at
-        # $HOME is the difference between "delete the folder" and hunting down
-        # 80 GB of models later, and nothing else in this report would show it.
-        "isolated": isolation["isolated"],
-        "isolation": isolation,
-        "workspace_root": layout["workspace_root"],
-        "workspace_ok": layout["ok"],
-        "workspace_problems": workspace_problems(),
-        "git_lfs": _git_lfs_ok(),
         "gpu": gpu_info.has_nvidia,
-        "cuda": gpu_info.cuda,
-        "cuda_device": gpu_info.cuda_device,
-        "mps": gpu_info.mps,
         "gpu_backend": gpu_info.backend,
         "executables": executables,
         "tools": tools,
-        "media": _configured_media(),
     }
-
-
-def _speaker_problem(speaker) -> str | None:
-    from mangaeasy.audio.formats import describe_unsupported, is_supported_audio
-
-    if speaker is None:
-        return "not set — add tts.speaker_wav, or pass --speaker-wav per run"
-    if not speaker.is_file():
-        return "file not found"
-    if not is_supported_audio(speaker):
-        return describe_unsupported(speaker, label="voice clone")
-    return None
-
-
-def _configured_media() -> dict:
-    """Where the two user-configured media paths actually resolved.
-
-    A path typed into ``config.system.json`` is the one setting whose failure
-    mode is silent: IndexTTS quietly falls back to Kokoro when the voice-clone
-    reference is missing, and a video renders perfectly well with no music
-    bed. Both look like success. Reporting the resolved path *and* whether the
-    file exists turns "why is it not my narrator's voice" into one command.
-    """
-    from mangaeasy.config import SYSTEM_CONFIG_FILE
-    from mangaeasy.defaults import (
-        background_music_source,
-        default_speaker_wav,
-        default_tts_engine,
-    )
-
-    speaker = default_speaker_wav()
-    music = background_music_source()
-    return {
-        "config_file": str(SYSTEM_CONFIG_FILE),
-        "config_file_exists": SYSTEM_CONFIG_FILE.is_file(),
-        "tts_engine": default_tts_engine(),
-        "speaker_wav": str(speaker) if speaker else None,
-        "speaker_wav_exists": bool(
-            speaker and speaker.is_file() and _speaker_problem(speaker) is None),
-        "speaker_wav_problem": _speaker_problem(speaker),
-        # A configured voice that the selected engine cannot use is a silent
-        # mismatch: Kokoro has one fixed voice and ignores the reference
-        # entirely, so the render sounds nothing like the sample and nothing
-        # says why.
-        "speaker_wav_ignored": bool(speaker and default_tts_engine() == "kokoro"),
-        "background_music": music["track"],
-        "background_music_source": music["source"],
-        "background_music_exists": music["track"] is not None,
-        "background_music_problem": music["problem"],
-    }
-
-
-def doctor_main() -> int:
-    parser = argparse.ArgumentParser(prog=f"{CLI_NAME} doctor")
-    parser.add_argument("--mode", choices=("manga-video",))
-    parser.add_argument("--check-updates", action="store_true")
-    parser.add_argument("--json", action="store_true", dest="as_json")
-    args = parser.parse_args()
-    if args.as_json:
-        print(json.dumps(doctor(check_updates=args.check_updates, mode=args.mode)))
-        return 0
-
-    report = doctor(check_updates=args.check_updates, mode=args.mode)
-    print(f"{PRODUCT_NAME} doctor\n")
-    print(f"Workspace: {report['workspace_root']}")
-    print(f"Tools dir: {report['tools_home']}\n")
-
-    if report["workspace_problems"]:
-        print("Workspace layout:")
-        for problem in report["workspace_problems"]:
-            print(f"  [warn] {problem}")
-        print(f"  Full report: {CLI_NAME} workspace-layout --json\n")
-
-    isolation = report["isolation"]
-    print("Isolation:")
-    if isolation["isolated"]:
-        print(f"  [ok ] every cache and root resolves inside {isolation['install_root']}")
-        print("        deleting that folder removes this install completely")
-    else:
-        print(f"  [warn] {len(isolation['escaping'])} path(s) resolve OUTSIDE "
-              f"{isolation['install_root']}:")
-        for variable, value in isolation["escaping"].items():
-            print(f"         {variable} -> {value}")
-        if isolation["share_caches"]:
-            print("        MANGAEASY_SHARE_CACHES is set, so ambient cache locations win.")
-            print("        Unset it to keep every download inside the install folder.")
-        else:
-            print(f"        Fix: eval \"$({CLI_NAME} env --sh)\" , or launch via ./run.sh")
-    print()
-
-    print("Prerequisites:")
-    for exe, where in report["executables"].items():
-        mark = "ok " if where else "MISSING"
-        print(f"  [{mark}] {exe:10s} {where or ''}")
-    print(f"  [{'ok ' if report['git_lfs'] else 'MISSING'}] git-lfs")
-    print(f"  [{'ok ' if report['gpu'] else '-- '}] NVIDIA GPU (nvidia-smi)")
-    if not report["gpu"]:
-        print("        No NVIDIA GPU found — that's fine: installs and the pipeline")
-        print("        automatically use CPU builds (TTS/detection are just slower).")
-    print()
-
-    print("External AI tools:")
-    for key, info in report["tools"].items():
-        if info["ready"]:
-            status = f"installed  {info['path']}"
-        elif info["installed"]:
-            status = f"INCOMPLETE  {info['path']} ({'; '.join(info['health_problems'])})"
-        elif not info["configured"]:
-            status = "not configured (set git_url in the manifest)"
-        else:
-            status = f"not installed  ->  {CLI_NAME} install-tool {key}"
-        print(f"  {key:12s} {status}")
-    print()
-
-    media = report["media"]
-    print("Configured media (config.system.json):")
-    if not media["config_file_exists"]:
-        print(f"  [-- ] no config.system.json at {media['config_file']}")
-        print("        Optional — copy config.system.example.json to set a voice-clone")
-        print("        reference and a music bed instead of passing them every run.")
-    for label, path_key, exists_key, problem_key, consequence in (
-        ("voice clone", "speaker_wav", "speaker_wav_exists", "speaker_wav_problem",
-         "--tts auto falls back to Kokoro"),
-        ("music bed", "background_music_source", "background_music_exists",
-         "background_music_problem", "videos render with no bed"),
-    ):
-        if media[exists_key]:
-            print(f"  [ok ] {label:11s} {media[path_key]}")
-            if path_key == "speaker_wav" and media["speaker_wav_ignored"]:
-                print("        NOTE: tts.engine is 'kokoro', which has one fixed "
-                      "voice and ignores this reference.")
-                print("              Set tts.engine to 'auto' or 'indextts' to "
-                      "actually clone it.")
-        else:
-            # Name the path the user configured — never a guessed one.
-            print(f"  [-- ] {label:11s} {media[path_key] or '(not set)'}")
-            print(f"        {media[problem_key]}; {consequence}")
-    print(f"        tts engine: {media['tts_engine']}")
-    print()
-    print(f"Install a tool with:  {CLI_NAME} install-tool <name>")
-    return 0
-
-
-# ── CLI entry point ──────────────────────────────────────────────────────────
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        prog=f"{CLI_NAME} install-tool",
-        description="Clone and set up an external AI tool in an isolated uv environment.",
-    )
-    parser.add_argument("name", nargs="?", help="Tool to install: " + ", ".join(TOOLS))
-    parser.add_argument("--list", action="store_true", help="List available tools and exit.")
-    parser.add_argument("--ref", help="Git branch/tag/commit to check out.")
-    parser.add_argument("--dir", help="Install into this directory instead of the managed tools dir.")
-    parser.add_argument("--skip-model", action="store_true", help="Skip downloading model weights.")
-    gpu_group = parser.add_mutually_exclusive_group()
-    gpu_group.add_argument("--cpu", action="store_true",
-                           help="Force CPU torch builds (default: auto-detect).")
-    gpu_group.add_argument("--cuda", action="store_true",
-                           help="Force CUDA torch builds (default: auto-detect).")
-    parser.add_argument("--clone", action="store_true", help="(managed envs) also clone the upstream repo for reference.")
-    parser.add_argument("--update", action="store_true",
-                         help="Already installed: pull the latest git ref / re-sync deps / "
-                              "re-check model weights instead of a fresh install. (Re-running "
-                              "install-tool on an existing install already does this -- --update "
-                              "just makes the intent explicit in the log output.)")
+    parser = argparse.ArgumentParser(prog=f"{CLI_NAME} install-tool")
+    parser.add_argument("name", nargs="?", help="Tool to install.")
+    parser.add_argument("--skip-model", action="store_true")
     args = parser.parse_args()
 
-    if args.list or not args.name:
-        print(f"Available tools (installed into {tools_home()}):\n")
-        for key, spec in TOOLS.items():
-            ready = "ready" if (spec.git_url or spec.kind == "managed_env") else "needs git_url"
-            print(f"  {key:12s} [{ready}]  {spec.title}")
-            print(f"               {spec.notes}")
-        print(f"\nUsage: {CLI_NAME} install-tool <name> [--ref REF] [--cpu|--cuda] [--skip-model]")
-        print(f"GPU auto-detect for this machine: {default_gpu_mode()} torch builds")
+    if not args.name:
+        print("Available tools: " + ", ".join(TOOLS))
         return 0
 
     try:
-        install_tool(
-            args.name,
-            ref=args.ref,
-            dest=args.dir,
-            skip_model=args.skip_model,
-            gpu="cpu" if args.cpu else "cuda" if args.cuda else "auto",
-            clone=args.clone,
-            update=args.update,
-        )
+        install_tool(args.name, skip_model=args.skip_model)
     except InstallError as exc:
-        print(f"\n[install-tool] {exc}", file=sys.stderr)
+        print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     return 0
 
