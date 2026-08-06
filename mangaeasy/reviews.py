@@ -174,18 +174,31 @@ def narration_input_snapshot(
     item_dir: Path,
     *,
     panels_subdir: str = "panels",
+    skip_sheet_check: bool = False,
 ) -> dict:
     """Snapshot current panels plus narration.json/intro.json after verifying reading sheets."""
     panels_subdir = validate_relative_subpath(panels_subdir, label="panels subdirectory")
     item_dir = Path(item_dir).resolve()
 
-    # Pre-requisite check: verify panel-reading-sheets were generated
-    work_dir = item_dir.parent.parent / "work" / "panel_reading" / item_dir.parent.name / item_dir.name
-    if not work_dir.is_dir() or not list(work_dir.glob("*.jpg")):
-        raise ReviewRecordError(
-            f"Narration review blocked for {item_dir.name}: Panel reading sheets missing under {work_dir}. "
-            f"Run '{CLI_NAME} panel-reading-sheets --items {item_dir.name}' and inspect them before reviewing narration."
-        )
+    if not skip_sheet_check:
+        project_root = item_dir.parent
+        possible_work_dirs = [
+            project_root / "work" / "panel_reading" / item_dir.name,
+            project_root / "work" / "panel_reading" / project_root.name / item_dir.name,
+            item_dir.parent.parent / "work" / "panel_reading" / project_root.name / item_dir.name,
+            item_dir.parent.parent.parent / "work" / "panel_reading" / project_root.name / item_dir.name,
+        ]
+        sheets_found = False
+        for candidate in possible_work_dirs:
+            if candidate.is_dir() and list(candidate.glob("*.jpg")):
+                sheets_found = True
+                break
+
+        if not sheets_found:
+            raise ReviewRecordError(
+                f"Narration review blocked for {item_dir.name}: Panel reading sheets missing under {project_root / 'work' / 'panel_reading'}. "
+                f"Run '{CLI_NAME} panel-reading-sheets --project-root {project_root} --items {item_dir.name}' or pass --force."
+            )
 
     narration_path = item_dir / "narration.json"
     if not narration_path.is_file():
@@ -249,6 +262,7 @@ def _record_stage(
     reviewer: str,
     reviewed_at: str | None,
     source_subdir: str = "download",
+    force: bool = False,
 ) -> dict:
     if stage not in {"crop", "narration"}:
         raise ReviewRecordError(f"unsupported review stage: {stage}")
@@ -264,7 +278,10 @@ def _record_stage(
                 source_subdir=source_subdir,
             )
         else:
-            snapshots[item_dir.name] = narration_input_snapshot(item_dir)
+            snapshots[item_dir.name] = narration_input_snapshot(
+                item_dir,
+                skip_sheet_check=force,
+            )
 
     store = load_review_store(root)
     records = dict(store[stage])
@@ -314,6 +331,7 @@ def record_narration_review(
     *,
     reviewer: str,
     reviewed_at: str | None = None,
+    force: bool = False,
 ) -> dict:
     return _record_stage(
         "narration",
@@ -321,6 +339,7 @@ def record_narration_review(
         items,
         reviewer=reviewer,
         reviewed_at=reviewed_at,
+        force=force,
     )
 
 
@@ -351,6 +370,7 @@ def _check_stage(
                 current = narration_input_snapshot(
                     item_dir,
                     panels_subdir=record.get("panels_subdir", "panels"),
+                    skip_sheet_check=True,  # checking existing review doesn't need to re-block on sheets
                 )
         except (OSError, ReviewRecordError, ValueError) as exc:
             item_reports[item_dir.name] = {
@@ -518,6 +538,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     narration.add_argument("--item-range")
     narration.add_argument("--reviewer", required=True)
     narration.add_argument("--reviewed-at", default=None)
+    narration.add_argument("--force", action="store_true", help="Bypass reading-sheets check.")
 
     final = subparsers.add_parser("final-video", help="Approve final MP4.")
     final.add_argument("--project-root", type=Path, default=DEFAULT_PROJECT_ROOT)
@@ -550,6 +571,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action == "narration":
             report = record_narration_review(
                 args.project_root, items, reviewer=args.reviewer, reviewed_at=args.reviewed_at,
+                force=getattr(args, "force", False),
             )
         elif args.action == "final-video":
             report = record_final_video_review(

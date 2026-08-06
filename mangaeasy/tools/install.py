@@ -284,7 +284,7 @@ def install_tool(
         raise InstallError(f"unknown tool '{key}'. Known: {', '.join(TOOLS)}")
     spec = TOOLS[key]
     target = Path(dest).expanduser().resolve() if dest else (tools_home() / spec.key)
-    target.parent.mkdir(parents=True, exist_ok=True)
+    target.mkdir(parents=True, exist_ok=True)
 
     gpu_mode = gpu if gpu in ("cuda", "cpu") else default_torch_build()
     log(f"=== Installing {spec.title} -> {target} ===")
