@@ -21,10 +21,9 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-
-from mangaeasy import runtime
 from pathlib import Path
 
+from mangaeasy import runtime
 from mangaeasy.brand import CLI_NAME
 from mangaeasy.runtime import cli_command
 from mangaeasy.utils import emit_result, remove_tree
@@ -64,6 +63,15 @@ def record_fixture_reviews(project_root: Path) -> None:
     its panels *are* its source pages.
     """
     from mangaeasy.reviews import record_crop_review, record_narration_review
+    from mangaeasy.video_pipeline.panel_reading_sheets import render_item_sheets
+
+    item_dir = project_root / "01"
+    sheets_dir1 = item_dir.parent.parent / "work" / "panel_reading" / project_root.name / item_dir.name
+    render_item_sheets(item_dir, sheets_dir1)
+
+    sheets_dir2 = project_root / "work" / "panel_reading" / item_dir.name
+    if sheets_dir2 != sheets_dir1:
+        render_item_sheets(item_dir, sheets_dir2)
 
     record_crop_review(project_root, ["01"], reviewer=SMOKE_REVIEWER, source_subdir="panels")
     record_narration_review(project_root, ["01"], reviewer=SMOKE_REVIEWER)

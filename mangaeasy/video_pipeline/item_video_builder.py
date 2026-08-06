@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+from mangaeasy.layout import project_dir
 from mangaeasy.utils import archive_before_overwrite
 from mangaeasy.video_pipeline.blur_background import (
     BlurBackgroundOptions,
@@ -63,8 +64,12 @@ class VideoBuildConfig:
 def item_output_dir(config: VideoBuildConfig) -> Path:
     if config.output_dir is not None:
         return config.output_dir.resolve()
+    p_root = config.project_root.resolve()
+    o_root = config.output_root.resolve()
+    if o_root == p_root / "output" or o_root.is_relative_to(p_root):
+        return (o_root / "items").resolve()
     return (
-        config.output_root.resolve()
+        o_root
         / project_name(config.project_root, config.project_name_override)
         / "items"
     ).resolve()

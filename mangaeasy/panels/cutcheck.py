@@ -159,7 +159,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection
+    from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, DEFAULT_WORK_DIR
 
     args = parse_args()
     project_root = args.project_root.resolve()
@@ -168,8 +168,9 @@ def main() -> int:
         print(f"[FATAL] No item folders found under {project_root}")
         return 1
 
-    verify_dir = (args.verify_root or args.work_dir / "webtoon_verify" / project_root.name).resolve()
-    out_dir = (args.output_root or args.work_dir / "cutcheck" / project_root.name).resolve()
+    effective_work = (project_root / "work") if args.work_dir.resolve() == DEFAULT_WORK_DIR.resolve() else args.work_dir
+    verify_dir = (args.verify_root or effective_work / "webtoon_verify").resolve()
+    out_dir = (args.output_root or effective_work / "cutcheck").resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     for stale in out_dir.glob("sheet_*.jpg"):
         stale.unlink(missing_ok=True)

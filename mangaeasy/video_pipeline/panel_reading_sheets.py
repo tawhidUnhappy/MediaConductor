@@ -132,7 +132,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection
+    from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, DEFAULT_WORK_DIR
 
     args = parse_args()
     project_root = args.project_root.resolve()
@@ -140,7 +140,8 @@ def main() -> int:
     if not selected:
         print(f"[FATAL] No item folders found under {project_root}")
         return 1
-    out_root = (args.output_root or args.work_dir / "panel_reading" / project_root.name).resolve()
+    effective_work = (project_root / "work") if args.work_dir.resolve() == DEFAULT_WORK_DIR.resolve() else args.work_dir
+    out_root = (args.output_root or effective_work / "panel_reading").resolve()
     reports = []
     all_sheets: list[str] = []
     for index, item_dir in enumerate(selected, start=1):

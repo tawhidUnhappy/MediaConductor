@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mangaeasy.audio.narration_safety import narration_quality_findings
+from mangaeasy.layout import project_dir
 from mangaeasy.video_pipeline.common import IMAGE_EXTENSIONS  # noqa: F401  (single home: common.py)
 from mangaeasy.video_pipeline.common import project_name
 from mangaeasy.video_pipeline.ffmpeg_tools import probe_duration
@@ -71,7 +72,11 @@ def validate_calm_narration(entries: list[dict], source: Path) -> None:
 
 
 def item_audio_dir(audio_root: Path, project_root: Path, project_name_override: str | None, item_dir: Path) -> Path:
-    return audio_root.resolve() / project_name(project_root, project_name_override) / item_dir.name
+    p_root = project_dir(project_root).resolve()
+    a_root = audio_root.resolve()
+    if a_root == p_root / "audio" or a_root.is_relative_to(p_root):
+        return a_root / item_dir.name
+    return a_root / project_name(project_root, project_name_override) / item_dir.name
 
 
 def item_narration_dir(audio_root: Path, project_root: Path, project_name_override: str | None) -> Path:

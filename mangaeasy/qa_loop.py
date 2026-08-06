@@ -117,7 +117,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             f"--set {finding.beat} \"<rewritten line>\" --prune-audio")
 
     # 4. Audio coverage
-    audio_dir = audio_root / name / item
+    audio_dir = audio_root / name / item if not audio_root.is_relative_to(project_root.resolve()) and audio_root != project_root.resolve() / "audio" else audio_root / item
     missing, corrupt = [], []
     for entry in entries:
         image = entry.get("image")
@@ -144,8 +144,8 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             _stage_fix("render", root_arg, item))
 
     # 6. Vision-required review artifacts
-    page_verify = work_dir / "page_verify" / name / item
-    webtoon_verify = work_dir / "webtoon_verify" / name
+    page_verify = (project_root / "work" / "page_verify" / item) if (project_root / "work" / "page_verify").is_dir() else (work_dir / "page_verify" / name / item if (work_dir / "page_verify" / name / item).is_dir() else work_dir / "page_verify" / item)
+    webtoon_verify = (project_root / "work" / "webtoon_verify") if (project_root / "work" / "webtoon_verify").is_dir() else (work_dir / "webtoon_verify" / name if (work_dir / "webtoon_verify" / name).is_dir() else work_dir / "webtoon_verify")
     crop_evidence: list[Path] = []
     if page_verify.is_dir():
         crop_evidence.extend(page_verify.glob(f"{item}_page_*.png"))
@@ -153,7 +153,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
     if webtoon_verify.is_dir():
         crop_evidence.extend(webtoon_verify.glob(f"{item}_strip_*.png"))
         crop_evidence.extend(webtoon_verify.glob(f"{item}_sheet_*.png"))
-    cutcheck = work_dir / "cutcheck" / name
+    cutcheck = (project_root / "work" / "cutcheck") if (project_root / "work" / "cutcheck").is_dir() else (work_dir / "cutcheck" / name if (work_dir / "cutcheck" / name).is_dir() else work_dir / "cutcheck")
     if cutcheck.is_dir():
         crop_evidence.extend(cutcheck.glob(f"{item}_*.jpg"))
     crop_evidence = sorted({p.resolve() for p in crop_evidence})
@@ -178,7 +178,7 @@ def qa_item(item_dir: Path, name: str, project_root: Path,
             f"Run the correct splitter for {root_arg}/{item} to generate overlays",
         )
 
-    narration_review = work_dir / "narration_review" / name / item
+    narration_review = (project_root / "work" / "narration_review" / item) if (project_root / "work" / "narration_review").is_dir() else (work_dir / "narration_review" / name / item if (work_dir / "narration_review" / name / item).is_dir() else work_dir / "narration_review" / item)
     narration_sheets = (
         sorted(p.resolve() for p in narration_review.glob("review_*.jpg"))
         if narration_review.is_dir() else []

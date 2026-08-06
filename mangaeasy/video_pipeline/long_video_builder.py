@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from mangaeasy.defaults import default_music_volume_db
+from mangaeasy.layout import project_dir
 from mangaeasy.utils import archive_before_overwrite
 from mangaeasy.video_pipeline.check_items import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, files_by_stem, load_narration
 from mangaeasy.video_pipeline.common import (
@@ -71,15 +72,27 @@ def default_output_name(name: str) -> str:
 
 def output_path(config: LongVideoConfig) -> Path:
     name = project_name(config.project_root, config.project_name_override)
-    return (config.output or (config.output_root / name / default_output_name(name))).resolve()
+    if config.output:
+        return config.output.resolve()
+    p_root = config.project_root.resolve()
+    o_root = config.output_root.resolve()
+    if o_root == p_root / "output" or o_root.is_relative_to(p_root):
+        return (o_root / default_output_name(name)).resolve()
+    return (o_root / name / default_output_name(name)).resolve()
 
 
 def input_dir(config: LongVideoConfig) -> Path:
     name = project_name(config.project_root, config.project_name_override)
     if config.input_dir is not None:
         return config.input_dir.resolve()
-    current = (config.output_root / name / "items").resolve()
-    legacy = (config.output_root / name / "chapters").resolve()
+    p_root = config.project_root.resolve()
+    o_root = config.output_root.resolve()
+    if o_root == p_root / "output" or o_root.is_relative_to(p_root):
+        current = (o_root / "items").resolve()
+        legacy = (o_root / "chapters").resolve()
+        return legacy if legacy.exists() and not current.exists() else current
+    current = (o_root / name / "items").resolve()
+    legacy = (o_root / name / "chapters").resolve()
     return legacy if legacy.exists() and not current.exists() else current
 
 
@@ -265,7 +278,8 @@ def validate_items_strict(config: LongVideoConfig, chapters: dict[str, Path], na
             problems.append(f"{label}: missing panel image(s) for {', '.join(missing_panels[:10])}")
 
         if audio_root is not None:
-            audios = files_by_stem(audio_root / project / item_dir.name, AUDIO_EXTENSIONS)
+            a_dir = audio_root / item_dir.name if (audio_root == config.project_root.resolve() / "audio" or audio_root.is_relative_to(config.project_root.resolve())) else audio_root / project / item_dir.name
+            audios = files_by_stem(a_dir, AUDIO_EXTENSIONS)
             missing_audio = sorted(set(narration_stems) - set(audios))
             if missing_audio:
                 problems.append(f"{label}: missing audio for {', '.join(missing_audio[:10])}")

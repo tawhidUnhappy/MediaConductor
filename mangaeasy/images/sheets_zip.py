@@ -27,16 +27,25 @@ def pack_sheets_to_zips(
     output_directory = (out_dir or zips_root(project_root)).resolve()
     output_directory.mkdir(parents=True, exist_ok=True)
 
+    from mangaeasy.layout import data_root
+    global_data_root = data_root().resolve()
+
     search_dirs = [
         project_root / "review",
         project_root / "work",
+        global_data_root / "work" / "panel_reading" / project_root.name,
+        global_data_root / "work" / "narration_review" / project_root.name,
+        global_data_root / "work" / "webtoon_verify" / project_root.name,
+        global_data_root / "work" / "page_verify" / project_root.name,
+        global_data_root / "work" / "cutcheck" / project_root.name,
+        global_data_root / "review" / project_root.name,
     ]
 
     files: list[Path] = []
     for s_dir in search_dirs:
         if s_dir.is_dir():
             for p in sorted(s_dir.rglob("*")):
-                if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS:
+                if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS and p not in files:
                     files.append(p)
 
     if not files:
@@ -60,7 +69,10 @@ def pack_sheets_to_zips(
             current_zip = zipfile.ZipFile(current_zip_path, "w", compression=zipfile.ZIP_STORED)
             current_zip_bytes = 0
 
-        arcname = file_path.relative_to(project_root).as_posix()
+        try:
+            arcname = file_path.relative_to(project_root).as_posix()
+        except ValueError:
+            arcname = file_path.name
         current_zip.write(file_path, arcname=arcname)
         current_zip_bytes += file_size
 

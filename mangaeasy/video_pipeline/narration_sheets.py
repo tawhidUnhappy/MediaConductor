@@ -151,7 +151,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection
+    from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, DEFAULT_WORK_DIR
     from mangaeasy.video_pipeline.item_assets import load_narration
 
     args = parse_args()
@@ -160,7 +160,8 @@ def main() -> int:
     if not selected:
         print(f"[FATAL] No item folders found under {project_root}")
         return 1
-    out_root = (args.output_root or args.work_dir / "narration_review" / project_root.name).resolve()
+    effective_work = (project_root / "work") if args.work_dir.resolve() == DEFAULT_WORK_DIR.resolve() else args.work_dir
+    out_root = (args.output_root or effective_work / "narration_review").resolve()
 
     only = None
     if args.only_images:

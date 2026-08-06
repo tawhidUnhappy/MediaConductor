@@ -30,7 +30,7 @@ Suspect pages (always eyeball these against the overlay before narration):
   * a page whose automatic single box covers most of the sheet -> no
     production crop until deliberate manual boxes are supplied
 
-Every crop must fully contain its panel — never a partial edge, never the
+Every crop must fully contain its panel — never a partial edge, and never the
 whole page standing in for a panel that has its own border. A box far taller
 than it is wide (>= TALL_PANEL_ASPECT_RATIO, reported as `tall_panel_boxes`)
 usually swallowed gutter whitespace above/below the art instead of hugging
@@ -429,7 +429,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection
+    from mangaeasy.video_pipeline.common import item_dirs, merge_item_selection, DEFAULT_WORK_DIR
 
     args = parse_args(argv)
     if args.respect_claims:
@@ -453,10 +453,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.overrides and args.overrides.exists():
         overrides = json.loads(args.overrides.read_text(encoding="utf-8"))
 
+    effective_work = (project_root / "work") if args.work_dir.resolve() == DEFAULT_WORK_DIR.resolve() else args.work_dir
     verify_dir = (
         args.verify_root
         if args.verify_root
-        else args.work_dir / "page_verify" / project_root.name
+        else effective_work / "page_verify"
     ).resolve()
     verify_dir.mkdir(parents=True, exist_ok=True)
 

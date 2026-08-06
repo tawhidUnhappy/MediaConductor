@@ -126,45 +126,31 @@ def project_dir(project_root: Path | None = None) -> Path:
 
 
 def audio_root(project_root: Path | None = None) -> Path:
-    if project_root is not None:
-        return project_dir(project_root) / "audio"
-    return data_root() / "audio"
+    return project_dir(project_root) / "audio"
 
 
 def faded_audio_root(project_root: Path | None = None) -> Path:
-    if project_root is not None:
-        return project_dir(project_root) / "audio_faded"
-    return data_root() / "audio_faded"
+    return project_dir(project_root) / "audio_faded"
 
 
 def output_root(project_root: Path | None = None) -> Path:
-    if project_root is not None:
-        return project_dir(project_root) / "output"
-    return data_root() / "output"
+    return project_dir(project_root) / "output"
 
 
 def review_root(project_root: Path | None = None) -> Path:
-    if project_root is not None:
-        return project_dir(project_root) / "review"
-    return data_root() / "review"
+    return project_dir(project_root) / "review"
 
 
 def work_root(project_root: Path | None = None) -> Path:
-    if project_root is not None:
-        return project_dir(project_root) / "work"
-    return data_root() / "work"
+    return project_dir(project_root) / "work"
 
 
 def zips_root(project_root: Path | None = None) -> Path:
-    if project_root is not None:
-        return project_dir(project_root) / "zips"
-    return data_root() / "zips"
+    return project_dir(project_root) / "zips"
 
 
 def subtitles_root(project_root: Path | None = None) -> Path:
-    if project_root is not None:
-        return project_dir(project_root) / "subtitles"
-    return data_root() / "subtitles"
+    return project_dir(project_root) / "subtitles"
 
 
 def project_memory_path(project_root: Path) -> Path:
