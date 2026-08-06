@@ -31,13 +31,6 @@ RUNTIME_DIRNAME = "runtime"
 # Subfolders of data/
 DATA_SUBDIRS: tuple[tuple[str, str], ...] = (
     ("library", "downloaded chapters, cropped panels, narration, and review records"),
-    ("audio", "raw TTS takes with their provenance sidecars"),
-    ("audio_faded", "render-safe narration derivatives (8ms edge fades)"),
-    ("output", "item videos, the joined full video, and quality reports"),
-    ("review", "review sheets and evidence rendered for approval"),
-    ("zips", "packed sheet and panel context ZIP files (<= 1 GB each)"),
-    ("subtitles", "generated ASS and SRT subtitle files"),
-    ("work", "scratch space and background job logs — safe to delete any time"),
 )
 
 # Subfolders of data/library/<project>/
@@ -126,31 +119,45 @@ def project_dir(project_root: Path | None = None) -> Path:
 
 
 def audio_root(project_root: Path | None = None) -> Path:
-    return project_dir(project_root) / "audio"
+    if project_root is not None:
+        return project_dir(project_root) / "audio"
+    return runtime_root() / "audio"
 
 
 def faded_audio_root(project_root: Path | None = None) -> Path:
-    return project_dir(project_root) / "audio_faded"
+    if project_root is not None:
+        return project_dir(project_root) / "audio_faded"
+    return runtime_root() / "audio_faded"
 
 
 def output_root(project_root: Path | None = None) -> Path:
-    return project_dir(project_root) / "output"
+    if project_root is not None:
+        return project_dir(project_root) / "output"
+    return runtime_root() / "output"
 
 
 def review_root(project_root: Path | None = None) -> Path:
-    return project_dir(project_root) / "review"
+    if project_root is not None:
+        return project_dir(project_root) / "review"
+    return runtime_root() / "review"
 
 
 def work_root(project_root: Path | None = None) -> Path:
-    return project_dir(project_root) / "work"
+    if project_root is not None:
+        return project_dir(project_root) / "work"
+    return runtime_root() / "work"
 
 
 def zips_root(project_root: Path | None = None) -> Path:
-    return project_dir(project_root) / "zips"
+    if project_root is not None:
+        return project_dir(project_root) / "zips"
+    return runtime_root() / "zips"
 
 
 def subtitles_root(project_root: Path | None = None) -> Path:
-    return project_dir(project_root) / "subtitles"
+    if project_root is not None:
+        return project_dir(project_root) / "subtitles"
+    return runtime_root() / "subtitles"
 
 
 def project_memory_path(project_root: Path) -> Path:
@@ -206,6 +213,7 @@ def ensure_data_root(write_readme: bool = True, project_root: Path | None = None
         return p_dir
 
     root = data_root()
+    root.mkdir(parents=True, exist_ok=True)
     for name, _ in DATA_SUBDIRS:
         (root / name).mkdir(parents=True, exist_ok=True)
     if write_readme:

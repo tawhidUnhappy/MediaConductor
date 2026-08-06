@@ -22,7 +22,7 @@ the final write, `job-status` can report a truthful exit code after the fact;
 if the supervisor pid is gone without a final write (machine slept, kill -9),
 the job is reported `orphaned` rather than forever "running".
 
-Jobs dir: `<work-dir>/jobs` (MANGAEASY_JOBS_DIR overrides). State files are
+Jobs dir: `<state-root>/jobs` (MANGAEASY_JOBS_DIR overrides). State files are
 small JSON; logs are plain text. Both are safe to delete when a job is done.
 
 Only the typed form is accepted. Raw positional argv used to be passed through
@@ -53,7 +53,6 @@ from uuid import uuid4
 
 from mangaeasy.brand import CLI_NAME, PRODUCT_NAME, PROGRESS_MARKERS, RESULT_MARKERS
 from mangaeasy.runtime import cli_command
-from mangaeasy.video_pipeline.common import DEFAULT_WORK_DIR
 
 # Commands a job must not wrap: the server (never terminates), and the job
 # commands themselves (recursion).
@@ -70,7 +69,8 @@ def jobs_dir() -> Path:
     configured = os.environ.get("MANGAEASY_JOBS_DIR")
     if configured:
         return Path(configured)
-    return DEFAULT_WORK_DIR / "jobs"
+    from mangaeasy.layout import state_root
+    return state_root() / "jobs"
 
 
 def _now_iso() -> str:
@@ -256,7 +256,7 @@ def start_main() -> int:
     parser.add_argument("--arguments-json", default="{}", metavar="OBJECT",
                         help="JSON object matching --tool's machine schema (default: {}).")
     parser.add_argument("--jobs-dir", type=Path, default=None,
-                        help="Where job state/log files live (default: <work>/jobs).")
+                        help="Where job state/log files live (default: <runtime>/state/jobs).")
     args = parser.parse_args()
 
     from mangaeasy.cli import COMMANDS  # late import: cli imports nothing heavy
