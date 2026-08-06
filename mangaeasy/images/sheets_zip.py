@@ -1,9 +1,4 @@
-"""mangaeasy.images.sheets_zip — pack generated reading/review sheets into split ZIPs (<= 1 GB each).
-
-Packs generated contact sheets and panel reading sheets from <project_root>/review/
-and <project_root>/work/ into organized ZIP files inside <project_root>/zips/.
-Strictly guarantees that no individual ZIP file exceeds 1 GB (1,073,741,824 bytes).
-"""
+"""mangaeasy.images.sheets_zip — pack generated reading/review sheets into split ZIPs (<= 1 GB each)."""
 
 from __future__ import annotations
 
@@ -17,7 +12,7 @@ from mangaeasy.brand import CLI_NAME
 from mangaeasy.layout import ensure_data_root, zips_root
 from mangaeasy.utils import emit_result
 
-MAX_ZIP_BYTES = 1000 * 1024 * 1024  # 1 GB in bytes
+MAX_ZIP_BYTES = 1000 * 1024 * 1024  # 1 GB
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
@@ -28,7 +23,7 @@ def pack_sheets_to_zips(
     log: Callable[[str], None] = print,
 ) -> list[Path]:
     project_root = project_root.resolve()
-    ensure_data_root(project_root)
+    ensure_data_root(project_root=project_root)
     output_directory = (out_dir or zips_root(project_root)).resolve()
     output_directory.mkdir(parents=True, exist_ok=True)
 
@@ -45,7 +40,7 @@ def pack_sheets_to_zips(
                     files.append(p)
 
     if not files:
-        log(f"[sheets-zip] No generated sheet images found in review/ or work/ for {project_root.name}.")
+        log(f"[sheets-zip] No generated sheet images found for {project_root.name}.")
         return []
 
     created_zips: list[Path] = []
@@ -84,9 +79,9 @@ def main(argv: list[str] | None = None) -> int:
         description="Pack generated reading and review sheets into split ZIP files <= 1 GB stored in <project_root>/zips/.",
     )
     parser.add_argument("--project-root", type=Path, required=True, help="Path to manga project directory.")
-    parser.add_argument("--max-size-mb", type=int, default=1000, help="Maximum ZIP size in MB (default: 1000 MB = ~1 GB).")
-    parser.add_argument("--out-dir", type=Path, default=None, help="Output directory (default: <project_root>/zips/).")
-    parser.add_argument("--json", action="store_true", dest="as_json", help="Emit JSON output on completion.")
+    parser.add_argument("--max-size-mb", type=int, default=1000, help="Maximum ZIP size in MB (default: 1000 MB).")
+    parser.add_argument("--out-dir", type=Path, default=None, help="Output directory.")
+    parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
 
     max_bytes = args.max_size_mb * 1024 * 1024

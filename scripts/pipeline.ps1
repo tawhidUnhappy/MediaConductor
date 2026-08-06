@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ProjectRoot = "data/library/$ProjectName"
 
-Write-Host "============================================================" -ForegroundColor Cipher
+Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host " Starting mangaEasy Pipeline for: $ProjectName" -ForegroundColor Cyan
 Write-Host " Project Root: $ProjectRoot" -ForegroundColor Cyan
 Write-Host "============================================================"
@@ -27,7 +27,7 @@ Write-Host "`n--- Step 3: Cropping Panels ---" -ForegroundColor Yellow
 uv run mangaeasy webtoon-split --project-root "$ProjectRoot" --item-range "$Chapters"
 
 Write-Host "`n--- Step 4: Generating Reading Sheets ---" -ForegroundColor Yellow
-uv run mangaeasy panel-reading-sheets --project-root "$ProjectRoot" --item-range "$CHAPTERS"
+uv run mangaeasy panel-reading-sheets --project-root "$ProjectRoot" --item-range "$Chapters"
 
 Write-Host "`n--- Step 5: Packing Sheets into ZIPs (<= 1 GB each) ---" -ForegroundColor Yellow
 uv run mangaeasy sheets-pack --project-root "$ProjectRoot"

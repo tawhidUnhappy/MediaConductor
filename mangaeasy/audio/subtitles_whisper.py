@@ -1,8 +1,4 @@
-"""mangaeasy.audio.subtitles_whisper — Subtitle generation via Whisper large-v3-turbo.
-
-Runs faster-whisper with `deepdml/faster-whisper-large-v3-turbo-ct2` (or HuggingFace repo ID)
-to generate word-level timestamped `.ass` and `.srt` subtitle files in `<project_root>/subtitles/`.
-"""
+"""mangaeasy.audio.subtitles_whisper — Subtitle generation via Whisper large-v3-turbo."""
 
 from __future__ import annotations
 
@@ -20,26 +16,6 @@ from mangaeasy.utils import emit_result
 MODEL_HF_REPO = "deepdml/faster-whisper-large-v3-turbo-ct2"
 
 
-def _fmt_ass_time(seconds: float) -> str:
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = int(seconds % 60)
-    cs = int(round((seconds % 1) * 100))
-    if cs >= 100:
-        cs = 99
-    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
-
-
-def _fmt_srt_time(seconds: float) -> str:
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = int(seconds % 60)
-    ms = int(round((seconds % 1) * 1000))
-    if ms >= 1000:
-        ms = 999
-    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
-
-
 def generate_subtitles_in_env(
     audio_video_file: Path,
     out_ass: Path,
@@ -49,15 +25,13 @@ def generate_subtitles_in_env(
 ) -> tuple[Path, Path]:
     tool_dir = resolve_tool_dir("whisper-turbo", required=False)
     if tool_dir is None:
-        raise RuntimeError("whisper-turbo tool environment not installed. Run `mangaeasy install-tool whisper-turbo` first.")
+        raise RuntimeError("whisper-turbo environment not installed. Run `mangaeasy install-tool whisper-turbo` first.")
 
     out_ass.parent.mkdir(parents=True, exist_ok=True)
     worker_script = Path(__file__).resolve().parent / "_whisper_worker.py"
     
-    # Write worker inline script if missing
     if not worker_script.is_file():
-        worker_code = """
-import sys, json
+        worker_code = """import sys
 from pathlib import Path
 from faster_whisper import WhisperModel
 
@@ -73,7 +47,6 @@ model = WhisperModel(model_repo, device=device, compute_type=compute_type)
 segments, info = model.transcribe(str(audio_path), beam_size=5, word_timestamps=True)
 seg_list = list(segments)
 
-# Write ASS
 ass_header = (
     "[Script Info]\\nScriptType: v4.00+\\nPlayResX: 1920\\nPlayResY: 1080\\n\\n"
     "[V4+ Styles]\\n"
@@ -105,7 +78,6 @@ for idx, seg in enumerate(seg_list, 1):
 
 out_ass.write_text("\\n".join(ass_lines) + "\\n", encoding="utf-8")
 out_srt.write_text("\\n".join(srt_lines) + "\\n", encoding="utf-8")
-print(f"Generated subtitles: {out_ass.name}, {out_srt.name}")
 """
         worker_script.write_text(worker_code, encoding="utf-8")
 
@@ -133,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Generate .ass/.srt subtitles using Whisper large-v3-turbo downloaded from HuggingFace.",
     )
     parser.add_argument("--project-root", type=Path, required=True, help="Path to manga project directory.")
-    parser.add_argument("--file", type=Path, default=None, help="Specific audio/video file. Defaults to latest joined video or merged audio.")
+    parser.add_argument("--file", type=Path, default=None, help="Specific audio/video file.")
     parser.add_argument("--model-repo", default=MODEL_HF_REPO, help="HuggingFace model repo ID.")
     parser.add_argument("--device", choices=("auto", "cuda", "cpu"), default="auto")
     parser.add_argument("--json", action="store_true", dest="as_json")
@@ -145,7 +117,6 @@ def main(argv: list[str] | None = None) -> int:
 
     input_file = args.file
     if input_file is None:
-        # Search for joined video or audio
         output_mp4s = list((project_root / "output").glob("*_full*.mp4"))
         if output_mp4s:
             input_file = max(output_mp4s, key=lambda p: p.stat().st_mtime)

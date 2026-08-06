@@ -1,7 +1,6 @@
 """mangaeasy.tools.install — provision external AI tool environments.
 
-Tools download model weights directly from HuggingFace Hub repositories
-instead of Git clones where possible.
+Tools download model weights directly from HuggingFace Hub repositories.
 """
 
 from __future__ import annotations
@@ -331,6 +330,46 @@ def doctor(*, check_updates: bool = False, mode: str | None = None) -> dict:
         "executables": executables,
         "tools": tools,
     }
+
+
+def _configured_media() -> dict:
+    from mangaeasy.config import SYSTEM_CONFIG_FILE
+    from mangaeasy.defaults import default_speaker_wav, default_tts_engine
+
+    speaker = default_speaker_wav()
+    return {
+        "config_file": str(SYSTEM_CONFIG_FILE),
+        "config_file_exists": SYSTEM_CONFIG_FILE.is_file(),
+        "tts_engine": default_tts_engine(),
+        "speaker_wav": str(speaker) if speaker else None,
+        "speaker_wav_exists": bool(speaker and speaker.is_file()),
+    }
+
+
+def doctor_main() -> int:
+    parser = argparse.ArgumentParser(prog=f"{CLI_NAME} doctor")
+    parser.add_argument("--mode", choices=("manga-video",))
+    parser.add_argument("--check-updates", action="store_true")
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    args = parser.parse_args()
+
+    report = doctor(check_updates=args.check_updates, mode=args.mode)
+    if args.as_json:
+        print(json.dumps(report, ensure_ascii=False))
+        return 0
+
+    print(f"{PRODUCT_NAME} doctor\n")
+    print(f"Tools dir: {report['tools_home']}\n")
+    print("Prerequisites:")
+    for exe, where in report["executables"].items():
+        mark = "ok " if where else "MISSING"
+        print(f"  [{mark}] {exe:10s} {where or ''}")
+    print()
+    print("External AI tools:")
+    for key, info in report["tools"].items():
+        status = f"installed ({info['path']})" if info["installed"] else "not installed"
+        print(f"  {key:15s} {status}")
+    return 0
 
 
 def main() -> int:

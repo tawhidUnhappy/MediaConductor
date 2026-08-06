@@ -17,48 +17,19 @@ from mangaeasy.layout import (
     zips_root,
 )
 from mangaeasy.path_safety import validate_portable_segment
+from mangaeasy.utils import LazyArchiveRunDir, archive_into_run
 
 
-def _env_path(namespaced: str, default_fn: Callable[[Path | None], Path], project_root: Path | None = None) -> Path:
+def _env_path(namespaced: str, default_fn: Callable[[], Path]) -> Path:
     value = os.environ.get(namespaced)
-    if value:
-        return Path(value).expanduser().resolve()
-    return default_fn(project_root)
+    return Path(value) if value else default_fn()
 
 
-def default_project_root() -> Path:
-    return library_root()
-
-
-def default_audio_root(project_root: Path | None = None) -> Path:
-    return _env_path("MANGAEASY_AUDIO_ROOT", audio_root, project_root)
-
-
-def default_output_root(project_root: Path | None = None) -> Path:
-    return _env_path("MANGAEASY_OUTPUT_ROOT", output_root, project_root)
-
-
-def default_work_dir(project_root: Path | None = None) -> Path:
-    return _env_path("MANGAEASY_WORK_DIR", work_root, project_root)
-
-
-def default_review_root(project_root: Path | None = None) -> Path:
-    return _env_path("MANGAEASY_REVIEW_ROOT", review_root, project_root)
-
-
-def default_zips_root(project_root: Path | None = None) -> Path:
-    return _env_path("MANGAEASY_ZIPS_ROOT", zips_root, project_root)
-
-
-def default_subtitles_root(project_root: Path | None = None) -> Path:
-    return _env_path("MANGAEASY_SUBTITLES_ROOT", subtitles_root, project_root)
-
-
-DEFAULT_PROJECT_ROOT = library_root()
-DEFAULT_AUDIO_ROOT = audio_root()
-DEFAULT_OUTPUT_ROOT = output_root()
-DEFAULT_WORK_DIR = work_root()
-DEFAULT_REVIEW_ROOT = review_root()
+DEFAULT_PROJECT_ROOT = _env_path("MANGAEASY_ITEMS_ROOT", library_root)
+DEFAULT_AUDIO_ROOT = _env_path("MANGAEASY_AUDIO_ROOT", audio_root)
+DEFAULT_OUTPUT_ROOT = _env_path("MANGAEASY_OUTPUT_ROOT", output_root)
+DEFAULT_WORK_DIR = _env_path("MANGAEASY_WORK_DIR", work_root)
+DEFAULT_REVIEW_ROOT = _env_path("MANGAEASY_REVIEW_ROOT", review_root)
 DEFAULT_KOKORO_ROOT = Path(os.environ.get("KOKORO_ROOT", "kokoro-82m"))
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -113,6 +84,10 @@ def item_value(value: str) -> float:
     return float(match.group(0))
 
 
+def _format_item(number: int, width: int) -> str:
+    return f"{number:0{width}d}"
+
+
 ITEM_RANGE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:-|\.\.|:)\s*(\d+(?:\.\d+)?)")
 
 
@@ -141,13 +116,13 @@ def expand_item_tokens(
                     start = int(float(range_match.group(1)))
                     end = int(float(range_match.group(2)))
                     step = 1 if end >= start else -1
-                    expanded.extend(f"{number:0{width}d}" for number in range(start, end + step, step))
+                    expanded.extend(_format_item(number, width) for number in range(start, end + step, step))
                 else:
                     expanded.append(token)
                 continue
 
             if token.isdigit():
-                expanded.append(f"{int(token):0{width}d}")
+                expanded.append(_format_item(int(token), width))
             else:
                 expanded.append(token)
 
@@ -229,6 +204,50 @@ def chunk_list(items: list, shards: int) -> list[list]:
         return [items]
     size = -(-len(items) // shards)
     return [items[i:i + size] for i in range(0, len(items), size)]
+
+
+def _prune_recent_audio_in_sequence(
+    ordered_paths: list[Path], archive_run_dir: LazyArchiveRunDir, lookback: int
+) -> list[Path]:
+    if not ordered_paths:
+        return []
+    current_idx = next((i for i, path in enumerate(ordered_paths) if not path.exists()), len(ordered_paths) - 1)
+    start_idx = max(0, current_idx - lookback)
+    removed = [path for path in ordered_paths[start_idx:current_idx + 1] if path.exists()]
+    for path in removed:
+        archive_into_run(path, archive_run_dir.dir, subdir=path.parent.name)
+    return removed
+
+
+def prune_recent_audio_for_resume(
+    ordered_paths: list[Path],
+    archive_run_dir: LazyArchiveRunDir,
+    lookback: int = 5,
+    shards: int = 1,
+) -> list[Path]:
+    removed: list[Path] = []
+    for chunk in chunk_list(ordered_paths, shards):
+        removed.extend(_prune_recent_audio_in_sequence(chunk, archive_run_dir, lookback))
+    return removed
+
+
+def find_latest_long_video(output_root: Path, name: str) -> Path | None:
+    """Most recently created plain-join long video for a project."""
+    project_dir = output_root.resolve()
+    if (project_dir / name).is_dir():
+        project_dir = project_dir / name
+    if not project_dir.is_dir():
+        return None
+    candidates = [
+        path for path in project_dir.glob(f"{name}_full*.mp4")
+        if path.is_file() and "_bgm_" not in path.name
+        and ".before_normalize" not in path.name
+    ]
+    if not candidates:
+        return None
+    timestamped = [p for p in candidates if re.fullmatch(rf"{re.escape(name)}_full_[\d-]+\.mp4", p.name)]
+    pool = timestamped or candidates
+    return max(pool, key=lambda path: path.stat().st_mtime)
 
 
 def item_dirs(root: Path, selected: list[str] | None = None) -> list[Path]:
